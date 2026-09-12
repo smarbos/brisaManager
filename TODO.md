@@ -36,6 +36,7 @@ High-level backlog of everything requested so far. Each section will be broken d
   - [ ] Admin "intranet" app (internal reservation management)
   - [ ] Public-facing app (guest forms: confirmation, contract acceptance, payment info) — kept separate so guests never access the admin/intranet site
 - [ ] Use labrisa.com.ar domain with subdomains for each app (e.g. admin subdomain + public/guest-facing subdomain)
+- [ ] Guest-facing app's look and feel should match labrisa.com.ar's existing design (colors, typography, general style) so guests feel it's an integrated part of the same site, not a disconnected tool. Admin/intranet app has no such constraint — internal-only, functional design is fine.
 
 ## Planning order (proposed)
 1. Core reservation management + multi-channel source tracking + base infra skeleton (Docker, two-app structure, subdomain routing)
