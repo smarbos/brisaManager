@@ -49,5 +49,16 @@ services:
     depends_on:
       - api
 
+  guest-web:
+    build:
+      context: ./guest-web
+      target: dev
+    restart: unless-stopped
+    ports:
+      - "${GUEST_WEB_PORT}:5174"
+    volumes:
+      - ./guest-web:/app
+      - /app/node_modules
+
 volumes:
   postgres_data:
