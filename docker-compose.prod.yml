@@ -26,7 +26,7 @@ services:
       target: prod
     restart: unless-stopped
     env_file: .env
-    ports: []
+    ports: !reset []
     labels:
       - traefik.enable=true
       - traefik.http.routers.api.rule=Host(`${API_DOMAIN}`)
@@ -39,7 +39,7 @@ services:
       context: ./admin-web
       target: prod
     restart: unless-stopped
-    ports: []
+    ports: !reset []
     labels:
       - traefik.enable=true
       - traefik.http.routers.admin-web.rule=Host(`${ADMIN_DOMAIN}`)
@@ -52,7 +52,7 @@ services:
       context: ./guest-web
       target: prod
     restart: unless-stopped
-    ports: []
+    ports: !reset []
     labels:
       - traefik.enable=true
       - traefik.http.routers.guest-web.rule=Host(`${GUEST_DOMAIN}`)
