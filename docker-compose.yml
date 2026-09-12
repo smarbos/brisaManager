@@ -33,5 +33,21 @@ services:
       postgres:
         condition: service_healthy
 
+  admin-web:
+    build:
+      context: ./admin-web
+      target: dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
+    ports:
+      - "${ADMIN_WEB_PORT}:5173"
+    volumes:
+      - ./admin-web:/app
+      - /app/node_modules
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
