@@ -2,10 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { LoginPage } from './auth/LoginPage';
 import { ProtectedRoute } from './auth/ProtectedRoute';
-
-function HomePlaceholder() {
-  return <p>Logged in.</p>;
-}
+import { ReservationListPage } from './reservations/ReservationListPage';
 
 export function App() {
   return (
@@ -14,7 +11,7 @@ export function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<HomePlaceholder />} />
+            <Route path="/" element={<ReservationListPage />} />
           </Route>
         </Routes>
       </AuthProvider>
