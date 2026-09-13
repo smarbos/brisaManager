@@ -40,6 +40,11 @@ High-level backlog of everything requested so far. Each section will be broken d
 - [ ] Use labrisa.com.ar domain with subdomains for each app (e.g. admin subdomain + public/guest-facing subdomain)
 - [ ] Guest-facing app's look and feel should match labrisa.com.ar's existing design (colors, typography, general style) so guests feel it's an integrated part of the same site, not a disconnected tool. Admin/intranet app has no such constraint — internal-only, functional design is fine.
 
+## 7. Staff notifications via WhatsApp (Twilio)
+- [ ] Send notifications to a staff WhatsApp group chat via the Twilio WhatsApp API (distinct from the existing email-based failure alerts from sub-project 2 — this is for day-to-day operational visibility, not just error alerting)
+- [ ] Example notifications: "New reservation confirmed and paid for [dates]", "Reminder: current guest checks out tomorrow at 3PM", likely also new-reservation-created, deposit-received, deposit-return-due
+- [ ] Needs its own brainstorming pass: which events trigger a message (avoid notification fatigue from over-notifying), Twilio WhatsApp Business setup/approval process, message template requirements (WhatsApp Business API requires pre-approved templates for business-initiated messages), where the group/recipient config lives
+
 ## Planning order (proposed)
 1. Core reservation management + multi-channel source tracking + base infra skeleton (Docker, two-app structure, subdomain routing)
 2. Guest onboarding workflow automation (messaging, deposit, contract, confirmation email)
