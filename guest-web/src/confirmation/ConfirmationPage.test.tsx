@@ -11,6 +11,7 @@ const baseReservation = {
   checkOut: '2026-03-05',
   paxCount: 2,
   totalAmount: 100000,
+  confirmationPaymentAmount: 30000,
   currency: 'ARS',
   datesConfirmedAt: null,
   contractAcceptedAt: null,
@@ -49,6 +50,14 @@ describe('ConfirmationPage', () => {
 
     expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument();
     expect(screen.queryByText(/reservation not found/i)).not.toBeInTheDocument();
+  });
+
+  it('displays the 30% confirmation payment amount', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+
+    renderAt('tok-1');
+
+    expect(await screen.findByText(/30% confirmation payment \(30000 ARS\)/i)).toBeInTheDocument();
   });
 
   it('renders reservation details and confirms dates', async () => {
