@@ -9,10 +9,10 @@ describe('Channel integrations schema', () => {
 
   it('sets and reads the new Settings sync fields', async () => {
     const settings = await prisma.settings.upsert({
-      where: { id: 'schema-test-singleton' },
+      where: { id: 'channel-integrations-schema-test-singleton' },
       update: {},
       create: {
-        id: 'schema-test-singleton',
+        id: 'channel-integrations-schema-test-singleton',
         houseRulesText: 'No parties.',
         paymentInstructions: 'Bank X.',
         bookingIcalUrl: 'https://booking.example/cal.ics',
@@ -25,7 +25,7 @@ describe('Channel integrations schema', () => {
     expect(settings.bookingIcalUrl).toBe('https://booking.example/cal.ics');
     expect(settings.airbnbIcalUrl).toBe('https://airbnb.example/cal.ics');
 
-    await prisma.settings.delete({ where: { id: 'schema-test-singleton' } });
+    await prisma.settings.delete({ where: { id: 'channel-integrations-schema-test-singleton' } });
   });
 
   it('sets and clears missingFromChannelAt on a Reservation', async () => {
