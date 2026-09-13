@@ -4,6 +4,7 @@ export interface GuestReservation {
   checkOut: string;
   paxCount: number;
   totalAmount: number;
+  confirmationPaymentAmount: number;
   currency: string;
   datesConfirmedAt: string | null;
   contractAcceptedAt: string | null;

@@ -132,7 +132,10 @@ export function ConfirmationPage() {
       <section>
         <h3>3. Payment</h3>
         <p style={{ whiteSpace: 'pre-wrap' }}>{reservation.paymentInstructions}</p>
-        <p>30% confirmation payment: {reservation.confirmationPaymentReceivedAt ? 'Received' : 'Pending'}</p>
+        <p>
+          30% confirmation payment ({reservation.confirmationPaymentAmount} {reservation.currency}):{' '}
+          {reservation.confirmationPaymentReceivedAt ? 'Received' : 'Pending'}
+        </p>
         <p>Security deposit: {reservation.depositReceivedAt ? 'Received' : 'Pending'}</p>
       </section>
 
