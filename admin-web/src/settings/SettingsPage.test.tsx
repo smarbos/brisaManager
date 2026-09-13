@@ -22,6 +22,11 @@ describe('SettingsPage', () => {
       lastChannelSyncAt: null,
       lastChannelSyncError: null,
     });
+    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
+      connected: false,
+      lastSyncAt: null,
+      lastSyncError: null,
+    });
 
     render(<SettingsPage />);
 
@@ -42,6 +47,11 @@ describe('SettingsPage', () => {
 
   it('shows an alert when loading settings fails', async () => {
     vi.spyOn(settingsApi, 'getSettings').mockRejectedValue(new Error('network error'));
+    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
+      connected: false,
+      lastSyncAt: null,
+      lastSyncError: null,
+    });
 
     render(<SettingsPage />);
 
@@ -58,6 +68,11 @@ describe('SettingsPage', () => {
       lastChannelSyncError: null,
     });
     vi.spyOn(settingsApi, 'updateSettings').mockRejectedValue(new Error('network error'));
+    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
+      connected: false,
+      lastSyncAt: null,
+      lastSyncError: null,
+    });
 
     render(<SettingsPage />);
 
@@ -87,6 +102,11 @@ describe('SettingsPage', () => {
         lastChannelSyncError: null,
       });
     const syncSpy = vi.spyOn(settingsApi, 'runChannelSync').mockResolvedValue({ triggeredAt: '2026-09-13T12:00:00.000Z' });
+    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
+      connected: false,
+      lastSyncAt: null,
+      lastSyncError: null,
+    });
 
     render(<SettingsPage />);
 
