@@ -20,6 +20,7 @@ High-level backlog of everything requested so far. Each section will be broken d
 - [ ] Integrate with Booking.com (credentials or API) to fetch/sync reservations
 - [ ] Integrate with Airbnb (credentials or API) to fetch/sync reservations
 - [ ] App acts as central hub aggregating reservations from all sources
+- [ ] **Future idea (not yet designed/approved):** iCal sync only gives blocked date ranges, not guest name/contact/pax/price. Considered alternative: use a headless browser (e.g. Playwright/Puppeteer) logged in with the owner's own Booking.com extranet credentials to scrape the actual reservation details page instead of relying on iCal. Real tradeoffs to weigh before building this: (1) likely violates Booking.com's/Airbnb's Terms of Service — scraping a logged-in account is different from using a public export feed; (2) fragile — breaks silently whenever the extranet's HTML/login flow changes, no warning like an API would give; (3) requires storing the owner's real login credentials (and handling 2FA) in the app, a meaningfully bigger security surface than an iCal URL or an API key. Worth a fresh brainstorming pass on its own before committing to it, weighed against just having staff manually copy guest details from the Booking.com/Airbnb inbox (which the current iCal-based plan already assumes).
 
 ## 4. Google Calendar integration
 - [ ] Sync reservations to a shared Google Calendar
