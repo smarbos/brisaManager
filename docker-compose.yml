@@ -42,7 +42,7 @@ services:
     environment:
       VITE_API_URL: ${VITE_API_URL}
     ports:
-      - "${ADMIN_WEB_PORT}:5173"
+      - "${ADMIN_WEB_PORT}:5180"
     volumes:
       - ./admin-web:/app
       - /app/node_modules
