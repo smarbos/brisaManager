@@ -1,23 +1,41 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { listReservations } from '../api/reservations';
+import { useAuth } from '../auth/AuthContext';
 import { Reservation, ReservationSource, ReservationStatus } from './types';
 
 export function ReservationListPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [source, setSource] = useState<ReservationSource | ''>('');
   const [status, setStatus] = useState<ReservationStatus | ''>('');
+  const [error, setError] = useState<string | null>(null);
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    setError(null);
     listReservations({
       source: source || undefined,
       status: status || undefined,
-    }).then(setReservations);
+    })
+      .then(setReservations)
+      .catch((err) => {
+        console.error('Failed to load reservations', err);
+        setError('Could not load the reservations');
+      });
   }, [source, status]);
+
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
 
   return (
     <div>
       <h1>Reservations</h1>
+      <button type="button" onClick={handleLogout}>
+        Log out
+      </button>
       <Link to="/reservations/new">New reservation</Link>
       <div>
         <label>
@@ -41,6 +59,7 @@ export function ReservationListPage() {
           </select>
         </label>
       </div>
+      {error && <p role="alert">{error}</p>}
       <table>
         <thead>
           <tr>

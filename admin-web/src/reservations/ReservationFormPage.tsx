@@ -27,15 +27,20 @@ export function ReservationFormPage() {
 
   useEffect(() => {
     if (id) {
-      getReservation(id).then((reservation: Reservation) =>
-        setForm({
-          ...emptyForm,
-          ...reservation,
-          checkIn: reservation.checkIn.slice(0, 10),
-          checkOut: reservation.checkOut.slice(0, 10),
-          totalAmount: Number(reservation.totalAmount),
-        }),
-      );
+      getReservation(id)
+        .then((reservation: Reservation) =>
+          setForm({
+            ...emptyForm,
+            ...reservation,
+            checkIn: reservation.checkIn.slice(0, 10),
+            checkOut: reservation.checkOut.slice(0, 10),
+            totalAmount: Number(reservation.totalAmount),
+          }),
+        )
+        .catch((err) => {
+          console.error('Failed to load the reservation', err);
+          setError('Could not load the reservation');
+        });
     }
   }, [id]);
 
