@@ -68,4 +68,25 @@ describe('ReservationListPage', () => {
 
     await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: 'AIRBNB', status: undefined }));
   });
+
+  it('shows a warning badge for a reservation missing from its channel feed', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Jane Doe',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'BOOKING',
+        totalAmount: 100000,
+        currency: 'ARS',
+        status: 'PENDING',
+        missingFromChannelAt: '2026-01-01T00:00:00.000Z',
+      } as never,
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText(/no longer in channel feed/i)).toBeInTheDocument();
+  });
 });

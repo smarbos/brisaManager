@@ -22,6 +22,7 @@ export interface Reservation {
   confirmationPaymentReceivedAt?: string | null;
   depositReceivedAt?: string | null;
   depositReturnedAt?: string | null;
+  missingFromChannelAt?: string | null;
 }
 
 export interface ReservationEvent {
