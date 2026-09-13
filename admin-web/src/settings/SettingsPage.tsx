@@ -1,5 +1,11 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { getSettings, updateSettings, runChannelSync } from '../api/settings';
+import {
+  getGoogleCalendarStatus,
+  getGoogleCalendarConnectUrl,
+  disconnectGoogleCalendar,
+  runGoogleCalendarSync,
+} from '../api/google-calendar';
 
 export function SettingsPage() {
   const [houseRulesText, setHouseRulesText] = useState('');
@@ -13,6 +19,11 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleLastSyncAt, setGoogleLastSyncAt] = useState<string | null>(null);
+  const [googleLastSyncError, setGoogleLastSyncError] = useState<string | null>(null);
+  const [googleActionError, setGoogleActionError] = useState<string | null>(null);
+  const [googleSyncing, setGoogleSyncing] = useState(false);
 
   useEffect(() => {
     getSettings()
@@ -26,6 +37,19 @@ export function SettingsPage() {
       })
       .catch(() => {
         setLoadError('Could not load the settings. Please reload the page.');
+      });
+  }, []);
+
+  useEffect(() => {
+    getGoogleCalendarStatus()
+      .then((status) => {
+        setGoogleConnected(status.connected);
+        setGoogleLastSyncAt(status.lastSyncAt);
+        setGoogleLastSyncError(status.lastSyncError);
+      })
+      .catch(() => {
+        // Status is a secondary concern to the main Settings form — fail silently, the
+        // section below simply won't have anything to show.
       });
   }, []);
 
@@ -60,6 +84,41 @@ export function SettingsPage() {
       setSyncActionError('Could not trigger the sync. Please try again.');
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleConnectGoogleCalendar() {
+    setGoogleActionError(null);
+    try {
+      const { url } = await getGoogleCalendarConnectUrl();
+      window.location.href = url;
+    } catch {
+      setGoogleActionError('Could not start the Google Calendar connection. Please try again.');
+    }
+  }
+
+  async function handleDisconnectGoogleCalendar() {
+    setGoogleActionError(null);
+    try {
+      await disconnectGoogleCalendar();
+      setGoogleConnected(false);
+    } catch {
+      setGoogleActionError('Could not disconnect Google Calendar. Please try again.');
+    }
+  }
+
+  async function handleSyncGoogleCalendarNow() {
+    setGoogleActionError(null);
+    setGoogleSyncing(true);
+    try {
+      await runGoogleCalendarSync();
+      const status = await getGoogleCalendarStatus();
+      setGoogleLastSyncAt(status.lastSyncAt);
+      setGoogleLastSyncError(status.lastSyncError);
+    } catch {
+      setGoogleActionError('Could not trigger the sync. Please try again.');
+    } finally {
+      setGoogleSyncing(false);
     }
   }
 
@@ -99,6 +158,32 @@ export function SettingsPage() {
         <button type="button" onClick={handleSyncNow} disabled={syncing}>
           Sync now
         </button>
+      </section>
+      <section>
+        <h2>Google Calendar</h2>
+        {googleActionError && <p role="alert">{googleActionError}</p>}
+        {googleConnected ? (
+          <>
+            {googleLastSyncError ? (
+              <p role="alert">Last sync failed: {googleLastSyncError}</p>
+            ) : (
+              <p>Connected — last synced: {googleLastSyncAt ? new Date(googleLastSyncAt).toLocaleString() : 'never'}</p>
+            )}
+            <button type="button" onClick={handleSyncGoogleCalendarNow} disabled={googleSyncing}>
+              Sync Google Calendar now
+            </button>
+            <button type="button" onClick={handleDisconnectGoogleCalendar}>
+              Disconnect
+            </button>
+          </>
+        ) : (
+          <>
+            <p>Not connected.</p>
+            <button type="button" onClick={handleConnectGoogleCalendar}>
+              Connect Google Calendar
+            </button>
+          </>
+        )}
       </section>
     </>
   );

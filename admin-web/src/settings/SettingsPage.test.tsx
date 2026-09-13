@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from './SettingsPage';
 import * as settingsApi from '../api/settings';
+import * as googleCalendarApi from '../api/google-calendar';
 
 describe('SettingsPage', () => {
   it('loads existing settings and saves changes', async () => {
@@ -96,5 +97,63 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(syncSpy).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByText('Last synced: never')).not.toBeInTheDocument());
     expect(screen.getByText(/^last synced: (?!never)\S/i)).toBeInTheDocument();
+  });
+
+  it('shows "Connect Google Calendar" when not connected, and starts the OAuth flow', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue({
+      houseRulesText: 'Rules',
+      paymentInstructions: 'Pay',
+      bookingIcalUrl: null,
+      airbnbIcalUrl: null,
+      lastChannelSyncAt: null,
+      lastChannelSyncError: null,
+    });
+    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
+      connected: false,
+      lastSyncAt: null,
+      lastSyncError: null,
+    });
+    const connectUrlSpy = vi
+      .spyOn(googleCalendarApi, 'getGoogleCalendarConnectUrl')
+      .mockResolvedValue({ url: 'https://accounts.google.com/o/oauth2/auth?mock=1' });
+
+    render(<SettingsPage />);
+
+    const connectButton = await screen.findByRole('button', { name: /connect google calendar/i });
+    fireEvent.click(connectButton);
+
+    await waitFor(() => expect(connectUrlSpy).toHaveBeenCalled());
+    // Not asserting on window.location.href itself: jsdom's handling of location reassignment
+    // is version-sensitive and not something this codebase's tests rely on elsewhere. Knowing
+    // the connect-url call happened is enough — the `window.location.href = url` line in the
+    // handler is a trivial one-liner once that call resolves.
+  });
+
+  it('shows connected status with Disconnect and Sync now when connected', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue({
+      houseRulesText: 'Rules',
+      paymentInstructions: 'Pay',
+      bookingIcalUrl: null,
+      airbnbIcalUrl: null,
+      lastChannelSyncAt: null,
+      lastChannelSyncError: null,
+    });
+    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
+      connected: true,
+      lastSyncAt: '2026-09-13T12:00:00.000Z',
+      lastSyncError: null,
+    });
+    const disconnectSpy = vi.spyOn(googleCalendarApi, 'disconnectGoogleCalendar').mockResolvedValue({ disconnected: true });
+    const syncSpy = vi.spyOn(googleCalendarApi, 'runGoogleCalendarSync').mockResolvedValue({ triggeredAt: '2026-09-13T12:05:00.000Z' });
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByRole('button', { name: /disconnect/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /sync google calendar now/i }));
+    await waitFor(() => expect(syncSpy).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: /disconnect/i }));
+    await waitFor(() => expect(disconnectSpy).toHaveBeenCalled());
   });
 });
