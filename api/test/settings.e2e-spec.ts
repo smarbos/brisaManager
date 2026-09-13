@@ -39,6 +39,10 @@ describe('SettingsController (e2e)', () => {
   afterAll(async () => {
     if (originalSettings) {
       await prisma.settings.update({ where: { id: 'singleton' }, data: originalSettings });
+    } else {
+      await prisma.settings.delete({ where: { id: 'singleton' } }).catch(() => {
+        // Already gone or never created — nothing to clean up.
+      });
     }
     await prisma.adminUser.deleteMany({ where: { email: 'e2e-settings@labrisa.com.ar' } });
     await app.close();
