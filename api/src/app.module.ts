@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -7,9 +8,11 @@ import { SettingsModule } from './settings/settings.module';
 import { ReservationEventsModule } from './reservation-events/reservation-events.module';
 import { EmailModule } from './email/email.module';
 import { PublicReservationsModule } from './public-reservations/public-reservations.module';
+import { ChannelSyncModule } from './channel-sync/channel-sync.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     ReservationsModule,
@@ -17,6 +20,7 @@ import { PublicReservationsModule } from './public-reservations/public-reservati
     ReservationEventsModule,
     EmailModule,
     PublicReservationsModule,
+    ChannelSyncModule,
   ],
   controllers: [AppController],
 })
