@@ -26,4 +26,28 @@ describe('SettingsPage', () => {
     }));
     expect(await screen.findByRole('status')).toHaveTextContent(/saved/i);
   });
+
+  it('shows an alert when loading settings fails', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockRejectedValue(new Error('network error'));
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not load the settings/i);
+  });
+
+  it('shows an alert when saving settings fails', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue({
+      houseRulesText: 'Existing rules',
+      paymentInstructions: 'Existing payment info',
+    });
+    vi.spyOn(settingsApi, 'updateSettings').mockRejectedValue(new Error('network error'));
+
+    render(<SettingsPage />);
+
+    await waitFor(() => expect(screen.getByLabelText(/house rules/i)).toHaveValue('Existing rules'));
+
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not save the settings/i);
+  });
 });
