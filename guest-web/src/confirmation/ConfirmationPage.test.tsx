@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmationPage } from './ConfirmationPage';
 import * as publicApi from '../api/publicReservations';
+import { ApiError } from '../api/client';
 
 const baseReservation = {
   guestName: 'Jane Doe',
@@ -32,11 +33,22 @@ function renderAt(token: string) {
 
 describe('ConfirmationPage', () => {
   it('shows a not-found message for an invalid token', async () => {
-    vi.spyOn(publicApi, 'getReservationByToken').mockRejectedValue(new Error('404'));
+    vi.spyOn(publicApi, 'getReservationByToken').mockRejectedValue(new ApiError(404, 'Not Found'));
 
     renderAt('bad-token');
 
     expect(await screen.findByText(/reservation not found/i)).toBeInTheDocument();
+  });
+
+  it('shows a distinct error message for a non-404 failure, without implying the link is invalid', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockRejectedValue(
+      new ApiError(500, 'Internal Server Error'),
+    );
+
+    renderAt('tok-1');
+
+    expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument();
+    expect(screen.queryByText(/reservation not found/i)).not.toBeInTheDocument();
   });
 
   it('renders reservation details and confirms dates', async () => {

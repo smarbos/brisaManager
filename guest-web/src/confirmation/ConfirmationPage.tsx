@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { ApiError } from '../api/client';
 import { acceptContract, confirmDates, getReservationByToken } from '../api/publicReservations';
 import { GuestReservation } from './types';
 
@@ -7,14 +8,25 @@ export function ConfirmationPage() {
   const { token } = useParams<{ token: string }>();
   const [reservation, setReservation] = useState<GuestReservation | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   function load() {
     if (!token) return;
     getReservationByToken(token)
-      .then(setReservation)
-      .catch(() => setNotFound(true));
+      .then((r) => {
+        setReservation(r);
+        setNotFound(false);
+        setLoadError(false);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setNotFound(true);
+        } else {
+          setLoadError(true);
+        }
+      });
   }
 
   useEffect(load, [token]);
@@ -47,6 +59,15 @@ export function ConfirmationPage() {
       <main className="container">
         <h1>Reservation not found</h1>
         <p>This confirmation link is invalid. Please contact us directly.</p>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="container">
+        <h1>Unable to load reservation</h1>
+        <p>Something went wrong loading your reservation. Please try again or contact us directly.</p>
       </main>
     );
   }
