@@ -33,6 +33,7 @@ export class PublicReservationsService {
       checkOut: reservation.checkOut,
       paxCount: reservation.paxCount,
       totalAmount: reservation.totalAmount,
+      confirmationPaymentAmount: Number(reservation.totalAmount) * 0.3,
       currency: reservation.currency,
       datesConfirmedAt: reservation.datesConfirmedAt,
       contractAcceptedAt: reservation.contractAcceptedAt,
@@ -47,9 +48,13 @@ export class PublicReservationsService {
   async confirmDates(token: string) {
     const reservation = await this.findByToken(token);
 
+    if (reservation.datesConfirmedAt) {
+      return { datesConfirmedAt: reservation.datesConfirmedAt };
+    }
+
     const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },
-      data: { datesConfirmedAt: reservation.datesConfirmedAt ?? new Date() },
+      data: { datesConfirmedAt: new Date() },
     });
 
     await this.eventsService.record(reservation.id, 'DATES_CONFIRMED');
@@ -60,12 +65,17 @@ export class PublicReservationsService {
 
   async acceptContract(token: string, fullName: string) {
     const reservation = await this.findByToken(token);
+
+    if (reservation.contractAcceptedAt) {
+      return { contractAcceptedAt: reservation.contractAcceptedAt };
+    }
+
     const settings = await this.settingsService.get();
 
     const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },
       data: {
-        contractAcceptedAt: reservation.contractAcceptedAt ?? new Date(),
+        contractAcceptedAt: new Date(),
         contractAcceptedName: fullName,
         contractSnapshot: settings.houseRulesText,
       },

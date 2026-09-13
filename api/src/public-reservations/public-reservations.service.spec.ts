@@ -73,6 +73,17 @@ describe('PublicReservationsService', () => {
     expect(result.paymentInstructions).toBe('Bank X.');
   });
 
+  it('computes confirmationPaymentAmount as 30% of totalAmount', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      totalAmount: 100000,
+    });
+
+    const result = await service.getByToken('tok-1');
+
+    expect(result.confirmationPaymentAmount).toBe(30000);
+  });
+
   it('confirms dates, records an event, and checks auto-confirmation', async () => {
     prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
     prisma.reservation.update.mockResolvedValue({
@@ -91,6 +102,21 @@ describe('PublicReservationsService', () => {
       'DATES_CONFIRMED',
     );
     expect(confirmationService.maybeAutoConfirm).toHaveBeenCalledWith('res-1');
+  });
+
+  it('does not re-update or re-record an event when dates are already confirmed', async () => {
+    const alreadyConfirmedAt = new Date('2026-01-01T00:00:00.000Z');
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: alreadyConfirmedAt,
+    });
+
+    const result = await service.confirmDates('tok-1');
+
+    expect(result).toEqual({ datesConfirmedAt: alreadyConfirmedAt });
+    expect(prisma.reservation.update).not.toHaveBeenCalled();
+    expect(eventsService.record).not.toHaveBeenCalled();
+    expect(confirmationService.maybeAutoConfirm).not.toHaveBeenCalled();
   });
 
   it('accepts the contract, snapshotting the current house rules text', async () => {
@@ -115,5 +141,21 @@ describe('PublicReservationsService', () => {
       'CONTRACT_ACCEPTED',
     );
     expect(confirmationService.maybeAutoConfirm).toHaveBeenCalledWith('res-1');
+  });
+
+  it('does not re-update or re-record an event when the contract is already accepted', async () => {
+    const alreadyAcceptedAt = new Date('2026-01-01T00:00:00.000Z');
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      contractAcceptedAt: alreadyAcceptedAt,
+      contractAcceptedName: 'Original Name',
+    });
+
+    const result = await service.acceptContract('tok-1', 'A Different Name');
+
+    expect(result).toEqual({ contractAcceptedAt: alreadyAcceptedAt });
+    expect(prisma.reservation.update).not.toHaveBeenCalled();
+    expect(eventsService.record).not.toHaveBeenCalled();
+    expect(confirmationService.maybeAutoConfirm).not.toHaveBeenCalled();
   });
 });
