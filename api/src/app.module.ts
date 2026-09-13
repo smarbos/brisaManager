@@ -9,6 +9,7 @@ import { ReservationEventsModule } from './reservation-events/reservation-events
 import { EmailModule } from './email/email.module';
 import { PublicReservationsModule } from './public-reservations/public-reservations.module';
 import { ChannelSyncModule } from './channel-sync/channel-sync.module';
+import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ChannelSyncModule } from './channel-sync/channel-sync.module';
     EmailModule,
     PublicReservationsModule,
     ChannelSyncModule,
+    GoogleCalendarModule,
   ],
   controllers: [AppController],
 })
