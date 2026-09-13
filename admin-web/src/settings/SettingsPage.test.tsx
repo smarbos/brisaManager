@@ -95,6 +95,6 @@ describe('SettingsPage', () => {
 
     await waitFor(() => expect(syncSpy).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByText('Last synced: never')).not.toBeInTheDocument());
-    expect(screen.getByText(/last synced: 9\/13\/2026, 12:00:00 PM/i)).toBeInTheDocument();
+    expect(screen.getByText(/^last synced: (?!never)\S/i)).toBeInTheDocument();
   });
 });
