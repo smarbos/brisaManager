@@ -44,6 +44,7 @@ services:
       target: prod
       args:
         VITE_API_URL: ${VITE_API_URL}
+        VITE_GUEST_WEB_URL: ${VITE_GUEST_WEB_URL}
     restart: unless-stopped
     ports: !reset []
     volumes: !reset []

@@ -24,4 +24,37 @@ describe('ReservationFormPage', () => {
 
     await waitFor(() => expect(createSpy).toHaveBeenCalled());
   });
+
+  it('marks the 30% payment as received and refreshes the progress list', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    const markSpy = vi.spyOn(reservationsApi, 'markPaymentReceived').mockResolvedValue({
+      id: '1',
+      confirmationPaymentReceivedAt: '2026-01-01T00:00:00.000Z',
+    } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const button = await screen.findByRole('button', { name: /mark 30% payment received/i });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(markSpy).toHaveBeenCalledWith('1'));
+  });
 });

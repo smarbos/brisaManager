@@ -28,6 +28,7 @@ describe('ReservationListPage', () => {
         totalAmount: 100000,
         currency: 'ARS',
         status: 'PENDING',
+        confirmationToken: 'tok-1',
       },
     ]);
 
