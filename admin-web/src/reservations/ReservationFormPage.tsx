@@ -1,7 +1,15 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { createReservation, getReservation, updateReservation } from '../api/reservations';
-import { Reservation, ReservationSource, ReservationStatus } from './types';
+import {
+  createReservation,
+  getReservation,
+  listReservationEvents,
+  markDepositReceived,
+  markDepositReturned,
+  markPaymentReceived,
+  updateReservation,
+} from '../api/reservations';
+import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } from './types';
 
 const emptyForm = {
   guestName: '',
@@ -24,6 +32,42 @@ export function ReservationFormPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
+  const [reservationRecord, setReservationRecord] = useState<Reservation | null>(null);
+  const [events, setEvents] = useState<ReservationEvent[]>([]);
+  const guestWebUrl = import.meta.env.VITE_GUEST_WEB_URL as string;
+
+  function refreshOnboardingState() {
+    if (!id) return;
+    getReservation(id).then(setReservationRecord);
+    listReservationEvents(id).then(setEvents);
+  }
+
+  useEffect(() => {
+    refreshOnboardingState();
+  }, [id]);
+
+  async function handleMarkPaymentReceived() {
+    if (!id) return;
+    await markPaymentReceived(id);
+    refreshOnboardingState();
+  }
+
+  async function handleMarkDepositReceived() {
+    if (!id) return;
+    await markDepositReceived(id);
+    refreshOnboardingState();
+  }
+
+  async function handleMarkDepositReturned() {
+    if (!id) return;
+    await markDepositReturned(id);
+    refreshOnboardingState();
+  }
+
+  function copyGuestLink() {
+    if (!reservationRecord) return;
+    navigator.clipboard.writeText(`${guestWebUrl}/r/${reservationRecord.confirmationToken}`);
+  }
 
   useEffect(() => {
     if (id) {
@@ -60,7 +104,8 @@ export function ReservationFormPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <>
+      <form onSubmit={handleSubmit}>
       <h1>{isEditing ? 'Edit reservation' : 'New reservation'}</h1>
       <label>
         Guest name
@@ -134,6 +179,62 @@ export function ReservationFormPage() {
       </label>
       {error && <p role="alert">{error}</p>}
       <button type="submit">Save</button>
-    </form>
+      </form>
+      {isEditing && reservationRecord && (
+        <section>
+          <h2>Onboarding progress</h2>
+          <ul>
+            <li>Dates confirmed: {reservationRecord.datesConfirmedAt ? 'Yes' : 'No'}</li>
+            <li>
+              Contract accepted:{' '}
+              {reservationRecord.contractAcceptedAt ? `Yes (${reservationRecord.contractAcceptedName})` : 'No'}
+            </li>
+            <li>
+              30% payment received:{' '}
+              {reservationRecord.confirmationPaymentReceivedAt ? (
+                'Yes'
+              ) : (
+                <button type="button" onClick={handleMarkPaymentReceived}>
+                  Mark 30% payment received
+                </button>
+              )}
+            </li>
+            <li>
+              Deposit received:{' '}
+              {reservationRecord.depositReceivedAt ? (
+                'Yes'
+              ) : (
+                <button type="button" onClick={handleMarkDepositReceived}>
+                  Mark deposit received
+                </button>
+              )}
+            </li>
+            <li>
+              Deposit returned:{' '}
+              {reservationRecord.depositReturnedAt ? (
+                'Yes'
+              ) : (
+                <button type="button" onClick={handleMarkDepositReturned}>
+                  Mark deposit returned
+                </button>
+              )}
+            </li>
+          </ul>
+          <button type="button" onClick={copyGuestLink}>
+            Copy guest confirmation link
+          </button>
+
+          <h2>Event history</h2>
+          <ul>
+            {events.map((event) => (
+              <li key={event.id}>
+                {event.type} — {new Date(event.createdAt).toLocaleString()}
+                {event.detail ? `: ${event.detail}` : ''}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   );
 }

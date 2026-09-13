@@ -15,4 +15,18 @@ export interface Reservation {
   currency: string;
   status: ReservationStatus;
   notes?: string;
+  confirmationToken: string;
+  datesConfirmedAt?: string | null;
+  contractAcceptedAt?: string | null;
+  contractAcceptedName?: string | null;
+  confirmationPaymentReceivedAt?: string | null;
+  depositReceivedAt?: string | null;
+  depositReturnedAt?: string | null;
+}
+
+export interface ReservationEvent {
+  id: string;
+  type: string;
+  detail?: string | null;
+  createdAt: string;
 }
