@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { EmailService } from '../email/email.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
+import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { QueryReservationDto } from './dto/query-reservation.dto';
@@ -15,6 +16,7 @@ export class ReservationsService {
     private readonly eventsService: ReservationEventsService,
     private readonly emailService: EmailService,
     private readonly confirmationService: ReservationConfirmationService,
+    private readonly googleCalendarPushService: GoogleCalendarPushService,
   ) {}
 
   private validateDates(checkIn: string, checkOut: string) {
@@ -38,6 +40,8 @@ export class ReservationsService {
     if (reservation.guestEmail) {
       await this.sendInitialEmail(reservation);
     }
+
+    await this.googleCalendarPushService.pushReservation(reservation);
 
     return reservation;
   }
@@ -90,7 +94,7 @@ export class ReservationsService {
       this.validateDates(dto.checkIn, dto.checkOut);
     }
 
-    return this.prisma.reservation.update({
+    const updated = await this.prisma.reservation.update({
       where: { id },
       data: {
         ...dto,
@@ -104,6 +108,10 @@ export class ReservationsService {
             : undefined,
       },
     });
+
+    await this.googleCalendarPushService.pushReservation(updated);
+
+    return updated;
   }
 
   async markPaymentReceived(id: string) {

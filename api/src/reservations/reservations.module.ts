@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { ReservationsController } from './reservations.controller';
 import { ReservationsService } from './reservations.service';
 import { ReservationConfirmationModule } from '../reservation-confirmation/reservation-confirmation.module';
+import { GoogleCalendarModule } from '../google-calendar/google-calendar.module';
 
 @Module({
-  imports: [ReservationConfirmationModule],
+  imports: [ReservationConfirmationModule, GoogleCalendarModule],
   controllers: [ReservationsController],
   providers: [ReservationsService],
 })

@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { EmailService } from '../email/email.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
+import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 
 describe('ReservationsService', () => {
   let service: ReservationsService;
@@ -19,6 +20,7 @@ describe('ReservationsService', () => {
   let eventsService: { record: jest.Mock };
   let emailService: { sendInitialConfirmationEmail: jest.Mock; sendAlert: jest.Mock };
   let confirmationService: { maybeAutoConfirm: jest.Mock };
+  let googleCalendarPushService: { pushReservation: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -32,6 +34,7 @@ describe('ReservationsService', () => {
     eventsService = { record: jest.fn() };
     emailService = { sendInitialConfirmationEmail: jest.fn(), sendAlert: jest.fn() };
     confirmationService = { maybeAutoConfirm: jest.fn() };
+    googleCalendarPushService = { pushReservation: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -40,6 +43,7 @@ describe('ReservationsService', () => {
         { provide: ReservationEventsService, useValue: eventsService },
         { provide: EmailService, useValue: emailService },
         { provide: ReservationConfirmationService, useValue: confirmationService },
+        { provide: GoogleCalendarPushService, useValue: googleCalendarPushService },
       ],
     }).compile();
 
@@ -107,6 +111,25 @@ describe('ReservationsService', () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
 
     await expect(service.update('missing-id', { guestName: 'New Name' })).rejects.toThrow(NotFoundException);
+  });
+
+  it('pushes the reservation to Google Calendar after creating it', async () => {
+    const created = { id: '1', ...validDto };
+    prisma.reservation.create.mockResolvedValue(created);
+
+    await service.create(validDto);
+
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(created);
+  });
+
+  it('pushes the reservation to Google Calendar after updating it', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto });
+    const updated = { id: '1', ...validDto, guestName: 'Updated Name' };
+    prisma.reservation.update.mockResolvedValue(updated);
+
+    await service.update('1', { guestName: 'Updated Name' });
+
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(updated);
   });
 
   describe('externalReference normalization on update', () => {
