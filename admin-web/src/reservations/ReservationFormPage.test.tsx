@@ -114,4 +114,24 @@ describe('ReservationFormPage', () => {
 
     expect(await screen.findByText(/no longer found in the channel's calendar/i)).toBeInTheDocument();
   });
+
+  it('shows a warning when the entered dates overlap an existing reservation', async () => {
+    const overlapSpy = vi.spyOn(reservationsApi, 'checkOverlap').mockResolvedValue([
+      { id: '2', guestName: 'Other Guest', checkIn: '2026-01-12', checkOut: '2026-01-16', source: 'AIRBNB' } as never,
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText(/check-in/i), { target: { value: '2026-01-10' } });
+    fireEvent.change(screen.getByLabelText(/check-out/i), { target: { value: '2026-01-15' } });
+
+    await waitFor(() => expect(overlapSpy).toHaveBeenCalledWith('2026-01-10', '2026-01-15', undefined));
+    expect(await screen.findByText(/other guest/i)).toBeInTheDocument();
+  });
 });

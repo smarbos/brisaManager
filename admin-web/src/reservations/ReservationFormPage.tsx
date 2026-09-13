@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  checkOverlap,
   createReservation,
   getReservation,
   listReservationEvents,
@@ -35,6 +36,7 @@ export function ReservationFormPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [reservationRecord, setReservationRecord] = useState<Reservation | null>(null);
   const [events, setEvents] = useState<ReservationEvent[]>([]);
+  const [overlaps, setOverlaps] = useState<Reservation[]>([]);
   const guestWebUrl = import.meta.env.VITE_GUEST_WEB_URL as string;
 
   function loadReservation() {
@@ -64,6 +66,16 @@ export function ReservationFormPage() {
   useEffect(() => {
     loadReservation();
   }, [id]);
+
+  useEffect(() => {
+    if (!form.checkIn || !form.checkOut) {
+      setOverlaps([]);
+      return;
+    }
+    checkOverlap(form.checkIn, form.checkOut, id)
+      .then(setOverlaps)
+      .catch(() => setOverlaps([]));
+  }, [form.checkIn, form.checkOut, id]);
 
   async function handleMarkPaymentReceived() {
     if (!id) return;
@@ -122,6 +134,18 @@ export function ReservationFormPage() {
     <>
       <form onSubmit={handleSubmit}>
       <h1>{isEditing ? 'Edit reservation' : 'New reservation'}</h1>
+      {overlaps.length > 0 && (
+        <div role="alert">
+          <p>These dates overlap with existing reservation(s):</p>
+          <ul>
+            {overlaps.map((o) => (
+              <li key={o.id}>
+                {o.guestName} ({o.source}): {o.checkIn.slice(0, 10)} – {o.checkOut.slice(0, 10)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <label>
         Guest name
         <input value={form.guestName} onChange={(e) => setForm({ ...form, guestName: e.target.value })} required />

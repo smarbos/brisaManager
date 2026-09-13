@@ -45,3 +45,11 @@ export function markDepositReturned(id: string): Promise<Reservation> {
 export function listReservationEvents(id: string): Promise<ReservationEvent[]> {
   return apiClient.request(`/reservations/${id}/events`);
 }
+
+export function checkOverlap(checkIn: string, checkOut: string, excludeId?: string): Promise<Reservation[]> {
+  const params = new URLSearchParams({ checkIn, checkOut });
+  if (excludeId) {
+    params.set('excludeId', excludeId);
+  }
+  return apiClient.request(`/reservations/check-overlap?${params.toString()}`);
+}
