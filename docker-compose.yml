@@ -55,6 +55,8 @@ services:
       context: ./guest-web
       target: dev
     restart: unless-stopped
+    environment:
+      VITE_API_URL: ${VITE_API_URL}
     ports:
       - "${GUEST_WEB_PORT}:5174"
     volumes:
