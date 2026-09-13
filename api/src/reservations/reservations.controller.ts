@@ -4,6 +4,7 @@ import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { QueryReservationDto } from './dto/query-reservation.dto';
+import { CheckOverlapDto } from './dto/check-overlap.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('reservations')
@@ -18,6 +19,11 @@ export class ReservationsController {
   @Get()
   findAll(@Query() query: QueryReservationDto) {
     return this.reservationsService.findAll(query);
+  }
+
+  @Get('check-overlap')
+  checkOverlap(@Query() query: CheckOverlapDto) {
+    return this.reservationsService.checkOverlap(query.checkIn, query.checkOut, query.excludeId);
   }
 
   @Get(':id')

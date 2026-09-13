@@ -146,4 +146,15 @@ export class ReservationsService {
   listEvents(id: string) {
     return this.eventsService.listForReservation(id);
   }
+
+  checkOverlap(checkIn: string, checkOut: string, excludeId?: string) {
+    return this.prisma.reservation.findMany({
+      where: {
+        id: excludeId ? { not: excludeId } : undefined,
+        status: { not: 'CANCELLED' },
+        checkIn: { lt: new Date(checkOut) },
+        checkOut: { gt: new Date(checkIn) },
+      },
+    });
+  }
 }

@@ -34,6 +34,7 @@ describe('ReservationsController (e2e)', () => {
 
   afterAll(async () => {
     await prisma.reservation.deleteMany({ where: { guestName: 'E2E Guest' } });
+    await prisma.reservation.deleteMany({ where: { guestName: 'Overlap E2E Guest' } });
     await prisma.adminUser.deleteMany({ where: { email: 'e2e-reservations@labrisa.com.ar' } });
     await app.close();
   });
@@ -63,5 +64,35 @@ describe('ReservationsController (e2e)', () => {
 
   it('rejects requests without a valid token', async () => {
     await request(app.getHttpServer()).get('/reservations').expect(401);
+  });
+
+  it('finds overlapping reservations and respects excludeId', async () => {
+    const first = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        guestName: 'Overlap E2E Guest',
+        checkIn: '2026-07-01',
+        checkOut: '2026-07-10',
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 100000,
+        currency: 'ARS',
+      })
+      .expect(201);
+
+    const overlapResponse = await request(app.getHttpServer())
+      .get('/reservations/check-overlap?checkIn=2026-07-05&checkOut=2026-07-08')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(overlapResponse.body.some((r: { id: string }) => r.id === first.body.id)).toBe(true);
+
+    const excludedResponse = await request(app.getHttpServer())
+      .get(`/reservations/check-overlap?checkIn=2026-07-05&checkOut=2026-07-08&excludeId=${first.body.id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(excludedResponse.body.some((r: { id: string }) => r.id === first.body.id)).toBe(false);
   });
 });
