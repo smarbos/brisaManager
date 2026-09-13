@@ -21,22 +21,62 @@ enum ReservationStatus {
   COMPLETED
 }
 
+enum ReservationEventType {
+  DATES_CONFIRMED
+  CONTRACT_ACCEPTED
+  PAYMENT_RECEIVED
+  DEPOSIT_RECEIVED
+  DEPOSIT_RETURNED
+  RESERVATION_CONFIRMED
+  INITIAL_EMAIL_SENT
+  INITIAL_EMAIL_FAILED
+  FINAL_EMAIL_SENT
+  FINAL_EMAIL_FAILED
+}
+
 model Reservation {
-  id                String            @id @default(uuid())
-  guestName         String
-  guestPhone        String?
-  guestEmail        String?
-  checkIn           DateTime
-  checkOut          DateTime
-  paxCount          Int
-  source            ReservationSource
-  externalReference String?
-  totalAmount       Decimal           @db.Decimal(10, 2)
-  currency          String
-  status            ReservationStatus @default(PENDING)
-  notes             String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id                            String            @id @default(uuid())
+  guestName                     String
+  guestPhone                    String?
+  guestEmail                    String?
+  checkIn                       DateTime
+  checkOut                      DateTime
+  paxCount                      Int
+  source                        ReservationSource
+  externalReference             String?
+  totalAmount                   Decimal           @db.Decimal(10, 2)
+  currency                      String
+  status                        ReservationStatus @default(PENDING)
+  notes                         String?
+  confirmationToken             String            @unique @default(uuid())
+  datesConfirmedAt              DateTime?
+  contractAcceptedAt            DateTime?
+  contractAcceptedName          String?
+  contractSnapshot              String?
+  confirmationPaymentReceivedAt DateTime?
+  depositReceivedAt             DateTime?
+  depositReturnedAt             DateTime?
+  confirmationEmailSentAt       DateTime?
+  finalConfirmationEmailSentAt  DateTime?
+  events                        ReservationEvent[]
+  createdAt                     DateTime          @default(now())
+  updatedAt                     DateTime          @updatedAt
+}
+
+model Settings {
+  id                  String   @id
+  houseRulesText      String
+  paymentInstructions String
+  updatedAt           DateTime @updatedAt
+}
+
+model ReservationEvent {
+  id            String               @id @default(uuid())
+  reservationId String
+  reservation   Reservation          @relation(fields: [reservationId], references: [id])
+  type          ReservationEventType
+  detail        String?
+  createdAt     DateTime             @default(now())
 }
 
 model AdminUser {
