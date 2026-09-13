@@ -130,4 +130,32 @@ describe('ReservationsService', () => {
       expect(prisma.reservation.update).not.toHaveBeenCalled();
     });
   });
+
+  describe('checkOverlap', () => {
+    it('queries for non-cancelled reservations overlapping the given range', async () => {
+      prisma.reservation.findMany.mockResolvedValue([{ id: 'res-1' }]);
+
+      const result = await service.checkOverlap('2026-05-02', '2026-05-04');
+
+      expect(prisma.reservation.findMany).toHaveBeenCalledWith({
+        where: {
+          id: undefined,
+          status: { not: 'CANCELLED' },
+          checkIn: { lt: new Date('2026-05-04') },
+          checkOut: { gt: new Date('2026-05-02') },
+        },
+      });
+      expect(result).toEqual([{ id: 'res-1' }]);
+    });
+
+    it('excludes the given id when editing an existing reservation', async () => {
+      prisma.reservation.findMany.mockResolvedValue([]);
+
+      await service.checkOverlap('2026-05-02', '2026-05-04', 'res-1');
+
+      expect(prisma.reservation.findMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({ id: { not: 'res-1' } }),
+      });
+    });
+  });
 });
