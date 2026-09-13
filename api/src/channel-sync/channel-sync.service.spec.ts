@@ -12,7 +12,7 @@ import { EmailService } from '../email/email.service';
 describe('ChannelSyncService', () => {
   let service: ChannelSyncService;
   let prisma: {
-    reservation: { findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
+    reservation: { findMany: jest.Mock; upsert: jest.Mock; update: jest.Mock };
     settings: { update: jest.Mock };
   };
   let settingsService: { get: jest.Mock };
@@ -25,9 +25,8 @@ describe('ChannelSyncService', () => {
 
     prisma = {
       reservation: {
-        findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
-        create: jest.fn(),
+        upsert: jest.fn(),
         update: jest.fn(),
       },
       settings: { update: jest.fn() },
@@ -59,7 +58,22 @@ describe('ChannelSyncService', () => {
     });
   });
 
-  it('creates a new reservation for a booking not seen before', async () => {
+  it('fetches the feed with a fetch timeout/abort signal', async () => {
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({});
+
+    await service.syncAll();
+
+    expect(fromURLMock).toHaveBeenCalledWith(
+      'https://booking.example/cal.ics',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('upserts a new reservation for a booking not seen before', async () => {
     settingsService.get.mockResolvedValue({
       bookingIcalUrl: 'https://booking.example/cal.ics',
       airbnbIcalUrl: null,
@@ -67,21 +81,25 @@ describe('ChannelSyncService', () => {
     fromURLMock.mockResolvedValueOnce({
       'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
     });
-    prisma.reservation.findFirst.mockResolvedValue(null);
+    prisma.reservation.upsert.mockResolvedValue({ id: 'res-1' });
 
     await service.syncAll();
 
-    expect(prisma.reservation.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(prisma.reservation.upsert).toHaveBeenCalledWith({
+      where: {
+        source_externalReference: { source: 'BOOKING', externalReference: 'uid-1' },
+      },
+      create: expect.objectContaining({
         source: 'BOOKING',
         externalReference: 'uid-1',
         status: 'PENDING',
         guestName: 'Booking.com Guest',
       }),
+      update: { missingFromChannelAt: null },
     });
   });
 
-  it('does not recreate or modify an already-synced reservation', async () => {
+  it('does not recreate or modify an already-synced reservation still present in the feed', async () => {
     settingsService.get.mockResolvedValue({
       bookingIcalUrl: 'https://booking.example/cal.ics',
       airbnbIcalUrl: null,
@@ -89,14 +107,16 @@ describe('ChannelSyncService', () => {
     fromURLMock.mockResolvedValueOnce({
       'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
     });
-    prisma.reservation.findFirst.mockResolvedValue({ id: 'res-1', missingFromChannelAt: null });
+    prisma.reservation.upsert.mockResolvedValue({ id: 'res-1', missingFromChannelAt: null });
     prisma.reservation.findMany.mockResolvedValue([
       { id: 'res-1', externalReference: 'uid-1', missingFromChannelAt: null },
     ]);
 
     await service.syncAll();
 
-    expect(prisma.reservation.create).not.toHaveBeenCalled();
+    // The upsert is still called (it's the mechanism itself — atomic create-or-touch), but it
+    // must not trigger the separate "missing" flag-update path for a UID still in the feed.
+    expect(prisma.reservation.upsert).toHaveBeenCalledTimes(1);
     expect(prisma.reservation.update).not.toHaveBeenCalled();
   });
 
@@ -118,7 +138,26 @@ describe('ChannelSyncService', () => {
     });
   });
 
-  it('un-flags a reservation that reappears in the feed', async () => {
+  it('queries only current/active reservations when checking for ones missing from the feed', async () => {
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({});
+
+    await service.syncAll();
+
+    expect(prisma.reservation.findMany).toHaveBeenCalledWith({
+      where: {
+        source: 'BOOKING',
+        externalReference: { not: null },
+        checkOut: { gte: expect.any(Date) },
+        status: { notIn: ['CANCELLED', 'COMPLETED'] },
+      },
+    });
+  });
+
+  it('un-flags a reservation that reappears in the feed via the upsert update branch', async () => {
     settingsService.get.mockResolvedValue({
       bookingIcalUrl: 'https://booking.example/cal.ics',
       airbnbIcalUrl: null,
@@ -126,20 +165,19 @@ describe('ChannelSyncService', () => {
     fromURLMock.mockResolvedValueOnce({
       'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
     });
-    prisma.reservation.findFirst.mockResolvedValue({
+    prisma.reservation.upsert.mockResolvedValue({
       id: 'res-1',
-      missingFromChannelAt: new Date('2026-01-01'),
+      missingFromChannelAt: null,
     });
-    prisma.reservation.findMany.mockResolvedValue([
-      { id: 'res-1', externalReference: 'uid-1', missingFromChannelAt: new Date('2026-01-01') },
-    ]);
 
     await service.syncAll();
 
-    expect(prisma.reservation.update).toHaveBeenCalledWith({
-      where: { id: 'res-1' },
-      data: { missingFromChannelAt: null },
-    });
+    expect(prisma.reservation.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { source_externalReference: { source: 'BOOKING', externalReference: 'uid-1' } },
+        update: { missingFromChannelAt: null },
+      }),
+    );
   });
 
   it('records the error and sends an alert on a fetch failure, without touching reservation data', async () => {
@@ -151,7 +189,7 @@ describe('ChannelSyncService', () => {
 
     await service.syncAll();
 
-    expect(prisma.reservation.create).not.toHaveBeenCalled();
+    expect(prisma.reservation.upsert).not.toHaveBeenCalled();
     expect(prisma.reservation.update).not.toHaveBeenCalled();
     expect(prisma.settings.update).toHaveBeenCalledWith({
       where: { id: 'singleton' },
@@ -169,13 +207,16 @@ describe('ChannelSyncService', () => {
     fromURLMock.mockResolvedValueOnce({
       'uid-2': { type: 'VEVENT', uid: 'uid-2', start: new Date('2026-06-01'), end: new Date('2026-06-03') },
     });
-    prisma.reservation.findFirst.mockResolvedValue(null);
+    prisma.reservation.upsert.mockResolvedValue({ id: 'res-2' });
 
     await service.syncAll();
 
-    expect(prisma.reservation.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ source: 'AIRBNB', externalReference: 'uid-2' }),
-    });
+    expect(prisma.reservation.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { source_externalReference: { source: 'AIRBNB', externalReference: 'uid-2' } },
+        create: expect.objectContaining({ source: 'AIRBNB', externalReference: 'uid-2' }),
+      }),
+    );
     expect(prisma.settings.update).toHaveBeenCalledWith({
       where: { id: 'singleton' },
       data: { lastChannelSyncAt: expect.any(Date), lastChannelSyncError: expect.stringContaining('booking down') },

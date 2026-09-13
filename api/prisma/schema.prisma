@@ -62,6 +62,8 @@ model Reservation {
   missingFromChannelAt          DateTime?
   createdAt                     DateTime          @default(now())
   updatedAt                     DateTime          @updatedAt
+
+  @@unique([source, externalReference])
 }
 
 model Settings {

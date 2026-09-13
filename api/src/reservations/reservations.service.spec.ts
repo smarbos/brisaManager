@@ -73,10 +73,83 @@ describe('ReservationsService', () => {
     expect(prisma.reservation.create).toHaveBeenCalled();
   });
 
+  it('normalizes an empty-string externalReference to null on create', async () => {
+    prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto, externalReference: null });
+
+    await service.create({ ...validDto, externalReference: '' });
+
+    expect(prisma.reservation.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ externalReference: null }),
+    });
+  });
+
+  it('normalizes a whitespace-only externalReference to null on create', async () => {
+    prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto, externalReference: null });
+
+    await service.create({ ...validDto, externalReference: '   ' });
+
+    expect(prisma.reservation.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ externalReference: null }),
+    });
+  });
+
+  it('trims and keeps a real externalReference on create', async () => {
+    prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto, externalReference: 'uid-1' });
+
+    await service.create({ ...validDto, externalReference: '  uid-1  ' });
+
+    expect(prisma.reservation.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ externalReference: 'uid-1' }),
+    });
+  });
+
   it('throws NotFoundException when updating a reservation that does not exist', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
 
     await expect(service.update('missing-id', { guestName: 'New Name' })).rejects.toThrow(NotFoundException);
+  });
+
+  describe('externalReference normalization on update', () => {
+    beforeEach(() => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto });
+      prisma.reservation.update.mockResolvedValue({ id: '1', ...validDto, externalReference: null });
+    });
+
+    it('normalizes an empty-string externalReference to null on update', async () => {
+      await service.update('1', { externalReference: '' });
+
+      expect(prisma.reservation.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: expect.objectContaining({ externalReference: null }),
+      });
+    });
+
+    it('normalizes a whitespace-only externalReference to null on update', async () => {
+      await service.update('1', { externalReference: '   ' });
+
+      expect(prisma.reservation.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: expect.objectContaining({ externalReference: null }),
+      });
+    });
+
+    it('leaves externalReference untouched (undefined) on update when omitted from the dto', async () => {
+      await service.update('1', { guestName: 'New Name' });
+
+      expect(prisma.reservation.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: expect.objectContaining({ externalReference: undefined }),
+      });
+    });
+
+    it('trims and keeps a real externalReference on update', async () => {
+      await service.update('1', { externalReference: '  uid-2  ' });
+
+      expect(prisma.reservation.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: expect.objectContaining({ externalReference: 'uid-2' }),
+      });
+    });
   });
 
   describe('onboarding actions', () => {
