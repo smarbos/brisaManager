@@ -32,61 +32,76 @@ export function ReservationFormPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [reservationRecord, setReservationRecord] = useState<Reservation | null>(null);
   const [events, setEvents] = useState<ReservationEvent[]>([]);
   const guestWebUrl = import.meta.env.VITE_GUEST_WEB_URL as string;
 
-  function refreshOnboardingState() {
+  function loadReservation() {
     if (!id) return;
-    getReservation(id).then(setReservationRecord);
-    listReservationEvents(id).then(setEvents);
+    getReservation(id)
+      .then((reservation: Reservation) => {
+        setReservationRecord(reservation);
+        setForm({
+          ...emptyForm,
+          ...reservation,
+          checkIn: reservation.checkIn.slice(0, 10),
+          checkOut: reservation.checkOut.slice(0, 10),
+          totalAmount: Number(reservation.totalAmount),
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to load the reservation', err);
+        setError('Could not load the reservation');
+      });
+    listReservationEvents(id)
+      .then(setEvents)
+      .catch((err) => {
+        console.error('Failed to load the reservation events', err);
+      });
   }
 
   useEffect(() => {
-    refreshOnboardingState();
+    loadReservation();
   }, [id]);
 
   async function handleMarkPaymentReceived() {
     if (!id) return;
-    await markPaymentReceived(id);
-    refreshOnboardingState();
+    setActionError(null);
+    try {
+      await markPaymentReceived(id);
+      loadReservation();
+    } catch {
+      setActionError('Could not mark the 30% payment as received. Please try again.');
+    }
   }
 
   async function handleMarkDepositReceived() {
     if (!id) return;
-    await markDepositReceived(id);
-    refreshOnboardingState();
+    setActionError(null);
+    try {
+      await markDepositReceived(id);
+      loadReservation();
+    } catch {
+      setActionError('Could not mark the deposit as received. Please try again.');
+    }
   }
 
   async function handleMarkDepositReturned() {
     if (!id) return;
-    await markDepositReturned(id);
-    refreshOnboardingState();
+    setActionError(null);
+    try {
+      await markDepositReturned(id);
+      loadReservation();
+    } catch {
+      setActionError('Could not mark the deposit as returned. Please try again.');
+    }
   }
 
   function copyGuestLink() {
     if (!reservationRecord) return;
     navigator.clipboard.writeText(`${guestWebUrl}/r/${reservationRecord.confirmationToken}`);
   }
-
-  useEffect(() => {
-    if (id) {
-      getReservation(id)
-        .then((reservation: Reservation) =>
-          setForm({
-            ...emptyForm,
-            ...reservation,
-            checkIn: reservation.checkIn.slice(0, 10),
-            checkOut: reservation.checkOut.slice(0, 10),
-            totalAmount: Number(reservation.totalAmount),
-          }),
-        )
-        .catch((err) => {
-          console.error('Failed to load the reservation', err);
-          setError('Could not load the reservation');
-        });
-    }
-  }, [id]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -183,6 +198,7 @@ export function ReservationFormPage() {
       {isEditing && reservationRecord && (
         <section>
           <h2>Onboarding progress</h2>
+          {actionError && <p role="alert">{actionError}</p>}
           <ul>
             <li>Dates confirmed: {reservationRecord.datesConfirmedAt ? 'Yes' : 'No'}</li>
             <li>

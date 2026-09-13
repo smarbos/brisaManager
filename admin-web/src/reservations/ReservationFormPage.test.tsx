@@ -57,4 +57,34 @@ describe('ReservationFormPage', () => {
 
     await waitFor(() => expect(markSpy).toHaveBeenCalledWith('1'));
   });
+
+  it('shows an alert when marking the 30% payment received fails', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    vi.spyOn(reservationsApi, 'markPaymentReceived').mockRejectedValue(new Error('network error'));
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const button = await screen.findByRole('button', { name: /mark 30% payment received/i });
+    fireEvent.click(button);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not mark the 30% payment/i);
+  });
 });
