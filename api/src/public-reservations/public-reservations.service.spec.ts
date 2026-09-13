@@ -84,6 +84,17 @@ describe('PublicReservationsService', () => {
     expect(result.confirmationPaymentAmount).toBe(30000);
   });
 
+  it('rounds confirmationPaymentAmount to 2 decimal places for a non-round total', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      totalAmount: 123456.78,
+    });
+
+    const result = await service.getByToken('tok-1');
+
+    expect(result.confirmationPaymentAmount).toBe(37037.03);
+  });
+
   it('confirms dates, records an event, and checks auto-confirmation', async () => {
     prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
     prisma.reservation.update.mockResolvedValue({
