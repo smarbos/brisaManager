@@ -94,6 +94,7 @@ describe('SettingsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /sync now/i }));
 
     await waitFor(() => expect(syncSpy).toHaveBeenCalled());
-    expect(await screen.findByText(/last synced/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Last synced: never')).not.toBeInTheDocument());
+    expect(screen.getByText(/last synced: 9\/13\/2026, 12:00:00 PM/i)).toBeInTheDocument();
   });
 });
