@@ -1,4 +1,4 @@
-import { IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateSettingsDto {
   @IsString()
@@ -8,4 +8,12 @@ export class UpdateSettingsDto {
   @IsString()
   @MinLength(1)
   paymentInstructions: string;
+
+  @IsOptional()
+  @IsString()
+  bookingIcalUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  airbnbIcalUrl?: string;
 }
