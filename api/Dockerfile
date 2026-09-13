@@ -19,6 +19,9 @@ FROM node:20-alpine AS prod
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./
+# tsconfig.json is needed by `prisma db seed` (ts-node prisma/seed.ts): without it
+# ts-node resolves seed.ts through Node's ESM loader and fails with ERR_UNKNOWN_FILE_EXTENSION.
+COPY tsconfig.json ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev
 RUN npx prisma generate
