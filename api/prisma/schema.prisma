@@ -59,15 +59,20 @@ model Reservation {
   confirmationEmailSentAt       DateTime?
   finalConfirmationEmailSentAt  DateTime?
   events                        ReservationEvent[]
+  missingFromChannelAt          DateTime?
   createdAt                     DateTime          @default(now())
   updatedAt                     DateTime          @updatedAt
 }
 
 model Settings {
-  id                  String   @id
-  houseRulesText      String
-  paymentInstructions String
-  updatedAt           DateTime @updatedAt
+  id                   String    @id
+  houseRulesText       String
+  paymentInstructions  String
+  bookingIcalUrl       String?
+  airbnbIcalUrl        String?
+  lastChannelSyncAt    DateTime?
+  lastChannelSyncError String?
+  updatedAt            DateTime  @updatedAt
 }
 
 model ReservationEvent {
