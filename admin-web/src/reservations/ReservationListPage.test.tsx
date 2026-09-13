@@ -2,7 +2,18 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ReservationListPage } from './ReservationListPage';
+import { AuthProvider } from '../auth/AuthContext';
 import * as reservationsApi from '../api/reservations';
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <AuthProvider>
+        <ReservationListPage />
+      </AuthProvider>
+    </MemoryRouter>,
+  );
+}
 
 describe('ReservationListPage', () => {
   it('renders reservations returned by the API', async () => {
@@ -20,23 +31,35 @@ describe('ReservationListPage', () => {
       },
     ]);
 
-    render(
-      <MemoryRouter>
-        <ReservationListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
+  });
+
+  it('shows an error when the reservations cannot be loaded', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockRejectedValue(new Error('boom'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not load the reservations/i));
+  });
+
+  it('clears the stored token when logging out', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([]);
+    localStorage.setItem('accessToken', 'a-token');
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
+
+    await waitFor(() => expect(localStorage.getItem('accessToken')).toBeNull());
   });
 
   it('refetches when the source filter changes', async () => {
     const spy = vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([]);
 
-    render(
-      <MemoryRouter>
-        <ReservationListPage />
-      </MemoryRouter>,
-    );
+    renderPage();
 
     await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: undefined, status: undefined }));
 

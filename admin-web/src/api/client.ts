@@ -19,7 +19,18 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, await response.text());
+    const body = await response.text();
+
+    if (response.status === 401) {
+      // The token is missing, invalid or expired: drop it and send the user back to
+      // the login page. This lives outside React Router, hence the full-page redirect.
+      localStorage.removeItem('accessToken');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+
+    throw new ApiError(response.status, body);
   }
 
   if (response.status === 204) {
