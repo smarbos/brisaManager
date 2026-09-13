@@ -2,10 +2,14 @@ import { Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GoogleCalendarAuthService } from './google-calendar-auth.service';
+import { GoogleCalendarPullService } from './google-calendar-pull.service';
 
 @Controller('google-calendar')
 export class GoogleCalendarController {
-  constructor(private readonly authService: GoogleCalendarAuthService) {}
+  constructor(
+    private readonly authService: GoogleCalendarAuthService,
+    private readonly pullService: GoogleCalendarPullService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('oauth/connect-url')
@@ -33,6 +37,13 @@ export class GoogleCalendarController {
   async disconnect() {
     await this.authService.disconnect();
     return { disconnected: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('sync-now')
+  async syncNow() {
+    await this.pullService.pull();
+    return { triggeredAt: new Date() };
   }
 
   @UseGuards(JwtAuthGuard)

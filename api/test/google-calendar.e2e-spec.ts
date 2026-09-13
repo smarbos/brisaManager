@@ -68,4 +68,28 @@ describe('GoogleCalendarController (e2e)', () => {
 
     expect(response.headers.location).toContain('googleCalendar=error');
   });
+
+  it('requires authentication for sync-now', async () => {
+    await request(app.getHttpServer()).post('/google-calendar/sync-now').expect(401);
+  });
+
+  it('triggers a sync and returns a timestamp (not connected in this test env, so it succeeds as a no-op)', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/google-calendar/sync-now')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201);
+
+    expect(response.body.triggeredAt).toBeTruthy();
+  });
+
+  it('requires authentication for disconnect', async () => {
+    await request(app.getHttpServer()).post('/google-calendar/disconnect').expect(401);
+  });
+
+  it('disconnects without error even when never connected', async () => {
+    await request(app.getHttpServer())
+      .post('/google-calendar/disconnect')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201);
+  });
 });
