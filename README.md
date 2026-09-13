@@ -7,13 +7,14 @@
 3. Run database migrations: `docker compose exec api npx prisma migrate deploy`
 4. Seed the initial admin user: `docker compose exec api npx prisma db seed`
 5. Admin app: http://localhost:5183 (or `$ADMIN_WEB_PORT`)
-6. Guest app placeholder: http://localhost:5174 (or `$GUEST_WEB_PORT`)
+6. Guest app: http://localhost:5174 (or `$GUEST_WEB_PORT`)
 7. API: http://localhost:3001 (or `$API_PORT`)
 
 ## Running tests
 
 - API: `docker compose exec api npm test` (unit) and `docker compose exec api npm run test:e2e` (e2e)
 - Admin web: `docker compose exec admin-web npm test`
+- Guest web: `docker compose exec guest-web npm test`
 
 ## Production deployment
 
@@ -30,9 +31,20 @@
      (whatever `API_DOMAIN` resolves to) — **not** `http://localhost:3001`. Vite inlines this
      value at *build* time into the admin-web bundle, so it is passed as a build arg; changing
      it later requires rebuilding the `admin-web` image (`--build`).
+   - **`VITE_GUEST_WEB_URL`:** must be the real public guest-web origin, e.g.
+     `https://reservas.labrisa.com.ar` — **not** `http://localhost:5174`. Admin-web uses it to
+     build the guest confirmation link it shows staff. Like `VITE_API_URL`, this is baked into
+     the admin-web bundle at *build* time, so changing it later also requires rebuilding the
+     `admin-web` image (`--build`).
+   - **Email:** `RESEND_API_KEY`, `EMAIL_FROM`, `ALERT_EMAIL` — the API uses these to send the
+     guest confirmation email and internal alerts via Resend. `EMAIL_FROM`'s domain must be
+     verified in Resend before emails will actually send.
    - **CORS origins:** `ADMIN_WEB_ORIGIN=https://admin.labrisa.com.ar` and
      `GUEST_WEB_ORIGIN=https://reservas.labrisa.com.ar` — the API rejects browser requests from
-     any other origin, so localhost defaults will break the deployed admin app.
+     any other origin, so localhost defaults will break the deployed admin app. `GUEST_WEB_ORIGIN`
+     serves double duty: besides being a CORS-allowed origin, it's also the base URL the API
+     embeds in the initial confirmation email sent to guests — left at its localhost default,
+     guests receive broken links.
 2. Point DNS A records for `admin.labrisa.com.ar`, `reservas.labrisa.com.ar`, and `api.labrisa.com.ar` at the server's IP
 3. Start: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`
 4. Run migrations and seed as above, using the same `docker compose -f ... exec` commands
