@@ -38,7 +38,6 @@ services:
       context: ./admin-web
       target: dev
     restart: unless-stopped
-    env_file: .env
     environment:
       VITE_API_URL: ${VITE_API_URL}
       VITE_GUEST_WEB_URL: ${VITE_GUEST_WEB_URL}
