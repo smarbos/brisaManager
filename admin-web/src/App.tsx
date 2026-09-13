@@ -4,6 +4,7 @@ import { LoginPage } from './auth/LoginPage';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { ReservationListPage } from './reservations/ReservationListPage';
 import { ReservationFormPage } from './reservations/ReservationFormPage';
+import { SettingsPage } from './settings/SettingsPage';
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
             <Route path="/" element={<ReservationListPage />} />
             <Route path="/reservations/new" element={<ReservationFormPage />} />
             <Route path="/reservations/:id" element={<ReservationFormPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>
       </AuthProvider>
