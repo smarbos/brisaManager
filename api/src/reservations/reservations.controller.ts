@@ -29,4 +29,24 @@ export class ReservationsController {
   update(@Param('id') id: string, @Body() dto: UpdateReservationDto) {
     return this.reservationsService.update(id, dto);
   }
+
+  @Post(':id/mark-payment-received')
+  markPaymentReceived(@Param('id') id: string) {
+    return this.reservationsService.markPaymentReceived(id);
+  }
+
+  @Post(':id/mark-deposit-received')
+  markDepositReceived(@Param('id') id: string) {
+    return this.reservationsService.markDepositReceived(id);
+  }
+
+  @Post(':id/mark-deposit-returned')
+  markDepositReturned(@Param('id') id: string) {
+    return this.reservationsService.markDepositReturned(id);
+  }
+
+  @Get(':id/events')
+  listEvents(@Param('id') id: string) {
+    return this.reservationsService.listEvents(id);
+  }
 }
