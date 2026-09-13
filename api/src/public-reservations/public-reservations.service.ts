@@ -33,7 +33,7 @@ export class PublicReservationsService {
       checkOut: reservation.checkOut,
       paxCount: reservation.paxCount,
       totalAmount: reservation.totalAmount,
-      confirmationPaymentAmount: Number(reservation.totalAmount) * 0.3,
+      confirmationPaymentAmount: Math.round(Number(reservation.totalAmount) * 0.3 * 100) / 100,
       currency: reservation.currency,
       datesConfirmedAt: reservation.datesConfirmedAt,
       contractAcceptedAt: reservation.contractAcceptedAt,
