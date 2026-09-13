@@ -31,6 +31,7 @@ export class ReservationsService {
         ...dto,
         checkIn: new Date(dto.checkIn),
         checkOut: new Date(dto.checkOut),
+        externalReference: dto.externalReference?.trim() ? dto.externalReference.trim() : null,
       },
     });
 
@@ -95,6 +96,12 @@ export class ReservationsService {
         ...dto,
         checkIn: dto.checkIn ? new Date(dto.checkIn) : undefined,
         checkOut: dto.checkOut ? new Date(dto.checkOut) : undefined,
+        externalReference:
+          dto.externalReference !== undefined
+            ? dto.externalReference?.trim()
+              ? dto.externalReference.trim()
+              : null
+            : undefined,
       },
     });
   }

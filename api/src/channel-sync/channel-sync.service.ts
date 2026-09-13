@@ -12,6 +12,10 @@ interface PlatformConfig {
   displayName: string;
 }
 
+// Guard against a slow/hanging feed provider blocking the sync (and, on the cron path, the
+// next scheduled tick) indefinitely.
+const ICAL_FETCH_TIMEOUT_MS = 15_000;
+
 @Injectable()
 export class ChannelSyncService {
   constructor(
@@ -64,7 +68,7 @@ export class ChannelSyncService {
       return;
     }
 
-    const parsed = await ical.async.fromURL(config.icalUrl);
+    const parsed = await ical.async.fromURL(config.icalUrl, { signal: AbortSignal.timeout(ICAL_FETCH_TIMEOUT_MS) });
 
     const events = Object.values(parsed).filter(
       (component): component is ical.VEvent => component !== undefined && component.type === 'VEVENT',
@@ -72,22 +76,14 @@ export class ChannelSyncService {
     const currentUids = new Set(events.map((event) => event.uid));
 
     for (const event of events) {
-      const existing = await this.prisma.reservation.findFirst({
-        where: { source: config.source, externalReference: event.uid },
-      });
-
-      if (existing) {
-        if (existing.missingFromChannelAt) {
-          await this.prisma.reservation.update({
-            where: { id: existing.id },
-            data: { missingFromChannelAt: null },
-          });
-        }
-        continue;
-      }
-
-      await this.prisma.reservation.create({
-        data: {
+      // Atomic upsert keyed on the (source, externalReference) unique constraint: this both
+      // avoids a race between overlapping sync runs (cron tick vs. manual "Sync now") for the
+      // same UID, and un-flags the reservation if it had been marked missing and reappeared.
+      await this.prisma.reservation.upsert({
+        where: {
+          source_externalReference: { source: config.source, externalReference: event.uid },
+        },
+        create: {
           guestName: config.guestNamePlaceholder,
           checkIn: event.start,
           // Some feeds omit DTEND for a zero-duration/one-day event; fall back to checkIn.
@@ -100,11 +96,21 @@ export class ChannelSyncService {
           status: 'PENDING',
           notes: `Auto-created from ${config.displayName} calendar sync. Please add the guest's real contact info.`,
         },
+        update: {
+          missingFromChannelAt: null,
+        },
       });
     }
 
     const existingSynced = await this.prisma.reservation.findMany({
-      where: { source: config.source, externalReference: { not: null } },
+      where: {
+        source: config.source,
+        externalReference: { not: null },
+        // Only flag reservations that are still operationally relevant: don't keep flagging a
+        // stay that's already over, or one that's already cancelled/completed.
+        checkOut: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+        status: { notIn: ['CANCELLED', 'COMPLETED'] },
+      },
     });
 
     for (const reservation of existingSynced) {
