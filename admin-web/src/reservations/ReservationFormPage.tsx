@@ -199,6 +199,13 @@ export function ReservationFormPage() {
         <section>
           <h2>Onboarding progress</h2>
           {actionError && <p role="alert">{actionError}</p>}
+          {reservationRecord.missingFromChannelAt && (
+            <p role="alert">
+              No longer found in the channel's calendar as of{' '}
+              {new Date(reservationRecord.missingFromChannelAt).toLocaleString()} — confirm with the guest or cancel
+              this reservation.
+            </p>
+          )}
           <ul>
             <li>Dates confirmed: {reservationRecord.datesConfirmedAt ? 'Yes' : 'No'}</li>
             <li>

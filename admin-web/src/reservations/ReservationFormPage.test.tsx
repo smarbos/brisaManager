@@ -87,4 +87,31 @@ describe('ReservationFormPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not mark the 30% payment/i);
   });
+
+  it('shows a warning banner when editing a reservation missing from its channel feed', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'BOOKING',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+      missingFromChannelAt: '2026-01-01T00:00:00.000Z',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/no longer found in the channel's calendar/i)).toBeInTheDocument();
+  });
 });

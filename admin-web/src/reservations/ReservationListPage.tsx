@@ -76,6 +76,7 @@ export function ReservationListPage() {
             <tr key={r.id}>
               <td>
                 <Link to={`/reservations/${r.id}`}>{r.guestName}</Link>
+                {r.missingFromChannelAt && <span> ⚠ No longer in channel feed</span>}
               </td>
               <td>{r.checkIn}</td>
               <td>{r.checkOut}</td>
