@@ -17,10 +17,10 @@ describe('LoginPage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'admin@labrisa.com.ar' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'wrong-password' } });
-    fireEvent.click(screen.getByRole('button', { name: /log in/i }));
+    fireEvent.change(screen.getByLabelText(/correo electrónico/i), { target: { value: 'admin@labrisa.com.ar' } });
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: 'wrong-password' } });
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/invalid email or password/i));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/email o contraseña incorrectos/i));
   });
 });

@@ -18,7 +18,7 @@ export function TemplatesPage() {
   function reload() {
     listCampaignTemplates()
       .then(setTemplates)
-      .catch(() => setLoadError('Could not load the templates. Please reload the page.'));
+      .catch(() => setLoadError('No se pudieron cargar las plantillas. Por favor, recargá la página.'));
   }
 
   useEffect(reload, []);
@@ -33,7 +33,7 @@ export function TemplatesPage() {
       setBodyHtml('');
       reload();
     } catch {
-      setActionError('Could not create the template. Please try again.');
+      setActionError('No se pudo crear la plantilla. Por favor, intentá de nuevo.');
     }
   }
 
@@ -43,30 +43,30 @@ export function TemplatesPage() {
       await deleteCampaignTemplate(id);
       reload();
     } catch {
-      setActionError('Could not delete the template — it may already be used in a campaign.');
+      setActionError('No se pudo eliminar la plantilla — puede que ya esté en uso en una campaña.');
     }
   }
 
   return (
     <PageContainer>
-      <PageHeader title="Templates" />
+      <PageHeader title="Plantillas" />
       {loadError && <Alert>{loadError}</Alert>}
       {actionError && <Alert>{actionError}</Alert>}
       <form onSubmit={handleCreate} className="mb-8 flex flex-col gap-4">
-        <FormField label="Name">
+        <FormField label="Nombre">
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </FormField>
-        <FormField label="Subject">
+        <FormField label="Asunto">
           <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
         </FormField>
-        <FormField label="Body">
+        <FormField label="Cuerpo">
           <Textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} rows={6} />
         </FormField>
         <p className="text-sm text-text-muted">
-          Use <code className="rounded bg-surface px-1 py-0.5">{'{{guestName}}'}</code> in the subject or body to
-          insert the guest's name.
+          Usá <code className="rounded bg-surface px-1 py-0.5">{'{{guestName}}'}</code> en el asunto o el cuerpo
+          para insertar el nombre del huésped.
         </p>
-        <Button type="submit">Create template</Button>
+        <Button type="submit">Crear plantilla</Button>
       </form>
       <ul className="flex flex-col gap-2">
         {templates.map((t) => (
@@ -75,7 +75,7 @@ export function TemplatesPage() {
               <strong>{t.name}</strong> — {t.subject}
             </span>
             <Button type="button" variant="danger" onClick={() => handleDelete(t.id)}>
-              Delete
+              Eliminar
             </Button>
           </li>
         ))}

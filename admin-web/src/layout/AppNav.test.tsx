@@ -18,12 +18,12 @@ describe('AppNav', () => {
   it('renders a link to every section', () => {
     renderNav();
 
-    expect(screen.getByRole('link', { name: 'Reservations' })).toHaveAttribute('href', '/');
-    expect(screen.getByRole('link', { name: 'Guests' })).toHaveAttribute('href', '/guests');
-    expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/templates');
-    expect(screen.getByRole('link', { name: 'Campaigns' })).toHaveAttribute('href', '/campaigns');
-    expect(screen.getByRole('link', { name: 'Activity Log' })).toHaveAttribute('href', '/activity');
-    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
+    expect(screen.getByRole('link', { name: 'Reservas' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Huéspedes' })).toHaveAttribute('href', '/guests');
+    expect(screen.getByRole('link', { name: 'Plantillas' })).toHaveAttribute('href', '/templates');
+    expect(screen.getByRole('link', { name: 'Campañas' })).toHaveAttribute('href', '/campaigns');
+    expect(screen.getByRole('link', { name: 'Registro de actividad' })).toHaveAttribute('href', '/activity');
+    expect(screen.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/settings');
   });
 
   it('clears the stored token when logging out', async () => {
@@ -31,7 +31,7 @@ describe('AppNav', () => {
 
     renderNav();
 
-    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
+    fireEvent.click(screen.getByRole('button', { name: /cerrar sesión/i }));
 
     await waitFor(() => expect(localStorage.getItem('accessToken')).toBeNull());
   });

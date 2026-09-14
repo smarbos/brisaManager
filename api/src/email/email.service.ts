@@ -12,8 +12,8 @@ export class EmailService {
     const { error } = await this.resend.emails.send({
       from: this.from,
       to,
-      subject: 'Confirm your reservation at La Brisa de Mar del Plata',
-      html: `<p>Hi ${guestName},</p><p>Please confirm your reservation and complete a few quick steps:</p><p><a href="${confirmationUrl}">${confirmationUrl}</a></p>`,
+      subject: 'Confirmá tu reserva en La Brisa de Mar del Plata',
+      html: `<p>Hola ${guestName},</p><p>Por favor confirmá tu reserva y completá unos pasos rápidos:</p><p><a href="${confirmationUrl}">${confirmationUrl}</a></p>`,
     });
 
     if (error) {
@@ -25,8 +25,8 @@ export class EmailService {
     const { error } = await this.resend.emails.send({
       from: this.from,
       to,
-      subject: 'Your reservation is confirmed!',
-      html: `<p>Hi ${guestName},</p><p>Your reservation at La Brisa de Mar del Plata is now fully confirmed. We look forward to hosting you!</p>`,
+      subject: '¡Tu reserva está confirmada!',
+      html: `<p>Hola ${guestName},</p><p>Tu reserva en La Brisa de Mar del Plata está completamente confirmada. ¡Te esperamos!</p>`,
     });
 
     if (error) {

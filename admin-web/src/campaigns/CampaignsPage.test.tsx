@@ -28,11 +28,11 @@ describe('CampaignsPage', () => {
 
     await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
-    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'ALL' } });
+    fireEvent.change(screen.getByLabelText(/plantilla/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/filtro/i), { target: { value: 'ALL' } });
 
     await waitFor(() => expect(previewSpy).toHaveBeenCalledWith({ templateId: 'tpl-1', filterType: 'ALL' }));
-    expect(await screen.findByText(/5 recipient/i)).toBeInTheDocument();
+    expect(await screen.findByText(/5 destinatario/i)).toBeInTheDocument();
   });
 
   it('requires confirmation before sending, then sends', async () => {
@@ -52,11 +52,11 @@ describe('CampaignsPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
-    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'ALL' } });
-    await waitFor(() => expect(screen.getByText(/5 recipient/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/plantilla/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/filtro/i), { target: { value: 'ALL' } });
+    await waitFor(() => expect(screen.getByText(/5 destinatario/i)).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /send campaign/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enviar campaña/i }));
 
     await waitFor(() => expect(sendSpy).toHaveBeenCalledWith({ templateId: 'tpl-1', filterType: 'ALL' }));
   });
@@ -69,11 +69,11 @@ describe('CampaignsPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
-    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'ALL' } });
-    await waitFor(() => expect(screen.getByText(/5 recipient/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/plantilla/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/filtro/i), { target: { value: 'ALL' } });
+    await waitFor(() => expect(screen.getByText(/5 destinatario/i)).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /send campaign/i }));
+    fireEvent.click(screen.getByRole('button', { name: /enviar campaña/i }));
 
     expect(sendSpy).not.toHaveBeenCalled();
   });
@@ -98,20 +98,20 @@ describe('CampaignsPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
-    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'ALL' } });
-    expect(await screen.findByText(/5 recipient/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/plantilla/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/filtro/i), { target: { value: 'ALL' } });
+    expect(await screen.findByText(/5 destinatario/i)).toBeInTheDocument();
 
     // Switch to a different (still valid) template while a slower preview is in flight.
-    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-2' } });
+    fireEvent.change(screen.getByLabelText(/plantilla/i), { target: { value: 'tpl-2' } });
 
     // The stale count must disappear immediately, before the new preview resolves.
-    await waitFor(() => expect(screen.queryByText(/5 recipient/i)).not.toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /send campaign/i })).toBeDisabled();
+    await waitFor(() => expect(screen.queryByText(/5 destinatario/i)).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /enviar campaña/i })).toBeDisabled();
 
     resolveSecondPreview({ recipientCount: 9 });
 
-    expect(await screen.findByText(/9 recipient/i)).toBeInTheDocument();
+    expect(await screen.findByText(/9 destinatario/i)).toBeInTheDocument();
     expect(previewSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -129,21 +129,21 @@ describe('CampaignsPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/plantilla/i), { target: { value: 'tpl-1' } });
     // This triggers the first (slow) preview request, using the default N months of 6.
-    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'STAYED_WITHIN_MONTHS' } });
+    fireEvent.change(screen.getByLabelText(/filtro/i), { target: { value: 'STAYED_WITHIN_MONTHS' } });
 
     // Changing N months before the first request resolves supersedes it with a second request.
-    fireEvent.change(screen.getByLabelText(/N months/i), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText(/N meses/i), { target: { value: '3' } });
 
-    expect(await screen.findByText(/9 recipient/i)).toBeInTheDocument();
+    expect(await screen.findByText(/9 destinatario/i)).toBeInTheDocument();
 
     // The stale first response resolves late; it must not overwrite the current count.
     resolveFirstPreview({ recipientCount: 5 });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(screen.getByText(/9 recipient/i)).toBeInTheDocument();
-    expect(screen.queryByText(/5 recipient/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/9 destinatario/i)).toBeInTheDocument();
+    expect(screen.queryByText(/5 destinatario/i)).not.toBeInTheDocument();
   });
 
   it('loads and displays campaign history', async () => {
@@ -166,6 +166,6 @@ describe('CampaignsPage', () => {
     renderPage();
 
     expect(await screen.findByText('Welcome back')).toBeInTheDocument();
-    expect(screen.getByText(/5 recipient/i)).toBeInTheDocument();
+    expect(screen.getByText(/5 destinatario/i)).toBeInTheDocument();
   });
 });

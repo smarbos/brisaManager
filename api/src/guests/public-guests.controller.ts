@@ -10,7 +10,7 @@ export class PublicGuestsController {
   async unsubscribe(@Param('token') token: string, @Res() res: Response) {
     await this.guestsService.unsubscribeByToken(token);
     res.send(
-      '<html><body><h1>You have been unsubscribed</h1><p>You will no longer receive marketing emails from La Brisa de Mar del Plata.</p></body></html>',
+      '<html><body><h1>Te diste de baja</h1><p>Ya no vas a recibir emails de marketing de La Brisa de Mar del Plata.</p></body></html>',
     );
   }
 }

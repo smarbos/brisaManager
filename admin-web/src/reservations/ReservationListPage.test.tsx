@@ -40,7 +40,7 @@ describe('ReservationListPage', () => {
 
     renderPage();
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not load the reservations/i));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no se pudieron cargar las reservas/i));
   });
 
   it('refetches when the source filter changes', async () => {
@@ -50,7 +50,7 @@ describe('ReservationListPage', () => {
 
     await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: undefined, status: undefined }));
 
-    fireEvent.change(screen.getByLabelText(/source/i), { target: { value: 'AIRBNB' } });
+    fireEvent.change(screen.getByLabelText(/canal/i), { target: { value: 'AIRBNB' } });
 
     await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: 'AIRBNB', status: undefined }));
   });
@@ -73,6 +73,6 @@ describe('ReservationListPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText(/no longer in channel feed/i)).toBeInTheDocument();
+    expect(await screen.findByText(/ya no está en el calendario del canal/i)).toBeInTheDocument();
   });
 });

@@ -41,7 +41,7 @@ describe('ReservationEventsController (e2e)', () => {
     });
     reservationId = reservation.id;
     await prisma.reservationEvent.create({
-      data: { reservationId, type: 'RESERVATION_CREATED', detail: 'Created manually by staff' },
+      data: { reservationId, type: 'RESERVATION_CREATED', detail: 'Creada manualmente por el personal' },
     });
   });
 
@@ -65,7 +65,7 @@ describe('ReservationEventsController (e2e)', () => {
     const event = response.body.find((e: { reservationId: string }) => e.reservationId === reservationId);
     expect(event).toMatchObject({
       type: 'RESERVATION_CREATED',
-      detail: 'Created manually by staff',
+      detail: 'Creada manualmente por el personal',
       reservation: { guestName: 'E2E Log Guest', source: 'DIRECT' },
     });
   });

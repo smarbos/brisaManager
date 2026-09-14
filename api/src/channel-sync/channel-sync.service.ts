@@ -36,13 +36,13 @@ export class ChannelSyncService {
       {
         source: 'BOOKING',
         icalUrl: settings.bookingIcalUrl,
-        guestNamePlaceholder: 'Booking.com Guest',
+        guestNamePlaceholder: 'Huésped de Booking.com',
         displayName: 'Booking.com',
       },
       {
         source: 'AIRBNB',
         icalUrl: settings.airbnbIcalUrl,
-        guestNamePlaceholder: 'Airbnb Guest',
+        guestNamePlaceholder: 'Huésped de Airbnb',
         displayName: 'Airbnb',
       },
     ];
@@ -63,7 +63,7 @@ export class ChannelSyncService {
     });
 
     if (errorMessage) {
-      await this.emailService.sendAlert('Channel sync failed', errorMessage);
+      await this.emailService.sendAlert('Falló la sincronización de canales', errorMessage);
     }
   }
 
@@ -110,7 +110,7 @@ export class ChannelSyncService {
           totalAmount: 0,
           currency: 'ARS',
           status: 'PENDING',
-          notes: `Auto-created from ${config.displayName} calendar sync. Please add the guest's real contact info.`,
+          notes: `Creada automáticamente desde la sincronización de calendario de ${config.displayName}. Por favor, completá los datos de contacto reales del huésped.`,
         },
         update: {
           missingFromChannelAt: null,
@@ -121,7 +121,7 @@ export class ChannelSyncService {
         await this.eventsService.record(
           upserted.id,
           'RESERVATION_CREATED',
-          `Created via ${config.displayName} calendar sync`,
+          `Creada vía sincronización de calendario de ${config.displayName}`,
         );
       }
 

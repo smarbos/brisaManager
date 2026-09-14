@@ -39,7 +39,7 @@ export class ReservationsService {
       },
     });
 
-    await this.eventsService.record(reservation.id, 'RESERVATION_CREATED', 'Created manually by staff');
+    await this.eventsService.record(reservation.id, 'RESERVATION_CREATED', 'Creada manualmente por el personal');
 
     if (reservation.guestEmail) {
       await this.sendInitialEmail(reservation);
@@ -78,8 +78,8 @@ export class ReservationsService {
     } catch (error) {
       await this.eventsService.record(reservation.id, 'INITIAL_EMAIL_FAILED', (error as Error).message);
       await this.emailService.sendAlert(
-        'Initial confirmation email failed',
-        `Reservation ${reservation.id} for ${reservation.guestName} was created but the initial email failed to send: ${(error as Error).message}`,
+        'Falló el email de confirmación inicial',
+        `Se creó la reserva ${reservation.id} para ${reservation.guestName} pero falló el envío del email de confirmación inicial: ${(error as Error).message}`,
       );
     }
   }

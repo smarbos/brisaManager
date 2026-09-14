@@ -39,7 +39,7 @@ export function SettingsPage() {
         setLastSyncError(settings.lastChannelSyncError);
       })
       .catch(() => {
-        setLoadError('Could not load the settings. Please reload the page.');
+        setLoadError('No se pudo cargar la configuración. Por favor, recargá la página.');
       });
   }, []);
 
@@ -79,7 +79,7 @@ export function SettingsPage() {
       });
       setSaved(true);
     } catch {
-      setSaveError('Could not save the settings. Please try again.');
+      setSaveError('No se pudo guardar la configuración. Por favor, intentá de nuevo.');
     }
   }
 
@@ -92,7 +92,7 @@ export function SettingsPage() {
       setLastSyncAt(settings.lastChannelSyncAt);
       setLastSyncError(settings.lastChannelSyncError);
     } catch {
-      setSyncActionError('Could not trigger the sync. Please try again.');
+      setSyncActionError('No se pudo iniciar la sincronización. Por favor, intentá de nuevo.');
     } finally {
       setSyncing(false);
     }
@@ -104,7 +104,7 @@ export function SettingsPage() {
       const { url } = await getGoogleCalendarConnectUrl();
       window.location.href = url;
     } catch {
-      setGoogleActionError('Could not start the Google Calendar connection. Please try again.');
+      setGoogleActionError('No se pudo iniciar la conexión con Google Calendar. Por favor, intentá de nuevo.');
     }
   }
 
@@ -114,7 +114,7 @@ export function SettingsPage() {
       await disconnectGoogleCalendar();
       setGoogleConnected(false);
     } catch {
-      setGoogleActionError('Could not disconnect Google Calendar. Please try again.');
+      setGoogleActionError('No se pudo desconectar Google Calendar. Por favor, intentá de nuevo.');
     }
   }
 
@@ -127,7 +127,7 @@ export function SettingsPage() {
       setGoogleLastSyncAt(status.lastSyncAt);
       setGoogleLastSyncError(status.lastSyncError);
     } catch {
-      setGoogleActionError('Could not trigger the sync. Please try again.');
+      setGoogleActionError('No se pudo iniciar la sincronización. Por favor, intentá de nuevo.');
     } finally {
       setGoogleSyncing(false);
     }
@@ -136,66 +136,66 @@ export function SettingsPage() {
   return (
     <PageContainer>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <h1 className="font-heading text-2xl font-semibold text-heading">Settings</h1>
+        <h1 className="font-heading text-2xl font-semibold text-heading">Configuración</h1>
         {loadError && <Alert>{loadError}</Alert>}
         {saveError && <Alert>{saveError}</Alert>}
-        <FormField label="House rules">
+        <FormField label="Reglas de la casa">
           <Textarea value={houseRulesText} onChange={(e) => setHouseRulesText(e.target.value)} rows={8} />
         </FormField>
-        <FormField label="Payment instructions">
+        <FormField label="Instrucciones de pago">
           <Textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={8} />
         </FormField>
-        <FormField label="Booking.com iCal URL">
+        <FormField label="URL de iCal de Booking.com">
           <Input value={bookingIcalUrl} onChange={(e) => setBookingIcalUrl(e.target.value)} />
         </FormField>
-        <FormField label="Airbnb iCal URL">
+        <FormField label="URL de iCal de Airbnb">
           <Input value={airbnbIcalUrl} onChange={(e) => setAirbnbIcalUrl(e.target.value)} />
         </FormField>
-        {saved && <Alert tone="success">Saved</Alert>}
-        <Button type="submit">Save</Button>
+        {saved && <Alert tone="success">Guardado</Alert>}
+        <Button type="submit">Guardar</Button>
       </form>
       <section className="mt-8">
-        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Channel sync</h2>
+        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Sincronización de canales</h2>
         {lastSyncError ? (
-          <Alert>Last sync failed: {lastSyncError}</Alert>
+          <Alert>Falló la última sincronización: {lastSyncError}</Alert>
         ) : (
           <p className="text-sm text-text-muted">
-            Last synced: {lastSyncAt ? formatDateTime(lastSyncAt) : 'never'}
+            Última sincronización: {lastSyncAt ? formatDateTime(lastSyncAt) : 'nunca'}
           </p>
         )}
         {syncActionError && <Alert>{syncActionError}</Alert>}
         <Button type="button" variant="secondary" className="mt-3" onClick={handleSyncNow} disabled={syncing}>
-          Sync now
+          Sincronizar ahora
         </Button>
       </section>
       <section className="mt-8">
         <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Google Calendar</h2>
-        {googleCallbackStatus === 'connected' && <Alert tone="success">Google Calendar connected.</Alert>}
-        {googleCallbackStatus === 'error' && <Alert>Could not connect Google Calendar. Please try again.</Alert>}
+        {googleCallbackStatus === 'connected' && <Alert tone="success">Google Calendar conectado.</Alert>}
+        {googleCallbackStatus === 'error' && <Alert>No se pudo conectar Google Calendar. Por favor, intentá de nuevo.</Alert>}
         {googleActionError && <Alert>{googleActionError}</Alert>}
         {googleConnected ? (
           <>
             {googleLastSyncError ? (
-              <Alert>Last sync failed: {googleLastSyncError}</Alert>
+              <Alert>Falló la última sincronización: {googleLastSyncError}</Alert>
             ) : (
               <p className="text-sm text-text-muted">
-                Connected — last synced: {googleLastSyncAt ? formatDateTime(googleLastSyncAt) : 'never'}
+                Conectado — última sincronización: {googleLastSyncAt ? formatDateTime(googleLastSyncAt) : 'nunca'}
               </p>
             )}
             <div className="mt-3 flex gap-3">
               <Button type="button" variant="secondary" onClick={handleSyncGoogleCalendarNow} disabled={googleSyncing}>
-                Sync Google Calendar now
+                Sincronizar Google Calendar ahora
               </Button>
               <Button type="button" variant="danger" onClick={handleDisconnectGoogleCalendar}>
-                Disconnect
+                Desconectar
               </Button>
             </div>
           </>
         ) : (
           <>
-            <p className="text-sm text-text-muted">Not connected.</p>
+            <p className="text-sm text-text-muted">No conectado.</p>
             <Button type="button" className="mt-3" onClick={handleConnectGoogleCalendar}>
-              Connect Google Calendar
+              Conectar Google Calendar
             </Button>
           </>
         )}

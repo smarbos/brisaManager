@@ -16,11 +16,11 @@ describe('ReservationFormPage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByLabelText(/guest name/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/nombre del huésped/i), { target: { value: 'Jane Doe' } });
     fireEvent.change(screen.getByLabelText(/check-in/i), { target: { value: '2026-01-10' } });
     fireEvent.change(screen.getByLabelText(/check-out/i), { target: { value: '2026-01-15' } });
-    fireEvent.change(screen.getByLabelText(/total amount/i), { target: { value: '100000' } });
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    fireEvent.change(screen.getByLabelText(/monto total/i), { target: { value: '100000' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
     await waitFor(() => expect(createSpy).toHaveBeenCalled());
   });
@@ -52,7 +52,7 @@ describe('ReservationFormPage', () => {
       </MemoryRouter>,
     );
 
-    const button = await screen.findByRole('button', { name: /mark 30% payment received/i });
+    const button = await screen.findByRole('button', { name: /marcar pago del 30% como recibido/i });
     fireEvent.click(button);
 
     await waitFor(() => expect(markSpy).toHaveBeenCalledWith('1'));
@@ -82,10 +82,10 @@ describe('ReservationFormPage', () => {
       </MemoryRouter>,
     );
 
-    const button = await screen.findByRole('button', { name: /mark 30% payment received/i });
+    const button = await screen.findByRole('button', { name: /marcar pago del 30% como recibido/i });
     fireEvent.click(button);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not mark the 30% payment/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo marcar el pago del 30%/i);
   });
 
   it('shows a warning banner when editing a reservation missing from its channel feed', async () => {
@@ -112,7 +112,7 @@ describe('ReservationFormPage', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText(/no longer found in the channel's calendar/i)).toBeInTheDocument();
+    expect(await screen.findByText(/ya no está en el calendario del canal/i)).toBeInTheDocument();
   });
 
   it('shows a warning when the entered dates overlap an existing reservation', async () => {

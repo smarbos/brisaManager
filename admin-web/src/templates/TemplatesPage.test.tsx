@@ -28,10 +28,10 @@ describe('TemplatesPage', () => {
 
     await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
 
-    fireEvent.change(screen.getByLabelText(/^name$/i), { target: { value: 'New template' } });
-    fireEvent.change(screen.getByLabelText(/subject/i), { target: { value: 'Subject' } });
-    fireEvent.change(screen.getByLabelText(/body/i), { target: { value: '<p>Body</p>' } });
-    fireEvent.click(screen.getByRole('button', { name: /create template/i }));
+    fireEvent.change(screen.getByLabelText(/^nombre$/i), { target: { value: 'New template' } });
+    fireEvent.change(screen.getByLabelText(/asunto/i), { target: { value: 'Subject' } });
+    fireEvent.change(screen.getByLabelText(/cuerpo/i), { target: { value: '<p>Body</p>' } });
+    fireEvent.click(screen.getByRole('button', { name: /crear plantilla/i }));
 
     await waitFor(() =>
       expect(createSpy).toHaveBeenCalledWith({ name: 'New template', subject: 'Subject', bodyHtml: '<p>Body</p>' }),
@@ -48,7 +48,7 @@ describe('TemplatesPage', () => {
 
     await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
+    fireEvent.click(screen.getByRole('button', { name: /eliminar/i }));
 
     await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith('1'));
   });
@@ -63,8 +63,8 @@ describe('TemplatesPage', () => {
 
     await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
+    fireEvent.click(screen.getByRole('button', { name: /eliminar/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not delete/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo eliminar/i);
   });
 });
