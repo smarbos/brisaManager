@@ -41,14 +41,26 @@ export function CampaignsPage() {
       setRecipientCount(null);
       return;
     }
+    // Clear the previous count immediately so a stale value is never shown
+    // (and the Send button stays disabled) while the new preview is in flight.
+    setRecipientCount(null);
+    let isCurrent = true;
     const query = {
       templateId,
       filterType,
       filterMonths: filterType === 'ALL' ? undefined : Number(filterMonths),
     };
     previewCampaign(query)
-      .then((result) => setRecipientCount(result.recipientCount))
-      .catch(() => setRecipientCount(null));
+      .then((result) => {
+        // Discard the result if a newer selection has superseded this request.
+        if (isCurrent) setRecipientCount(result.recipientCount);
+      })
+      .catch(() => {
+        if (isCurrent) setRecipientCount(null);
+      });
+    return () => {
+      isCurrent = false;
+    };
   }, [templateId, filterType, filterMonths]);
 
   async function handleSend() {
