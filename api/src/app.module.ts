@@ -11,6 +11,7 @@ import { PublicReservationsModule } from './public-reservations/public-reservati
 import { ChannelSyncModule } from './channel-sync/channel-sync.module';
 import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
 import { GuestsModule } from './guests/guests.module';
+import { CampaignTemplatesModule } from './campaign-templates/campaign-templates.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { GuestsModule } from './guests/guests.module';
     ChannelSyncModule,
     GoogleCalendarModule,
     GuestsModule,
+    CampaignTemplatesModule,
   ],
   controllers: [AppController],
 })
