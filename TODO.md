@@ -30,6 +30,8 @@ High-level backlog of everything requested so far. Each section will be broken d
 ## 5. Marketing / CRM
 - [ ] Maintain guest history across all past reservations
 - [ ] Ability to send marketing campaigns to past guests
+- [ ] **Future idea (not yet designed/approved):** at the guest check-in link (the existing guest onboarding portal), have the guest validate/confirm their phone number and email as part of the flow. If what they enter differs from what's on file, update our stored record to match what the guest confirmed — treat the guest's own confirmation as more trustworthy than whatever staff originally typed in (same reasoning already applied to `Guest.name` syncing from contract acceptance in sub-project 5). Needs its own brainstorming pass: what exactly "validate" means (a plain confirm-or-edit field vs. an actual verification step like an OTP/confirmation link), and whether changing the on-file contact info for an in-progress reservation should require any staff review before taking effect.
+- [ ] **Future idea (not yet designed/approved):** give `Guest` a history-of-changes record — e.g. if a guest updates their phone number (per the idea above, or any other future edit path), keep a trail of what changed, from what value to what value, and when. Needs its own brainstorming pass: whether this is a generic audit log (reusable pattern, similar to `ReservationEvent` from sub-project 2) or a narrower phone/email-only change log, and how much history is actually useful to show staff versus just useful for debugging a "wait, why did this change" question.
 
 ## 6. Infrastructure & deployment
 - [ ] Dockerized infrastructure (local dev environment)
