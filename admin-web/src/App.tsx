@@ -6,6 +6,7 @@ import { ReservationListPage } from './reservations/ReservationListPage';
 import { ReservationFormPage } from './reservations/ReservationFormPage';
 import { SettingsPage } from './settings/SettingsPage';
 import { GuestListPage } from './guests/GuestListPage';
+import { TemplatesPage } from './templates/TemplatesPage';
 
 export function App() {
   return (
@@ -19,6 +20,7 @@ export function App() {
             <Route path="/reservations/:id" element={<ReservationFormPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/guests" element={<GuestListPage />} />
+            <Route path="/templates" element={<TemplatesPage />} />
           </Route>
         </Routes>
       </AuthProvider>

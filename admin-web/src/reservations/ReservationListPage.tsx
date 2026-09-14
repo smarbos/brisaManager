@@ -38,6 +38,7 @@ export function ReservationListPage() {
       </button>
       <Link to="/settings">Settings</Link>
       <Link to="/guests">Guests</Link>
+      <Link to="/templates">Templates</Link>
       <Link to="/reservations/new">New reservation</Link>
       <div>
         <label>
