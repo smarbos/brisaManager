@@ -5,6 +5,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { ReservationListPage } from './reservations/ReservationListPage';
 import { ReservationFormPage } from './reservations/ReservationFormPage';
 import { SettingsPage } from './settings/SettingsPage';
+import { GuestListPage } from './guests/GuestListPage';
 
 export function App() {
   return (
@@ -17,6 +18,7 @@ export function App() {
             <Route path="/reservations/new" element={<ReservationFormPage />} />
             <Route path="/reservations/:id" element={<ReservationFormPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/guests" element={<GuestListPage />} />
           </Route>
         </Routes>
       </AuthProvider>

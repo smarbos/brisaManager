@@ -37,6 +37,7 @@ export function ReservationListPage() {
         Log out
       </button>
       <Link to="/settings">Settings</Link>
+      <Link to="/guests">Guests</Link>
       <Link to="/reservations/new">New reservation</Link>
       <div>
         <label>
