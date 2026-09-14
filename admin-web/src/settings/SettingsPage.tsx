@@ -24,6 +24,7 @@ export function SettingsPage() {
   const [googleLastSyncError, setGoogleLastSyncError] = useState<string | null>(null);
   const [googleActionError, setGoogleActionError] = useState<string | null>(null);
   const [googleSyncing, setGoogleSyncing] = useState(false);
+  const [googleCallbackStatus, setGoogleCallbackStatus] = useState<'connected' | 'error' | null>(null);
 
   useEffect(() => {
     getSettings()
@@ -38,6 +39,14 @@ export function SettingsPage() {
       .catch(() => {
         setLoadError('Could not load the settings. Please reload the page.');
       });
+  }, []);
+
+  useEffect(() => {
+    const googleCalendarParam = new URLSearchParams(window.location.search).get('googleCalendar');
+    if (googleCalendarParam === 'connected' || googleCalendarParam === 'error') {
+      setGoogleCallbackStatus(googleCalendarParam);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   }, []);
 
   useEffect(() => {
@@ -161,6 +170,10 @@ export function SettingsPage() {
       </section>
       <section>
         <h2>Google Calendar</h2>
+        {googleCallbackStatus === 'connected' && <p role="status">Google Calendar connected.</p>}
+        {googleCallbackStatus === 'error' && (
+          <p role="alert">Could not connect Google Calendar. Please try again.</p>
+        )}
         {googleActionError && <p role="alert">{googleActionError}</p>}
         {googleConnected ? (
           <>

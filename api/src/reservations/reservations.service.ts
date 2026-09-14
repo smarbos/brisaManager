@@ -41,7 +41,10 @@ export class ReservationsService {
       await this.sendInitialEmail(reservation);
     }
 
-    await this.googleCalendarPushService.pushReservation(reservation);
+    // Fire-and-forget: pushReservation never throws (all failures are caught and logged
+    // internally), but it makes a network round-trip to Google with no timeout — awaiting it
+    // would needlessly hold the HTTP response open on every reservation create.
+    void this.googleCalendarPushService.pushReservation(reservation);
 
     return reservation;
   }
@@ -109,7 +112,8 @@ export class ReservationsService {
       },
     });
 
-    await this.googleCalendarPushService.pushReservation(updated);
+    // Fire-and-forget: see the comment in create() above.
+    void this.googleCalendarPushService.pushReservation(updated);
 
     return updated;
   }

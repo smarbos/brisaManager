@@ -1,10 +1,22 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SettingsPage } from './SettingsPage';
 import * as settingsApi from '../api/settings';
 import * as googleCalendarApi from '../api/google-calendar';
 
 describe('SettingsPage', () => {
+  beforeEach(() => {
+    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
+      connected: false,
+      lastSyncAt: null,
+      lastSyncError: null,
+    });
+  });
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/settings');
+  });
+
   it('loads existing settings and saves changes', async () => {
     vi.spyOn(settingsApi, 'getSettings').mockResolvedValue({
       houseRulesText: 'Existing rules',
@@ -21,11 +33,6 @@ describe('SettingsPage', () => {
       airbnbIcalUrl: null,
       lastChannelSyncAt: null,
       lastChannelSyncError: null,
-    });
-    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
-      connected: false,
-      lastSyncAt: null,
-      lastSyncError: null,
     });
 
     render(<SettingsPage />);
@@ -47,11 +54,6 @@ describe('SettingsPage', () => {
 
   it('shows an alert when loading settings fails', async () => {
     vi.spyOn(settingsApi, 'getSettings').mockRejectedValue(new Error('network error'));
-    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
-      connected: false,
-      lastSyncAt: null,
-      lastSyncError: null,
-    });
 
     render(<SettingsPage />);
 
@@ -68,11 +70,6 @@ describe('SettingsPage', () => {
       lastChannelSyncError: null,
     });
     vi.spyOn(settingsApi, 'updateSettings').mockRejectedValue(new Error('network error'));
-    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
-      connected: false,
-      lastSyncAt: null,
-      lastSyncError: null,
-    });
 
     render(<SettingsPage />);
 
@@ -102,11 +99,6 @@ describe('SettingsPage', () => {
         lastChannelSyncError: null,
       });
     const syncSpy = vi.spyOn(settingsApi, 'runChannelSync').mockResolvedValue({ triggeredAt: '2026-09-13T12:00:00.000Z' });
-    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
-      connected: false,
-      lastSyncAt: null,
-      lastSyncError: null,
-    });
 
     render(<SettingsPage />);
 
@@ -127,11 +119,6 @@ describe('SettingsPage', () => {
       airbnbIcalUrl: null,
       lastChannelSyncAt: null,
       lastChannelSyncError: null,
-    });
-    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
-      connected: false,
-      lastSyncAt: null,
-      lastSyncError: null,
     });
     const connectUrlSpy = vi
       .spyOn(googleCalendarApi, 'getGoogleCalendarConnectUrl')
@@ -175,5 +162,39 @@ describe('SettingsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /disconnect/i }));
     await waitFor(() => expect(disconnectSpy).toHaveBeenCalled());
+  });
+
+  it('shows a success message and cleans the URL when redirected back with ?googleCalendar=connected', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue({
+      houseRulesText: 'Rules',
+      paymentInstructions: 'Pay',
+      bookingIcalUrl: null,
+      airbnbIcalUrl: null,
+      lastChannelSyncAt: null,
+      lastChannelSyncError: null,
+    });
+    window.history.pushState(null, '', '/settings?googleCalendar=connected');
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByText(/google calendar connected/i)).toBeInTheDocument();
+    expect(window.location.search).toBe('');
+  });
+
+  it('shows an alert when redirected back with ?googleCalendar=error', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue({
+      houseRulesText: 'Rules',
+      paymentInstructions: 'Pay',
+      bookingIcalUrl: null,
+      airbnbIcalUrl: null,
+      lastChannelSyncAt: null,
+      lastChannelSyncError: null,
+    });
+    window.history.pushState(null, '', '/settings?googleCalendar=error');
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByText(/could not connect google calendar/i)).toBeInTheDocument();
+    expect(window.location.search).toBe('');
   });
 });

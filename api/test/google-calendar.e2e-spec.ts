@@ -69,6 +69,18 @@ describe('GoogleCalendarController (e2e)', () => {
     expect(response.headers.location).toContain('googleCalendar=error');
   });
 
+  it('redirects to the admin app with an error when the callback has a code but a missing/invalid state', async () => {
+    // No consent URL was generated in this test run, so there is no pending state to match —
+    // this exercises the same CSRF protection a forged callback (attacker-initiated OAuth flow
+    // using our public client id) would hit.
+    const response = await request(app.getHttpServer())
+      .get('/google-calendar/oauth/callback')
+      .query({ code: 'some-code', state: 'forged-state' })
+      .expect(302);
+
+    expect(response.headers.location).toContain('googleCalendar=error');
+  });
+
   it('requires authentication for sync-now', async () => {
     await request(app.getHttpServer()).post('/google-calendar/sync-now').expect(401);
   });

@@ -6,7 +6,7 @@ import { Reservation } from '@prisma/client';
 
 describe('GoogleCalendarPushService', () => {
   let service: GoogleCalendarPushService;
-  let authService: { getAuthorizedCalendarClient: jest.Mock };
+  let authService: { getAuthorizedCalendarClient: jest.Mock; isInvalidGrantError: jest.Mock; disconnect: jest.Mock };
   let prisma: { reservation: { update: jest.Mock }; settings: { update: jest.Mock } };
   let insertMock: jest.Mock;
   let updateEventMock: jest.Mock;
@@ -49,7 +49,11 @@ describe('GoogleCalendarPushService', () => {
     deleteEventMock = jest.fn();
     calendarClient = { events: { insert: insertMock, update: updateEventMock, delete: deleteEventMock } };
 
-    authService = { getAuthorizedCalendarClient: jest.fn() };
+    authService = {
+      getAuthorizedCalendarClient: jest.fn(),
+      isInvalidGrantError: jest.fn().mockReturnValue(false),
+      disconnect: jest.fn().mockResolvedValue(undefined),
+    };
     prisma = { reservation: { update: jest.fn() }, settings: { update: jest.fn() } };
 
     const moduleRef = await Test.createTestingModule({
@@ -138,5 +142,48 @@ describe('GoogleCalendarPushService', () => {
       where: { id: 'singleton' },
       data: { lastCalendarSyncError: expect.stringContaining('quota exceeded') },
     });
+  });
+
+  it('falls back to creating a new event when the stored googleEventId no longer exists (404)', async () => {
+    authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+    const reservation = { ...baseReservation, googleEventId: 'stale-event-1' };
+    updateEventMock.mockRejectedValue({ code: 404 });
+    insertMock.mockResolvedValue({ data: { id: 'new-event-1' } });
+
+    await service.pushReservation(reservation);
+
+    expect(updateEventMock).toHaveBeenCalledWith({
+      calendarId: 'cal-1',
+      eventId: 'stale-event-1',
+      requestBody: expect.objectContaining({ summary: 'Jane Doe (Direct)' }),
+    });
+    expect(insertMock).toHaveBeenCalledWith({
+      calendarId: 'cal-1',
+      requestBody: expect.objectContaining({ summary: 'Jane Doe (Direct)' }),
+    });
+    expect(prisma.reservation.update).toHaveBeenCalledWith({
+      where: { id: 'res-1' },
+      data: { googleEventId: 'new-event-1' },
+    });
+  });
+
+  it('disconnects when the Calendar API reports an invalid_grant error', async () => {
+    authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+    authService.isInvalidGrantError.mockReturnValue(true);
+    insertMock.mockRejectedValue(new Error('invalid_grant: token revoked'));
+
+    await service.pushReservation(baseReservation);
+
+    expect(authService.disconnect).toHaveBeenCalled();
+  });
+
+  it('does not disconnect for an error that is not an invalid_grant error', async () => {
+    authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+    authService.isInvalidGrantError.mockReturnValue(false);
+    insertMock.mockRejectedValue(new Error('quota exceeded'));
+
+    await service.pushReservation(baseReservation);
+
+    expect(authService.disconnect).not.toHaveBeenCalled();
   });
 });

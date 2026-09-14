@@ -54,6 +54,12 @@ export class GoogleCalendarPushService {
       } catch {
         // Swallow: recording the sync error must never itself throw.
       }
+      if (this.authService.isInvalidGrantError(error)) {
+        // Google has revoked/expired our refresh token — clear the stored credentials so
+        // Settings correctly shows "not connected" / prompts reconnecting, instead of silently
+        // failing every push forever.
+        await this.authService.disconnect().catch(() => undefined);
+      }
     }
   }
 
@@ -84,8 +90,17 @@ export class GoogleCalendarPushService {
     };
 
     if (reservation.googleEventId) {
-      await client.events.update({ calendarId, eventId: reservation.googleEventId, requestBody });
-      return;
+      try {
+        await client.events.update({ calendarId, eventId: reservation.googleEventId, requestBody });
+        return;
+      } catch (error) {
+        // The stored event id no longer exists on the (possibly new, post-reconnect) calendar —
+        // fall back to creating a fresh event, same as the "never pushed yet" branch below, so
+        // the reservation's calendar sync recovers instead of failing forever.
+        if (!isNotFoundError(error)) {
+          throw error;
+        }
+      }
     }
 
     const created = await client.events.insert({ calendarId, requestBody });

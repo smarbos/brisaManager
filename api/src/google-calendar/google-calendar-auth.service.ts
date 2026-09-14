@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { calendar, calendar_v3 } from '@googleapis/calendar';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,6 +10,13 @@ const DEDICATED_CALENDAR_NAME = 'La Brisa de Mar del Plata - Reservations';
 
 @Injectable()
 export class GoogleCalendarAuthService {
+  // Holds the CSRF nonce for the OAuth flow currently in progress. This is a single-process
+  // app with a single admin connect flow at a time, so an in-memory field — rather than a DB
+  // column — is enough to bridge the few seconds between "admin clicks Connect" and "Google
+  // redirects back", and it's cleared immediately after a successful check so it can never be
+  // replayed.
+  private pendingOAuthState: string | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly settingsService: SettingsService,
@@ -24,14 +32,24 @@ export class GoogleCalendarAuthService {
 
   getConsentUrl(): string {
     const client = this.buildOAuthClient();
+    const state = randomBytes(32).toString('hex');
+    this.pendingOAuthState = state;
     return client.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
       scope: CALENDAR_SCOPES,
+      state,
     });
   }
 
-  async handleOAuthCallback(code: string): Promise<void> {
+  async handleOAuthCallback(code: string, state: string): Promise<void> {
+    if (state !== this.pendingOAuthState || this.pendingOAuthState === null) {
+      throw new UnauthorizedException('Invalid or missing OAuth state');
+    }
+    // Clear before doing the token exchange so this state value can never be replayed, even if
+    // the exchange below fails and the admin retries.
+    this.pendingOAuthState = null;
+
     const client = this.buildOAuthClient();
     const { tokens } = await client.getToken(code);
     if (!tokens.refresh_token) {
