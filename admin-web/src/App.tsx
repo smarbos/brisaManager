@@ -7,6 +7,7 @@ import { ReservationFormPage } from './reservations/ReservationFormPage';
 import { SettingsPage } from './settings/SettingsPage';
 import { GuestListPage } from './guests/GuestListPage';
 import { TemplatesPage } from './templates/TemplatesPage';
+import { CampaignsPage } from './campaigns/CampaignsPage';
 
 export function App() {
   return (
@@ -21,6 +22,7 @@ export function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/guests" element={<GuestListPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
+            <Route path="/campaigns" element={<CampaignsPage />} />
           </Route>
         </Routes>
       </AuthProvider>
