@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listGuests, Guest } from '../api/guests';
-import { PageContainer, PageHeader, Alert, Table, Badge } from '../ui';
-
-const thClass = 'border-b border-border px-3 py-2 text-left font-semibold text-text-muted';
-const tdClass = 'border-b border-border px-3 py-2';
+import { PageContainer, PageHeader, Alert, Table, Badge, tableThClass as thClass, tableTdClass as tdClass } from '../ui';
 
 export function GuestListPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
