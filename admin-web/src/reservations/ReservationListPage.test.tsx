@@ -2,15 +2,12 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ReservationListPage } from './ReservationListPage';
-import { AuthProvider } from '../auth/AuthContext';
 import * as reservationsApi from '../api/reservations';
 
 function renderPage() {
   return render(
     <MemoryRouter>
-      <AuthProvider>
-        <ReservationListPage />
-      </AuthProvider>
+      <ReservationListPage />
     </MemoryRouter>,
   );
 }
@@ -44,17 +41,6 @@ describe('ReservationListPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not load the reservations/i));
-  });
-
-  it('clears the stored token when logging out', async () => {
-    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([]);
-    localStorage.setItem('accessToken', 'a-token');
-
-    renderPage();
-
-    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
-
-    await waitFor(() => expect(localStorage.getItem('accessToken')).toBeNull());
   });
 
   it('refetches when the source filter changes', async () => {

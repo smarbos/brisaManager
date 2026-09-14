@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   listCampaignTemplates,
   createCampaignTemplate,
@@ -50,14 +49,7 @@ export function TemplatesPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Templates"
-        nav={
-          <Link to="/" className="text-accent hover:underline">
-            Reservations
-          </Link>
-        }
-      />
+      <PageHeader title="Templates" />
       {loadError && <Alert>{loadError}</Alert>}
       {actionError && <Alert>{actionError}</Alert>}
       <form onSubmit={handleCreate} className="mb-8 flex flex-col gap-4">

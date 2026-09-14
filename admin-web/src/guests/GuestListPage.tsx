@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { listGuests, Guest } from '../api/guests';
 import { PageContainer, PageHeader, Alert, Table, Badge, tableThClass as thClass, tableTdClass as tdClass } from '../ui';
 
@@ -15,14 +14,7 @@ export function GuestListPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Guests"
-        nav={
-          <Link to="/" className="text-accent hover:underline">
-            Reservations
-          </Link>
-        }
-      />
+      <PageHeader title="Guests" />
       {error && <Alert>{error}</Alert>}
       <Table>
         <thead>
