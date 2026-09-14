@@ -44,7 +44,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return handleResponse<T>(response);
 }
 
-async function upload<T>(path: string, formData: FormData): Promise<T> {
+async function upload<T>(path: string, formData: FormData, options: { signal?: AbortSignal } = {}): Promise<T> {
   const token = localStorage.getItem('accessToken');
 
   // No Content-Type header here: the browser must set multipart/form-data with the
@@ -55,6 +55,7 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: formData,
+    signal: options.signal,
   });
 
   return handleResponse<T>(response);

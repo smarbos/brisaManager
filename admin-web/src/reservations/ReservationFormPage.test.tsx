@@ -51,6 +51,7 @@ describe('ReservationFormPage', () => {
     expect(screen.getByLabelText(/check-in/i)).toHaveValue('2026-11-06');
     expect(screen.getByLabelText(/check-out/i)).toHaveValue('2026-11-08');
     expect(screen.getByLabelText(/huéspedes/i)).toHaveValue(3);
+    expect(screen.getByLabelText(/canal/i)).toHaveValue('BOOKING');
   });
 
   it('does not overwrite a field the user already typed when the extraction returns null for it', async () => {
@@ -96,6 +97,31 @@ describe('ReservationFormPage', () => {
     fireEvent.change(input, { target: { files: [file] } });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no pudimos leer los datos de la captura/i);
+  });
+
+  it('shows the fallback notice and does not change the channel when every extracted field is null', async () => {
+    vi.spyOn(reservationImportApi, 'parseScreenshot').mockResolvedValue({
+      guestName: null,
+      checkIn: null,
+      checkOut: null,
+      paxCount: null,
+      externalReference: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const file = new File(['fake-image-bytes'], 'screenshot.jpg', { type: 'image/jpeg' });
+    const input = screen.getByLabelText(/importar desde captura de booking\.com/i);
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no pudimos leer los datos de la captura/i);
+    expect(screen.getByLabelText(/canal/i)).toHaveValue('DIRECT');
   });
 
   it('marks the 30% payment as received and refreshes the progress list', async () => {
