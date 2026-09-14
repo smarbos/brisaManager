@@ -17,17 +17,6 @@ interface PlatformConfig {
 // next scheduled tick) indefinitely.
 const ICAL_FETCH_TIMEOUT_MS = 15_000;
 
-// Both Booking.com ("CLOSED - Not available") and Airbnb ("Airbnb (Not available)") represent
-// a host-blocked date range as a VEVENT in the same feed as real bookings, with no other
-// distinguishing field. These are availability blocks, not reservations, and must never be
-// imported as one.
-const BLOCKED_DATES_SUMMARY_PATTERN = /not available/i;
-
-function isBlockedDatesEvent(event: ical.VEvent): boolean {
-  const summary = typeof event.summary === 'string' ? event.summary : event.summary?.val;
-  return BLOCKED_DATES_SUMMARY_PATTERN.test(summary ?? '');
-}
-
 @Injectable()
 export class ChannelSyncService {
   constructor(
@@ -91,8 +80,7 @@ export class ChannelSyncService {
     const parsed = await fromURLWithOptions(config.icalUrl, { signal: AbortSignal.timeout(ICAL_FETCH_TIMEOUT_MS) });
 
     const events = Object.values(parsed).filter(
-      (component): component is ical.VEvent =>
-        component !== undefined && component.type === 'VEVENT' && !isBlockedDatesEvent(component),
+      (component): component is ical.VEvent => component !== undefined && component.type === 'VEVENT',
     );
     const currentUids = new Set(events.map((event) => event.uid));
 
