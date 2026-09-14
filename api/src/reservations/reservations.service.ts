@@ -39,6 +39,8 @@ export class ReservationsService {
       },
     });
 
+    await this.eventsService.record(reservation.id, 'RESERVATION_CREATED', 'Created manually by staff');
+
     if (reservation.guestEmail) {
       await this.sendInitialEmail(reservation);
     }

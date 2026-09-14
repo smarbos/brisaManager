@@ -9,16 +9,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { EmailService } from '../email/email.service';
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
+import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 
 describe('ChannelSyncService', () => {
   let service: ChannelSyncService;
   let prisma: {
-    reservation: { findMany: jest.Mock; upsert: jest.Mock; update: jest.Mock };
+    reservation: { findMany: jest.Mock; findUnique: jest.Mock; upsert: jest.Mock; update: jest.Mock };
     settings: { update: jest.Mock };
   };
   let settingsService: { get: jest.Mock };
   let emailService: { sendAlert: jest.Mock };
   let googleCalendarPushService: { pushReservation: jest.Mock };
+  let eventsService: { record: jest.Mock };
   let fromURLMock: jest.Mock;
 
   beforeEach(async () => {
@@ -28,6 +30,7 @@ describe('ChannelSyncService', () => {
     prisma = {
       reservation: {
         findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue(null),
         upsert: jest.fn(),
         update: jest.fn(),
       },
@@ -36,6 +39,7 @@ describe('ChannelSyncService', () => {
     settingsService = { get: jest.fn() };
     emailService = { sendAlert: jest.fn() };
     googleCalendarPushService = { pushReservation: jest.fn() };
+    eventsService = { record: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -44,6 +48,7 @@ describe('ChannelSyncService', () => {
         { provide: SettingsService, useValue: settingsService },
         { provide: EmailService, useValue: emailService },
         { provide: GoogleCalendarPushService, useValue: googleCalendarPushService },
+        { provide: ReservationEventsService, useValue: eventsService },
       ],
     }).compile();
 
@@ -101,6 +106,37 @@ describe('ChannelSyncService', () => {
       }),
       update: { missingFromChannelAt: null },
     });
+  });
+
+  it('records a RESERVATION_CREATED event for a booking not seen before', async () => {
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({
+      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
+    });
+    prisma.reservation.upsert.mockResolvedValue({ id: 'res-1' });
+
+    await service.syncAll();
+
+    expect(eventsService.record).toHaveBeenCalledWith('res-1', 'RESERVATION_CREATED', 'Created via Booking.com calendar sync');
+  });
+
+  it('does not record a RESERVATION_CREATED event when the reservation already existed', async () => {
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({
+      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
+    });
+    prisma.reservation.findUnique.mockResolvedValue({ id: 'res-1' });
+    prisma.reservation.upsert.mockResolvedValue({ id: 'res-1', missingFromChannelAt: null });
+
+    await service.syncAll();
+
+    expect(eventsService.record).not.toHaveBeenCalled();
   });
 
   it('pushes the upserted reservation to Google Calendar for every synced booking', async () => {

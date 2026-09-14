@@ -18,4 +18,11 @@ export class ReservationEventsService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  listAll() {
+    return this.prisma.reservationEvent.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { reservation: { select: { guestName: true, source: true } } },
+    });
+  }
 }

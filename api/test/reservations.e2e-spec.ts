@@ -33,6 +33,16 @@ describe('ReservationsController (e2e)', () => {
   });
 
   afterAll(async () => {
+    // Reservations created through the real ReservationsService.create() now have a
+    // RESERVATION_CREATED event row pointing at them — delete those first, or the reservation
+    // delete below violates the ReservationEvent -> Reservation foreign key.
+    const createdReservations = await prisma.reservation.findMany({
+      where: { guestName: { in: ['E2E Guest', 'Overlap E2E Guest'] } },
+      select: { id: true },
+    });
+    await prisma.reservationEvent.deleteMany({
+      where: { reservationId: { in: createdReservations.map((r) => r.id) } },
+    });
     await prisma.reservation.deleteMany({ where: { guestName: 'E2E Guest' } });
     await prisma.reservation.deleteMany({ where: { guestName: 'Overlap E2E Guest' } });
     await prisma.adminUser.deleteMany({ where: { email: 'e2e-reservations@labrisa.com.ar' } });
