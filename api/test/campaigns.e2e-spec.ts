@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
+import { EmailService } from '../src/email/email.service';
 
 describe('CampaignsController (e2e)', () => {
   let app: INestApplication;
@@ -12,9 +13,19 @@ describe('CampaignsController (e2e)', () => {
   let accessToken: string;
   let templateId: string;
   let guestId: string;
+  let sentCampaignId: string;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // Stub EmailService so this test never makes a real outbound call to Resend: `filterType:
+    // 'ALL'` below resolves every non-unsubscribed Guest row in the (shared) test database, not
+    // just the one this file creates, so an un-mocked send here could email real people on any
+    // environment with a real RESEND_API_KEY configured. overrideProvider still exercises the
+    // full HTTP -> controller -> service -> Prisma path; it only replaces the one call that would
+    // hit the external API.
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(EmailService)
+      .useValue({ sendMarketingEmail: jest.fn().mockResolvedValue(undefined) })
+      .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
@@ -41,7 +52,16 @@ describe('CampaignsController (e2e)', () => {
   });
 
   afterAll(async () => {
-    await prisma.campaignRecipient.deleteMany({ where: { guestId } });
+    // filterType: 'ALL' in the send test below sweeps in every non-unsubscribed guest that
+    // happens to exist in the shared test database at that moment, not just this file's own
+    // guest — so it can create CampaignRecipient rows pointing at guests owned by other spec
+    // files. Clean up by campaignId (every recipient this campaign created, whichever guest it
+    // references) rather than by guestId, so no dangling recipient row is left blocking another
+    // spec file's own guest.delete() in its afterAll (CampaignRecipient.guest is a required
+    // relation with the default onDelete: Restrict).
+    if (sentCampaignId) {
+      await prisma.campaignRecipient.deleteMany({ where: { campaignId: sentCampaignId } });
+    }
     await prisma.campaign.deleteMany({ where: { templateId } });
     await prisma.campaignTemplate.deleteMany({ where: { id: templateId } });
     await prisma.guest.deleteMany({ where: { id: guestId } });
@@ -77,6 +97,12 @@ describe('CampaignsController (e2e)', () => {
       .expect(201);
 
     expect(sendResponse.body.recipientCount).toBeGreaterThanOrEqual(1);
+    // EmailService is stubbed above to always resolve, so every attempted recipient is SENT.
+    expect(
+      sendResponse.body.recipients.every((r: { status: string }) => r.status === 'SENT'),
+    ).toBe(true);
+
+    sentCampaignId = sendResponse.body.id;
 
     const historyResponse = await request(app.getHttpServer())
       .get('/campaigns')
