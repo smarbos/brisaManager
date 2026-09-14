@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
+import { GuestsService } from '../guests/guests.service';
 
 @Injectable()
 export class PublicReservationsService {
@@ -11,6 +12,7 @@ export class PublicReservationsService {
     private readonly settingsService: SettingsService,
     private readonly eventsService: ReservationEventsService,
     private readonly confirmationService: ReservationConfirmationService,
+    private readonly guestsService: GuestsService,
   ) {}
 
   private async findByToken(token: string) {
@@ -83,6 +85,14 @@ export class PublicReservationsService {
 
     await this.eventsService.record(reservation.id, 'CONTRACT_ACCEPTED');
     await this.confirmationService.maybeAutoConfirm(reservation.id);
+
+    if (updated.guestEmail) {
+      void this.guestsService.syncFromReservation(updated.id, {
+        email: updated.guestEmail,
+        name: fullName,
+        phone: updated.guestPhone,
+      });
+    }
 
     return { contractAcceptedAt: updated.contractAcceptedAt };
   }

@@ -6,6 +6,7 @@ import { ReservationEventsService } from '../reservation-events/reservation-even
 import { EmailService } from '../email/email.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
+import { GuestsService } from '../guests/guests.service';
 
 describe('ReservationsService', () => {
   let service: ReservationsService;
@@ -21,6 +22,7 @@ describe('ReservationsService', () => {
   let emailService: { sendInitialConfirmationEmail: jest.Mock; sendAlert: jest.Mock };
   let confirmationService: { maybeAutoConfirm: jest.Mock };
   let googleCalendarPushService: { pushReservation: jest.Mock };
+  let guestsService: { syncFromReservation: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -35,6 +37,7 @@ describe('ReservationsService', () => {
     emailService = { sendInitialConfirmationEmail: jest.fn(), sendAlert: jest.fn() };
     confirmationService = { maybeAutoConfirm: jest.fn() };
     googleCalendarPushService = { pushReservation: jest.fn() };
+    guestsService = { syncFromReservation: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -44,6 +47,7 @@ describe('ReservationsService', () => {
         { provide: EmailService, useValue: emailService },
         { provide: ReservationConfirmationService, useValue: confirmationService },
         { provide: GoogleCalendarPushService, useValue: googleCalendarPushService },
+        { provide: GuestsService, useValue: guestsService },
       ],
     }).compile();
 
@@ -130,6 +134,41 @@ describe('ReservationsService', () => {
     await service.update('1', { guestName: 'Updated Name' });
 
     expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(updated);
+  });
+
+  it('syncs the guest after creating a reservation with a guestEmail', async () => {
+    const created = { id: '1', ...validDto, guestEmail: 'jane@example.com', guestPhone: '+54911' };
+    prisma.reservation.create.mockResolvedValue(created);
+
+    await service.create({ ...validDto, guestEmail: 'jane@example.com', guestPhone: '+54911' });
+
+    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('1', {
+      email: 'jane@example.com',
+      name: created.guestName,
+      phone: '+54911',
+    });
+  });
+
+  it('does not sync a guest when guestEmail is absent on create', async () => {
+    prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto, guestEmail: null });
+
+    await service.create(validDto);
+
+    expect(guestsService.syncFromReservation).not.toHaveBeenCalled();
+  });
+
+  it('syncs the guest after updating a reservation with a guestEmail', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto });
+    const updated = { id: '1', ...validDto, guestEmail: 'jane@example.com', guestName: 'Updated Name', guestPhone: null };
+    prisma.reservation.update.mockResolvedValue(updated);
+
+    await service.update('1', { guestName: 'Updated Name' });
+
+    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('1', {
+      email: 'jane@example.com',
+      name: 'Updated Name',
+      phone: null,
+    });
   });
 
   describe('externalReference normalization on update', () => {
