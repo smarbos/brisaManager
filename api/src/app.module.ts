@@ -10,6 +10,7 @@ import { EmailModule } from './email/email.module';
 import { PublicReservationsModule } from './public-reservations/public-reservations.module';
 import { ChannelSyncModule } from './channel-sync/channel-sync.module';
 import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
+import { GuestsModule } from './guests/guests.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
     PublicReservationsModule,
     ChannelSyncModule,
     GoogleCalendarModule,
+    GuestsModule,
   ],
   controllers: [AppController],
 })
