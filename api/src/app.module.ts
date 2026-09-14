@@ -13,6 +13,7 @@ import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
 import { GuestsModule } from './guests/guests.module';
 import { CampaignTemplatesModule } from './campaign-templates/campaign-templates.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { ReservationImportModule } from './reservation-import/reservation-import.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
     GuestsModule,
     CampaignTemplatesModule,
     CampaignsModule,
+    ReservationImportModule,
   ],
   controllers: [AppController],
 })
