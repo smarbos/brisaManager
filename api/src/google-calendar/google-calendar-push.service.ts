@@ -7,8 +7,15 @@ import { PrismaService } from '../prisma/prisma.service';
 const SOURCE_LABELS: Record<ReservationSource, string> = {
   BOOKING: 'Booking.com',
   AIRBNB: 'Airbnb',
-  DIRECT: 'Direct',
-  OTHER: 'Other',
+  DIRECT: 'Directo',
+  OTHER: 'Otro',
+};
+
+const STATUS_LABELS: Record<Reservation['status'], string> = {
+  PENDING: 'Pendiente',
+  CONFIRMED: 'Confirmada',
+  CANCELLED: 'Cancelada',
+  COMPLETED: 'Completada',
 };
 
 function toDateOnly(date: Date): string {
@@ -84,7 +91,7 @@ export class GoogleCalendarPushService {
   private async upsertEvent(client: calendar_v3.Calendar, calendarId: string, reservation: Reservation): Promise<void> {
     const requestBody: calendar_v3.Schema$Event = {
       summary: `${reservation.guestName} (${SOURCE_LABELS[reservation.source]})`,
-      description: `Pax: ${reservation.paxCount}\nTotal: ${Number(reservation.totalAmount)} ${reservation.currency}\nStatus: ${reservation.status}`,
+      description: `Huéspedes: ${reservation.paxCount}\nTotal: ${Number(reservation.totalAmount)} ${reservation.currency}\nEstado: ${STATUS_LABELS[reservation.status]}`,
       start: { date: toDateOnly(reservation.checkIn) },
       end: { date: toDateOnly(reservation.checkOut) },
     };

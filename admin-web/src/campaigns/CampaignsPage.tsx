@@ -9,6 +9,7 @@ import {
 } from '../api/campaigns';
 import { PageContainer, PageHeader, Alert, Badge, Button, FormField, Input, Select } from '../ui';
 import { formatDateTime } from '../lib/date';
+import { recipientStatusLabel } from '../lib/labels';
 
 export function CampaignsPage() {
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
@@ -23,14 +24,14 @@ export function CampaignsPage() {
   useEffect(() => {
     listCampaignTemplates()
       .then(setTemplates)
-      .catch(() => setError('Could not load templates.'));
+      .catch(() => setError('No se pudieron cargar las plantillas.'));
     reloadHistory();
   }, []);
 
   function reloadHistory() {
     listCampaignHistory()
       .then(setHistory)
-      .catch(() => setError('Could not load campaign history.'));
+      .catch(() => setError('No se pudo cargar el historial de campañas.'));
   }
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export function CampaignsPage() {
 
   async function handleSend() {
     if (!templateId || !filterType) return;
-    if (!window.confirm(`Send this campaign to ${recipientCount ?? 0} guest(s)? This cannot be undone.`)) {
+    if (!window.confirm(`¿Enviar esta campaña a ${recipientCount ?? 0} huésped(es)? Esta acción no se puede deshacer.`)) {
       return;
     }
     setError(null);
@@ -79,7 +80,7 @@ export function CampaignsPage() {
       });
       reloadHistory();
     } catch {
-      setError('Could not send the campaign. Please try again.');
+      setError('No se pudo enviar la campaña. Por favor, intentá de nuevo.');
     } finally {
       setSending(false);
     }
@@ -87,14 +88,14 @@ export function CampaignsPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Campaigns" />
+      <PageHeader title="Campañas" />
       {error && <Alert>{error}</Alert>}
       <section className="mb-8">
-        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Compose</h2>
+        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Redactar</h2>
         <div className="flex flex-col gap-4">
-          <FormField label="Template">
+          <FormField label="Plantilla">
             <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-              <option value="">Select a template</option>
+              <option value="">Seleccioná una plantilla</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -102,39 +103,39 @@ export function CampaignsPage() {
               ))}
             </Select>
           </FormField>
-          <FormField label="Filter">
+          <FormField label="Filtro">
             <Select value={filterType} onChange={(e) => setFilterType(e.target.value as CampaignFilterType | '')}>
-              <option value="">Select a filter</option>
-              <option value="ALL">All guests</option>
-              <option value="STAYED_WITHIN_MONTHS">Stayed within the last N months</option>
-              <option value="NOT_STAYED_WITHIN_MONTHS">Not stayed within the last N months</option>
+              <option value="">Seleccioná un filtro</option>
+              <option value="ALL">Todos los huéspedes</option>
+              <option value="STAYED_WITHIN_MONTHS">Se hospedaron en los últimos N meses</option>
+              <option value="NOT_STAYED_WITHIN_MONTHS">No se hospedaron en los últimos N meses</option>
             </Select>
           </FormField>
           {filterType !== 'ALL' && filterType !== '' && (
-            <FormField label="N months">
+            <FormField label="N meses">
               <Input type="number" min={1} value={filterMonths} onChange={(e) => setFilterMonths(e.target.value)} />
             </FormField>
           )}
           {recipientCount !== null && (
-            <p className="text-sm text-text-muted">{recipientCount} recipient(s) match this filter.</p>
+            <p className="text-sm text-text-muted">{recipientCount} destinatario(s) coinciden con este filtro.</p>
           )}
           <Button type="button" onClick={handleSend} disabled={sending || recipientCount === null}>
-            Send campaign
+            Enviar campaña
           </Button>
         </div>
       </section>
       <section>
-        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">History</h2>
+        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Historial</h2>
         <ul className="flex flex-col gap-4">
           {history.map((c) => (
             <li key={c.id} className="border-b border-border pb-4">
               <p>
-                {c.template.name} — {c.recipientCount} recipient(s) — {formatDateTime(c.sentAt)}
+                {c.template.name} — {c.recipientCount} destinatario(s) — {formatDateTime(c.sentAt)}
               </p>
               <ul className="mt-2 flex flex-col gap-1">
                 {c.recipients.map((r) => (
                   <li key={r.id} className="flex items-center gap-2 text-sm">
-                    <Badge tone={r.status === 'SENT' ? 'success' : 'danger'}>{r.status}</Badge>
+                    <Badge tone={r.status === 'SENT' ? 'success' : 'danger'}>{recipientStatusLabel(r.status)}</Badge>
                     {r.error ? <span>{r.error}</span> : null}
                   </li>
                 ))}

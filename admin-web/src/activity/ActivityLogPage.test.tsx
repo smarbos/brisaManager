@@ -35,10 +35,10 @@ describe('ActivityLogPage', () => {
 
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('Reservation created')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Reserva creada')).toBeInTheDocument());
     expect(screen.getByText('Created via Booking.com calendar sync')).toBeInTheDocument();
     expect(screen.getByText('Booking.com Guest')).toBeInTheDocument();
-    expect(screen.getByText('Dates confirmed')).toBeInTheDocument();
+    expect(screen.getByText('Fechas confirmadas')).toBeInTheDocument();
     expect(screen.getByText('Jane Doe')).toBeInTheDocument();
   });
 
@@ -65,6 +65,6 @@ describe('ActivityLogPage', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not load the activity log/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo cargar el registro de actividad/i);
   });
 });

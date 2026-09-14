@@ -6,7 +6,7 @@ function HomePlaceholder() {
   return (
     <PageContainer>
       <h1 className="font-heading text-2xl font-semibold text-heading">La Brisa de Mar del Plata</h1>
-      <p className="mt-2 text-text-muted">Guest portal coming soon.</p>
+      <p className="mt-2 text-text-muted">Portal de huéspedes próximamente.</p>
     </PageContainer>
   );
 }

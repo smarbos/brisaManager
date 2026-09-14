@@ -85,7 +85,7 @@ describe('GoogleCalendarPushService', () => {
     expect(insertMock).toHaveBeenCalledWith({
       calendarId: 'cal-1',
       requestBody: expect.objectContaining({
-        summary: 'Jane Doe (Direct)',
+        summary: 'Jane Doe (Directo)',
         start: { date: '2026-05-01' },
         end: { date: '2026-05-05' },
       }),
@@ -105,7 +105,7 @@ describe('GoogleCalendarPushService', () => {
     expect(updateEventMock).toHaveBeenCalledWith({
       calendarId: 'cal-1',
       eventId: 'event-1',
-      requestBody: expect.objectContaining({ summary: 'Jane Doe (Direct)' }),
+      requestBody: expect.objectContaining({ summary: 'Jane Doe (Directo)' }),
     });
     expect(insertMock).not.toHaveBeenCalled();
   });
@@ -156,11 +156,11 @@ describe('GoogleCalendarPushService', () => {
     expect(updateEventMock).toHaveBeenCalledWith({
       calendarId: 'cal-1',
       eventId: 'stale-event-1',
-      requestBody: expect.objectContaining({ summary: 'Jane Doe (Direct)' }),
+      requestBody: expect.objectContaining({ summary: 'Jane Doe (Directo)' }),
     });
     expect(insertMock).toHaveBeenCalledWith({
       calendarId: 'cal-1',
-      requestBody: expect.objectContaining({ summary: 'Jane Doe (Direct)' }),
+      requestBody: expect.objectContaining({ summary: 'Jane Doe (Directo)' }),
     });
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-1' },

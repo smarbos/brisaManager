@@ -13,6 +13,7 @@ import {
 import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } from './types';
 import { PageContainer, Alert, Button, FormField, Input, Select, Textarea } from '../ui';
 import { formatDate, formatDateTime } from '../lib/date';
+import { sourceLabel, eventTypeLabel } from '../lib/labels';
 
 const emptyForm = {
   guestName: '',
@@ -56,7 +57,7 @@ export function ReservationFormPage() {
       })
       .catch((err) => {
         console.error('Failed to load the reservation', err);
-        setError('Could not load the reservation');
+        setError('No se pudo cargar la reserva');
       });
     listReservationEvents(id)
       .then(setEvents)
@@ -86,7 +87,7 @@ export function ReservationFormPage() {
       await markPaymentReceived(id);
       loadReservation();
     } catch {
-      setActionError('Could not mark the 30% payment as received. Please try again.');
+      setActionError('No se pudo marcar el pago del 30% como recibido. Por favor, intentá de nuevo.');
     }
   }
 
@@ -97,7 +98,7 @@ export function ReservationFormPage() {
       await markDepositReceived(id);
       loadReservation();
     } catch {
-      setActionError('Could not mark the deposit as received. Please try again.');
+      setActionError('No se pudo marcar el depósito como recibido. Por favor, intentá de nuevo.');
     }
   }
 
@@ -108,7 +109,7 @@ export function ReservationFormPage() {
       await markDepositReturned(id);
       loadReservation();
     } catch {
-      setActionError('Could not mark the deposit as returned. Please try again.');
+      setActionError('No se pudo marcar el depósito como devuelto. Por favor, intentá de nuevo.');
     }
   }
 
@@ -128,7 +129,7 @@ export function ReservationFormPage() {
       }
       navigate('/');
     } catch {
-      setError('Could not save the reservation');
+      setError('No se pudo guardar la reserva');
     }
   }
 
@@ -136,21 +137,21 @@ export function ReservationFormPage() {
     <PageContainer>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <h1 className="font-heading text-2xl font-semibold text-heading">
-          {isEditing ? 'Edit reservation' : 'New reservation'}
+          {isEditing ? 'Editar reserva' : 'Nueva reserva'}
         </h1>
         {overlaps.length > 0 && (
           <Alert>
-            <p>These dates overlap with existing reservation(s):</p>
+            <p>Estas fechas se superponen con otra(s) reserva(s):</p>
             <ul className="mt-1 list-disc pl-5">
               {overlaps.map((o) => (
                 <li key={o.id}>
-                  {o.guestName} ({o.source}): {formatDate(o.checkIn)} – {formatDate(o.checkOut)}
+                  {o.guestName} ({sourceLabel(o.source)}): {formatDate(o.checkIn)} – {formatDate(o.checkOut)}
                 </li>
               ))}
             </ul>
           </Alert>
         )}
-        <FormField label="Guest name">
+        <FormField label="Nombre del huésped">
           <Input value={form.guestName} onChange={(e) => setForm({ ...form, guestName: e.target.value })} required />
         </FormField>
         <FormField label="Check-in">
@@ -169,7 +170,7 @@ export function ReservationFormPage() {
             required
           />
         </FormField>
-        <FormField label="Pax">
+        <FormField label="Huéspedes">
           <Input
             type="number"
             min={1}
@@ -178,15 +179,15 @@ export function ReservationFormPage() {
             required
           />
         </FormField>
-        <FormField label="Source">
+        <FormField label="Canal">
           <Select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value as ReservationSource })}>
             <option value="BOOKING">Booking.com</option>
             <option value="AIRBNB">Airbnb</option>
-            <option value="DIRECT">Direct</option>
-            <option value="OTHER">Other</option>
+            <option value="DIRECT">Directo</option>
+            <option value="OTHER">Otro</option>
           </Select>
         </FormField>
-        <FormField label="Total amount">
+        <FormField label="Monto total">
           <Input
             type="number"
             min={0}
@@ -195,82 +196,82 @@ export function ReservationFormPage() {
             required
           />
         </FormField>
-        <FormField label="Currency">
+        <FormField label="Moneda">
           <Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} required />
         </FormField>
         {isEditing && (
-          <FormField label="Status">
+          <FormField label="Estado">
             <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ReservationStatus })}>
-              <option value="PENDING">Pending</option>
-              <option value="CONFIRMED">Confirmed</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="COMPLETED">Completed</option>
+              <option value="PENDING">Pendiente</option>
+              <option value="CONFIRMED">Confirmada</option>
+              <option value="CANCELLED">Cancelada</option>
+              <option value="COMPLETED">Completada</option>
             </Select>
           </FormField>
         )}
-        <FormField label="Notes">
+        <FormField label="Notas">
           <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         </FormField>
         {error && <Alert>{error}</Alert>}
-        <Button type="submit">Save</Button>
+        <Button type="submit">Guardar</Button>
       </form>
       {isEditing && reservationRecord && (
         <section className="mt-8">
-          <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Onboarding progress</h2>
+          <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Progreso del onboarding</h2>
           {actionError && <Alert>{actionError}</Alert>}
           {reservationRecord.missingFromChannelAt && (
             <Alert>
-              No longer found in the channel's calendar as of{' '}
-              {formatDateTime(reservationRecord.missingFromChannelAt)} — confirm with the guest or cancel
-              this reservation.
+              Ya no está en el calendario del canal desde el{' '}
+              {formatDateTime(reservationRecord.missingFromChannelAt)} — confirmá con el huésped o cancelá
+              esta reserva.
             </Alert>
           )}
           <ul className="flex flex-col gap-2">
-            <li>Dates confirmed: {reservationRecord.datesConfirmedAt ? 'Yes' : 'No'}</li>
+            <li>Fechas confirmadas: {reservationRecord.datesConfirmedAt ? 'Sí' : 'No'}</li>
             <li>
-              Contract accepted:{' '}
-              {reservationRecord.contractAcceptedAt ? `Yes (${reservationRecord.contractAcceptedName})` : 'No'}
+              Contrato aceptado:{' '}
+              {reservationRecord.contractAcceptedAt ? `Sí (${reservationRecord.contractAcceptedName})` : 'No'}
             </li>
             <li>
-              30% payment received:{' '}
+              Pago del 30% recibido:{' '}
               {reservationRecord.confirmationPaymentReceivedAt ? (
-                'Yes'
+                'Sí'
               ) : (
                 <Button type="button" variant="secondary" onClick={handleMarkPaymentReceived}>
-                  Mark 30% payment received
+                  Marcar pago del 30% como recibido
                 </Button>
               )}
             </li>
             <li>
-              Deposit received:{' '}
+              Depósito recibido:{' '}
               {reservationRecord.depositReceivedAt ? (
-                'Yes'
+                'Sí'
               ) : (
                 <Button type="button" variant="secondary" onClick={handleMarkDepositReceived}>
-                  Mark deposit received
+                  Marcar depósito como recibido
                 </Button>
               )}
             </li>
             <li>
-              Deposit returned:{' '}
+              Depósito devuelto:{' '}
               {reservationRecord.depositReturnedAt ? (
-                'Yes'
+                'Sí'
               ) : (
                 <Button type="button" variant="secondary" onClick={handleMarkDepositReturned}>
-                  Mark deposit returned
+                  Marcar depósito como devuelto
                 </Button>
               )}
             </li>
           </ul>
           <Button type="button" variant="secondary" className="mt-3" onClick={copyGuestLink}>
-            Copy guest confirmation link
+            Copiar link de confirmación para el huésped
           </Button>
 
-          <h2 className="mb-3 mt-6 font-heading text-lg font-semibold text-heading">Event history</h2>
+          <h2 className="mb-3 mt-6 font-heading text-lg font-semibold text-heading">Historial de eventos</h2>
           <ul className="flex flex-col gap-1 text-sm text-text-muted">
             {events.map((event) => (
               <li key={event.id}>
-                {event.type} — {formatDateTime(event.createdAt)}
+                {eventTypeLabel(event.type)} — {formatDateTime(event.createdAt)}
                 {event.detail ? `: ${event.detail}` : ''}
               </li>
             ))}

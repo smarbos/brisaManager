@@ -17,7 +17,7 @@ export function LoginPage() {
       await login(email, password);
       navigate('/');
     } catch {
-      setError('Invalid email or password');
+      setError('Email o contraseña incorrectos');
     }
   }
 
@@ -25,14 +25,14 @@ export function LoginPage() {
     <PageContainer>
       <form onSubmit={handleSubmit} className="mx-auto flex max-w-sm flex-col gap-4">
         <h1 className="font-heading text-2xl font-semibold text-heading">La Brisa - Admin</h1>
-        <FormField label="Email">
+        <FormField label="Correo electrónico">
           <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
         </FormField>
-        <FormField label="Password">
+        <FormField label="Contraseña">
           <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />
         </FormField>
         {error && <Alert>{error}</Alert>}
-        <Button type="submit">Log in</Button>
+        <Button type="submit">Iniciar sesión</Button>
       </form>
     </PageContainer>
   );

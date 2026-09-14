@@ -39,7 +39,7 @@ describe('GuestListPage', () => {
 
     await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
     expect(screen.getByText('John Smith')).toBeInTheDocument();
-    expect(screen.getByText(/unsubscribed/i)).toBeInTheDocument();
+    expect(screen.getByText(/dado de baja/i)).toBeInTheDocument();
   });
 
   it('shows an alert when guests cannot be loaded', async () => {
@@ -47,6 +47,6 @@ describe('GuestListPage', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not load the guests/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudieron cargar los huéspedes/i);
   });
 });

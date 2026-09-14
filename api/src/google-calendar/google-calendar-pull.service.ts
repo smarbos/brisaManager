@@ -164,7 +164,7 @@ export class GoogleCalendarPullService {
         currency: 'ARS',
         status: 'PENDING',
         googleEventId: event.id,
-        notes: 'Auto-created from a Google Calendar event. Please review pax count, price, and contact details.',
+        notes: 'Creada automáticamente desde un evento de Google Calendar. Por favor, revisá la cantidad de huéspedes, el precio y los datos de contacto.',
       },
     });
   }

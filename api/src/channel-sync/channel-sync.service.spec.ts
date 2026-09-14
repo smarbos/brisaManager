@@ -102,7 +102,7 @@ describe('ChannelSyncService', () => {
         source: 'BOOKING',
         externalReference: 'uid-1',
         status: 'PENDING',
-        guestName: 'Booking.com Guest',
+        guestName: 'Huésped de Booking.com',
       }),
       update: { missingFromChannelAt: null },
     });
@@ -120,7 +120,7 @@ describe('ChannelSyncService', () => {
 
     await service.syncAll();
 
-    expect(eventsService.record).toHaveBeenCalledWith('res-1', 'RESERVATION_CREATED', 'Created via Booking.com calendar sync');
+    expect(eventsService.record).toHaveBeenCalledWith('res-1', 'RESERVATION_CREATED', 'Creada vía sincronización de calendario de Booking.com');
   });
 
   it('does not record a RESERVATION_CREATED event when the reservation already existed', async () => {

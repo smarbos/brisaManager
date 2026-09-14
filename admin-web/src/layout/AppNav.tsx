@@ -3,12 +3,12 @@ import { useAuth } from '../auth/AuthContext';
 import { Button } from '../ui';
 
 const sections = [
-  { to: '/', label: 'Reservations' },
-  { to: '/guests', label: 'Guests' },
-  { to: '/templates', label: 'Templates' },
-  { to: '/campaigns', label: 'Campaigns' },
-  { to: '/activity', label: 'Activity Log' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/', label: 'Reservas' },
+  { to: '/guests', label: 'Huéspedes' },
+  { to: '/templates', label: 'Plantillas' },
+  { to: '/campaigns', label: 'Campañas' },
+  { to: '/activity', label: 'Registro de actividad' },
+  { to: '/settings', label: 'Configuración' },
 ];
 
 export function AppNav() {
@@ -31,7 +31,7 @@ export function AppNav() {
             </Link>
           ))}
           <Button type="button" variant="secondary" onClick={handleLogout}>
-            Log out
+            Cerrar sesión
           </Button>
         </nav>
       </div>

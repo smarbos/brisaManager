@@ -86,7 +86,7 @@ describe('ReservationsService', () => {
 
     await service.create(validDto);
 
-    expect(eventsService.record).toHaveBeenCalledWith('1', 'RESERVATION_CREATED', 'Created manually by staff');
+    expect(eventsService.record).toHaveBeenCalledWith('1', 'RESERVATION_CREATED', 'Creada manualmente por el personal');
   });
 
   it('normalizes an empty-string externalReference to null on create', async () => {

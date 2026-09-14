@@ -37,9 +37,9 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    await waitFor(() => expect(screen.getByLabelText(/house rules/i)).toHaveValue('Existing rules'));
+    await waitFor(() => expect(screen.getByLabelText(/reglas de la casa/i)).toHaveValue('Existing rules'));
 
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalledWith({
       houseRulesText: 'Existing rules',
@@ -49,7 +49,7 @@ describe('SettingsPage', () => {
       lastChannelSyncAt: null,
       lastChannelSyncError: null,
     }));
-    expect(await screen.findByRole('status')).toHaveTextContent(/saved/i);
+    expect(await screen.findByRole('status')).toHaveTextContent(/guardado/i);
   });
 
   it('shows an alert when loading settings fails', async () => {
@@ -57,7 +57,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not load the settings/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo cargar la configuración/i);
   });
 
   it('shows an alert when saving settings fails', async () => {
@@ -73,11 +73,11 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    await waitFor(() => expect(screen.getByLabelText(/house rules/i)).toHaveValue('Existing rules'));
+    await waitFor(() => expect(screen.getByLabelText(/reglas de la casa/i)).toHaveValue('Existing rules'));
 
-    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not save the settings/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo guardar la configuración/i);
   });
 
   it('loads and displays iCal URLs and sync status, and triggers a sync', async () => {
@@ -102,13 +102,13 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    await waitFor(() => expect(screen.getByLabelText(/booking\.com ical url/i)).toHaveValue('https://booking.example/cal.ics'));
+    await waitFor(() => expect(screen.getByLabelText(/url de ical de booking\.com/i)).toHaveValue('https://booking.example/cal.ics'));
 
-    fireEvent.click(screen.getByRole('button', { name: /sync now/i }));
+    fireEvent.click(screen.getByRole('button', { name: /sincronizar ahora/i }));
 
     await waitFor(() => expect(syncSpy).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByText('Last synced: never')).not.toBeInTheDocument());
-    expect(screen.getByText(/^last synced: (?!never)\S/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Última sincronización: nunca')).not.toBeInTheDocument());
+    expect(screen.getByText(/^última sincronización: (?!nunca)\S/i)).toBeInTheDocument();
   });
 
   it('shows "Connect Google Calendar" when not connected, and starts the OAuth flow', async () => {
@@ -126,7 +126,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    const connectButton = await screen.findByRole('button', { name: /connect google calendar/i });
+    const connectButton = await screen.findByRole('button', { name: /conectar google calendar/i });
     fireEvent.click(connectButton);
 
     await waitFor(() => expect(connectUrlSpy).toHaveBeenCalled());
@@ -155,12 +155,12 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(await screen.findByRole('button', { name: /disconnect/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /desconectar/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /sync google calendar now/i }));
+    fireEvent.click(screen.getByRole('button', { name: /sincronizar google calendar ahora/i }));
     await waitFor(() => expect(syncSpy).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: /disconnect/i }));
+    fireEvent.click(screen.getByRole('button', { name: /desconectar/i }));
     await waitFor(() => expect(disconnectSpy).toHaveBeenCalled());
   });
 
@@ -177,7 +177,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(await screen.findByText(/google calendar connected/i)).toBeInTheDocument();
+    expect(await screen.findByText(/google calendar conectado/i)).toBeInTheDocument();
     expect(window.location.search).toBe('');
   });
 
@@ -194,7 +194,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(await screen.findByText(/could not connect google calendar/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no se pudo conectar google calendar/i)).toBeInTheDocument();
     expect(window.location.search).toBe('');
   });
 });

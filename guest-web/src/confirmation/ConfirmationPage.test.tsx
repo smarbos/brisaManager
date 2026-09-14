@@ -38,7 +38,7 @@ describe('ConfirmationPage', () => {
 
     renderAt('bad-token');
 
-    expect(await screen.findByText(/reservation not found/i)).toBeInTheDocument();
+    expect(await screen.findByText(/reserva no encontrada/i)).toBeInTheDocument();
   });
 
   it('shows a distinct error message for a non-404 failure, without implying the link is invalid', async () => {
@@ -48,8 +48,8 @@ describe('ConfirmationPage', () => {
 
     renderAt('tok-1');
 
-    expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument();
-    expect(screen.queryByText(/reservation not found/i)).not.toBeInTheDocument();
+    expect(await screen.findByText(/algo salió mal/i)).toBeInTheDocument();
+    expect(screen.queryByText(/reserva no encontrada/i)).not.toBeInTheDocument();
   });
 
   it('displays the 30% confirmation payment amount', async () => {
@@ -57,7 +57,7 @@ describe('ConfirmationPage', () => {
 
     renderAt('tok-1');
 
-    expect(await screen.findByText(/30% confirmation payment \(30000 ARS\)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/pago de confirmación del 30% \(30000 ARS\)/i)).toBeInTheDocument();
   });
 
   it('renders reservation details and confirms dates', async () => {
@@ -70,7 +70,7 @@ describe('ConfirmationPage', () => {
 
     expect(await screen.findByText(/jane doe/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /confirm dates and guests/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
 
     await waitFor(() => expect(confirmSpy).toHaveBeenCalledWith('tok-1'));
   });
@@ -85,8 +85,8 @@ describe('ConfirmationPage', () => {
 
     await screen.findByText(/jane doe/i);
 
-    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Jane Doe' } });
-    fireEvent.click(screen.getByRole('button', { name: /i accept the house rules/i }));
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Jane Doe' } });
+    fireEvent.click(screen.getByRole('button', { name: /acepto las reglas de la casa/i }));
 
     await waitFor(() => expect(acceptSpy).toHaveBeenCalledWith('tok-1', 'Jane Doe'));
   });
@@ -103,6 +103,6 @@ describe('ConfirmationPage', () => {
 
     renderAt('tok-1');
 
-    expect(await screen.findByText(/fully confirmed/i)).toBeInTheDocument();
+    expect(await screen.findByText(/completamente confirmada/i)).toBeInTheDocument();
   });
 });

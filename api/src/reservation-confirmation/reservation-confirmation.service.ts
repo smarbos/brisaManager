@@ -54,8 +54,8 @@ export class ReservationConfirmationService {
         (error as Error).message,
       );
       await this.emailService.sendAlert(
-        'Final confirmation email failed',
-        `Reservation ${reservationId} for ${reservation.guestName} auto-confirmed but the final email failed to send: ${(error as Error).message}`,
+        'Falló el email de confirmación final',
+        `La reserva ${reservationId} para ${reservation.guestName} se confirmó automáticamente pero falló el envío del email final: ${(error as Error).message}`,
       );
     }
   }

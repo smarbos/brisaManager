@@ -32,7 +32,7 @@ describe('PublicGuestsController (e2e)', () => {
       .get(`/public/guests/${guest.unsubscribeToken}/unsubscribe`)
       .expect(200);
 
-    expect(response.text).toContain('unsubscribed');
+    expect(response.text).toContain('diste de baja');
 
     const updated = await prisma.guest.findUnique({ where: { id: guest.id } });
     expect(updated?.unsubscribedAt).not.toBeNull();

@@ -10,22 +10,22 @@ export function GuestListPage() {
   useEffect(() => {
     listGuests()
       .then(setGuests)
-      .catch(() => setError('Could not load the guests. Please reload the page.'));
+      .catch(() => setError('No se pudieron cargar los huéspedes. Por favor, recargá la página.'));
   }, []);
 
   return (
     <PageContainer>
-      <PageHeader title="Guests" />
+      <PageHeader title="Huéspedes" />
       {error && <Alert>{error}</Alert>}
       <Table>
         <thead>
           <tr>
-            <th className={thClass}>Name</th>
+            <th className={thClass}>Nombre</th>
             <th className={thClass}>Email</th>
-            <th className={thClass}>Phone</th>
-            <th className={thClass}>Total stays</th>
-            <th className={thClass}>Last stay</th>
-            <th className={thClass}>Status</th>
+            <th className={thClass}>Teléfono</th>
+            <th className={thClass}>Estadías totales</th>
+            <th className={thClass}>Última estadía</th>
+            <th className={thClass}>Estado</th>
           </tr>
         </thead>
         <tbody>
@@ -38,7 +38,7 @@ export function GuestListPage() {
               <td className={tdClass}>{g.lastStayAt ? formatDate(g.lastStayAt) : '—'}</td>
               <td className={tdClass}>
                 <Badge tone={g.unsubscribedAt ? 'warning' : 'success'}>
-                  {g.unsubscribedAt ? 'Unsubscribed' : 'Subscribed'}
+                  {g.unsubscribedAt ? 'Dado de baja' : 'Suscripto'}
                 </Badge>
               </td>
             </tr>

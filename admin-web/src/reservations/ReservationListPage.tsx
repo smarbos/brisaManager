@@ -4,6 +4,7 @@ import { listReservations } from '../api/reservations';
 import { Reservation, ReservationSource, ReservationStatus } from './types';
 import { PageContainer, PageHeader, Button, FormField, Select, Alert, Table, tableThClass as thClass, tableTdClass as tdClass } from '../ui';
 import { formatDate } from '../lib/date';
+import { sourceLabel, statusLabel } from '../lib/labels';
 
 export function ReservationListPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -20,47 +21,47 @@ export function ReservationListPage() {
       .then(setReservations)
       .catch((err) => {
         console.error('Failed to load reservations', err);
-        setError('Could not load the reservations');
+        setError('No se pudieron cargar las reservas.');
       });
   }, [source, status]);
 
   return (
     <PageContainer>
-      <PageHeader title="Reservations" />
+      <PageHeader title="Reservas" />
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-wrap gap-4">
-          <FormField label="Source">
+          <FormField label="Canal">
             <Select value={source} onChange={(e) => setSource(e.target.value as ReservationSource | '')}>
-              <option value="">All</option>
+              <option value="">Todos</option>
               <option value="BOOKING">Booking.com</option>
               <option value="AIRBNB">Airbnb</option>
-              <option value="DIRECT">Direct</option>
-              <option value="OTHER">Other</option>
+              <option value="DIRECT">Directo</option>
+              <option value="OTHER">Otro</option>
             </Select>
           </FormField>
-          <FormField label="Status">
+          <FormField label="Estado">
             <Select value={status} onChange={(e) => setStatus(e.target.value as ReservationStatus | '')}>
-              <option value="">All</option>
-              <option value="PENDING">Pending</option>
-              <option value="CONFIRMED">Confirmed</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="COMPLETED">Completed</option>
+              <option value="">Todos</option>
+              <option value="PENDING">Pendiente</option>
+              <option value="CONFIRMED">Confirmada</option>
+              <option value="CANCELLED">Cancelada</option>
+              <option value="COMPLETED">Completada</option>
             </Select>
           </FormField>
         </div>
         <Link to="/reservations/new">
-          <Button type="button">New reservation</Button>
+          <Button type="button">Nueva reserva</Button>
         </Link>
       </div>
       {error && <Alert>{error}</Alert>}
       <Table>
         <thead>
           <tr>
-            <th className={thClass}>Guest</th>
+            <th className={thClass}>Huésped</th>
             <th className={thClass}>Check-in</th>
             <th className={thClass}>Check-out</th>
-            <th className={thClass}>Source</th>
-            <th className={thClass}>Status</th>
+            <th className={thClass}>Canal</th>
+            <th className={thClass}>Estado</th>
           </tr>
         </thead>
         <tbody>
@@ -70,12 +71,12 @@ export function ReservationListPage() {
                 <Link to={`/reservations/${r.id}`} className="text-accent hover:underline">
                   {r.guestName}
                 </Link>
-                {r.missingFromChannelAt && <span> ⚠ No longer in channel feed</span>}
+                {r.missingFromChannelAt && <span> ⚠ Ya no está en el calendario del canal</span>}
               </td>
               <td className={tdClass}>{formatDate(r.checkIn)}</td>
               <td className={tdClass}>{formatDate(r.checkOut)}</td>
-              <td className={tdClass}>{r.source}</td>
-              <td className={tdClass}>{r.status}</td>
+              <td className={tdClass}>{sourceLabel(r.source)}</td>
+              <td className={tdClass}>{statusLabel(r.status)}</td>
             </tr>
           ))}
         </tbody>
