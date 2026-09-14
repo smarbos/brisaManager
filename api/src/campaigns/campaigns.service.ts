@@ -27,7 +27,8 @@ export class CampaignsService {
 
     const results: { guestId: string; status: 'SENT' | 'FAILED'; error: string | null }[] = [];
 
-    for (const guest of guests) {
+    for (let i = 0; i < guests.length; i++) {
+      const guest = guests[i];
       const unsubscribeUrl = `${process.env.API_ORIGIN}/public/guests/${guest.unsubscribeToken}/unsubscribe`;
       const subject = template.subject.replaceAll('{{guestName}}', guest.name);
       const html = `${template.bodyHtml.replaceAll('{{guestName}}', guest.name)}<p><a href="${unsubscribeUrl}">Unsubscribe</a></p>`;
@@ -37,6 +38,13 @@ export class CampaignsService {
         results.push({ guestId: guest.id, status: 'SENT', error: null });
       } catch (error) {
         results.push({ guestId: guest.id, status: 'FAILED', error: (error as Error).message });
+      }
+
+      // Stay comfortably under Resend's ~2 req/sec default rate limit — a single 429 mid-batch
+      // would otherwise permanently record that recipient (and all after it) as FAILED with no
+      // safe retry path short of re-sending to the whole list.
+      if (i < guests.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
       }
     }
 

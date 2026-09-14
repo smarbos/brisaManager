@@ -95,6 +95,45 @@ describe('CampaignsService', () => {
       expect(result).toEqual({ id: 'camp-1', recipientCount: 2 });
     });
 
+    it('paces sends with a delay between each guest to stay under the email provider rate limit', async () => {
+      jest.useFakeTimers();
+      try {
+        prisma.campaignTemplate.findUnique.mockResolvedValue({
+          id: 'tpl-1',
+          subject: 'Hi {{guestName}}',
+          bodyHtml: '<p>Hi {{guestName}}</p>',
+        });
+        guestsService.findEligibleForCampaign.mockResolvedValue([
+          { id: 'g1', name: 'Jane Doe', email: 'jane@example.com', unsubscribeToken: 'tok-1' },
+          { id: 'g2', name: 'John Smith', email: 'john@example.com', unsubscribeToken: 'tok-2' },
+          { id: 'g3', name: 'Alex Lee', email: 'alex@example.com', unsubscribeToken: 'tok-3' },
+        ]);
+        emailService.sendMarketingEmail.mockResolvedValue(undefined);
+        prisma.campaign.create.mockResolvedValue({ id: 'camp-1', recipientCount: 3 });
+
+        const sendPromise = service.send('tpl-1', 'ALL');
+
+        // Let the first send's microtasks flush, then advance past its post-send delay.
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(emailService.sendMarketingEmail).toHaveBeenCalledTimes(1);
+
+        await jest.advanceTimersByTimeAsync(600);
+        expect(emailService.sendMarketingEmail).toHaveBeenCalledTimes(2);
+
+        await jest.advanceTimersByTimeAsync(600);
+        expect(emailService.sendMarketingEmail).toHaveBeenCalledTimes(3);
+
+        // No delay is awaited after the last guest — the send should resolve without a further advance.
+        await jest.advanceTimersByTimeAsync(0);
+        await sendPromise;
+
+        expect(emailService.sendMarketingEmail).toHaveBeenCalledTimes(3);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('creates a Campaign row with zero SENT even when there are no eligible guests', async () => {
       prisma.campaignTemplate.findUnique.mockResolvedValue({ id: 'tpl-1', subject: 'Hi', bodyHtml: '<p>Hi</p>' });
       guestsService.findEligibleForCampaign.mockResolvedValue([]);
