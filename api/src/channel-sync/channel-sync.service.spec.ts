@@ -218,6 +218,46 @@ describe('ChannelSyncService', () => {
     expect(emailService.sendAlert).toHaveBeenCalled();
   });
 
+  it('skips a "CLOSED - Not available" event instead of importing it as a reservation', async () => {
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({
+      'uid-blocked': {
+        type: 'VEVENT',
+        uid: 'uid-blocked',
+        start: new Date('2026-12-01'),
+        end: new Date('2028-03-14'),
+        summary: 'CLOSED - Not available',
+      },
+    });
+
+    await service.syncAll();
+
+    expect(prisma.reservation.upsert).not.toHaveBeenCalled();
+  });
+
+  it('is case-insensitive and platform-agnostic when detecting a blocked-dates event', async () => {
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: null,
+      airbnbIcalUrl: 'https://airbnb.example/cal.ics',
+    });
+    fromURLMock.mockResolvedValueOnce({
+      'uid-blocked': {
+        type: 'VEVENT',
+        uid: 'uid-blocked',
+        start: new Date('2026-12-01'),
+        end: new Date('2026-12-05'),
+        summary: 'Airbnb (Not Available)',
+      },
+    });
+
+    await service.syncAll();
+
+    expect(prisma.reservation.upsert).not.toHaveBeenCalled();
+  });
+
   it('syncs both platforms independently — one failing does not stop the other', async () => {
     settingsService.get.mockResolvedValue({
       bookingIcalUrl: 'https://booking.example/cal.ics',
