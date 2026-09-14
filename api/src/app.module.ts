@@ -12,6 +12,7 @@ import { ChannelSyncModule } from './channel-sync/channel-sync.module';
 import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
 import { GuestsModule } from './guests/guests.module';
 import { CampaignTemplatesModule } from './campaign-templates/campaign-templates.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { CampaignTemplatesModule } from './campaign-templates/campaign-templates
     GoogleCalendarModule,
     GuestsModule,
     CampaignTemplatesModule,
+    CampaignsModule,
   ],
   controllers: [AppController],
 })

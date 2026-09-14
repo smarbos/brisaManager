@@ -49,4 +49,25 @@ describe('EmailService', () => {
 
     await expect(service.sendAlert('Something failed', 'details here')).resolves.toBeUndefined();
   });
+
+  it('sends a marketing email with the given subject and html', async () => {
+    sendMock.mockResolvedValue({ error: null });
+
+    await expect(
+      service.sendMarketingEmail('guest@example.com', 'Come back!', '<p>We miss you</p>'),
+    ).resolves.toBeUndefined();
+
+    expect(sendMock).toHaveBeenCalledWith({
+      from: 'reservas@labrisa.com.ar',
+      to: 'guest@example.com',
+      subject: 'Come back!',
+      html: '<p>We miss you</p>',
+    });
+  });
+
+  it('throws when Resend returns an error for a marketing email', async () => {
+    sendMock.mockResolvedValue({ error: { message: 'bounced' } });
+
+    await expect(service.sendMarketingEmail('bad@example.com', 'Subject', '<p>Body</p>')).rejects.toThrow('bounced');
+  });
 });

@@ -34,6 +34,14 @@ export class EmailService {
     }
   }
 
+  async sendMarketingEmail(to: string, subject: string, html: string): Promise<void> {
+    const { error } = await this.resend.emails.send({ from: this.from, to, subject, html });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
   async sendAlert(subject: string, message: string): Promise<void> {
     if (!this.alertEmail) {
       return;
