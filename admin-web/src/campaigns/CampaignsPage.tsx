@@ -8,6 +8,7 @@ import {
   Campaign,
   CampaignFilterType,
 } from '../api/campaigns';
+import { PageContainer, PageHeader, Alert, Badge, Button, FormField, Input, Select } from '../ui';
 
 export function CampaignsPage() {
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
@@ -85,54 +86,63 @@ export function CampaignsPage() {
   }
 
   return (
-    <div>
-      <h1>Campaigns</h1>
-      <Link to="/">Reservations</Link>
-      {error && <p role="alert">{error}</p>}
-      <section>
-        <h2>Compose</h2>
-        <label>
-          Template
-          <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-            <option value="">Select a template</option>
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Filter
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value as CampaignFilterType | '')}>
-            <option value="">Select a filter</option>
-            <option value="ALL">All guests</option>
-            <option value="STAYED_WITHIN_MONTHS">Stayed within the last N months</option>
-            <option value="NOT_STAYED_WITHIN_MONTHS">Not stayed within the last N months</option>
-          </select>
-        </label>
-        {filterType !== 'ALL' && filterType !== '' && (
-          <label>
-            N months
-            <input type="number" min={1} value={filterMonths} onChange={(e) => setFilterMonths(e.target.value)} />
-          </label>
-        )}
-        {recipientCount !== null && <p>{recipientCount} recipient(s) match this filter.</p>}
-        <button type="button" onClick={handleSend} disabled={sending || recipientCount === null}>
-          Send campaign
-        </button>
+    <PageContainer>
+      <PageHeader
+        title="Campaigns"
+        nav={
+          <Link to="/" className="text-accent hover:underline">
+            Reservations
+          </Link>
+        }
+      />
+      {error && <Alert>{error}</Alert>}
+      <section className="mb-8">
+        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Compose</h2>
+        <div className="flex flex-col gap-4">
+          <FormField label="Template">
+            <Select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+              <option value="">Select a template</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Filter">
+            <Select value={filterType} onChange={(e) => setFilterType(e.target.value as CampaignFilterType | '')}>
+              <option value="">Select a filter</option>
+              <option value="ALL">All guests</option>
+              <option value="STAYED_WITHIN_MONTHS">Stayed within the last N months</option>
+              <option value="NOT_STAYED_WITHIN_MONTHS">Not stayed within the last N months</option>
+            </Select>
+          </FormField>
+          {filterType !== 'ALL' && filterType !== '' && (
+            <FormField label="N months">
+              <Input type="number" min={1} value={filterMonths} onChange={(e) => setFilterMonths(e.target.value)} />
+            </FormField>
+          )}
+          {recipientCount !== null && (
+            <p className="text-sm text-text-muted">{recipientCount} recipient(s) match this filter.</p>
+          )}
+          <Button type="button" onClick={handleSend} disabled={sending || recipientCount === null}>
+            Send campaign
+          </Button>
+        </div>
       </section>
       <section>
-        <h2>History</h2>
-        <ul>
+        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">History</h2>
+        <ul className="flex flex-col gap-4">
           {history.map((c) => (
-            <li key={c.id}>
-              {c.template.name} — {c.recipientCount} recipient(s) — {new Date(c.sentAt).toLocaleString()}
-              <ul>
+            <li key={c.id} className="border-b border-border pb-4">
+              <p>
+                {c.template.name} — {c.recipientCount} recipient(s) — {new Date(c.sentAt).toLocaleString()}
+              </p>
+              <ul className="mt-2 flex flex-col gap-1">
                 {c.recipients.map((r) => (
-                  <li key={r.id}>
-                    {r.status}
-                    {r.error ? `: ${r.error}` : ''}
+                  <li key={r.id} className="flex items-center gap-2 text-sm">
+                    <Badge tone={r.status === 'SENT' ? 'success' : 'danger'}>{r.status}</Badge>
+                    {r.error ? <span>{r.error}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -140,6 +150,6 @@ export function CampaignsPage() {
           ))}
         </ul>
       </section>
-    </div>
+    </PageContainer>
   );
 }
