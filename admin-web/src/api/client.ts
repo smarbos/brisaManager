@@ -6,18 +6,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('accessToken');
-
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-
+async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const body = await response.text();
 
@@ -40,8 +29,39 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem('accessToken');
+
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  return handleResponse<T>(response);
+}
+
+async function upload<T>(path: string, formData: FormData): Promise<T> {
+  const token = localStorage.getItem('accessToken');
+
+  // No Content-Type header here: the browser must set multipart/form-data with the
+  // correct boundary itself, which it can only do when the header is left unset.
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  return handleResponse<T>(response);
+}
+
 export async function login(email: string, password: string): Promise<{ accessToken: string }> {
   return request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
 }
 
-export const apiClient = { request };
+export const apiClient = { request, upload };
