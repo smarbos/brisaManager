@@ -122,10 +122,16 @@ export function ReservationFormPage() {
   }
 
   async function applyExtractedFields(file: File) {
+    if (importing) return;
     setImportError(null);
     setImporting(true);
     try {
       const extracted = await parseScreenshot(file);
+      const gotAnything = Object.values(extracted).some((value) => value !== null);
+      if (!gotAnything) {
+        setImportError('No pudimos leer los datos de la captura — completá el formulario manualmente.');
+        return;
+      }
       setForm((prev) => ({
         ...prev,
         guestName: extracted.guestName ?? prev.guestName,
@@ -185,6 +191,8 @@ export function ReservationFormPage() {
             className="flex flex-col gap-2 rounded border border-dashed border-border p-4"
           >
             <FormField label="Importar desde captura de Booking.com">
+              {/* Raw input, not the shared Input primitive — file pickers render as a native
+                  browser button and don't benefit from the same text-input styling. */}
               <input
                 type="file"
                 accept="image/*"
@@ -247,6 +255,12 @@ export function ReservationFormPage() {
             <option value="DIRECT">Directo</option>
             <option value="OTHER">Otro</option>
           </Select>
+        </FormField>
+        <FormField label="Referencia externa">
+          <Input
+            value={form.externalReference}
+            onChange={(e) => setForm({ ...form, externalReference: e.target.value })}
+          />
         </FormField>
         <FormField label="Monto total">
           <Input

@@ -1,4 +1,14 @@
-import { BadRequestException, Controller, HttpCode, HttpStatus, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -9,6 +19,8 @@ const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 @UseGuards(JwtAuthGuard)
 @Controller('reservation-import')
 export class ReservationImportController {
+  private readonly logger = new Logger(ReservationImportController.name);
+
   constructor(private readonly reservationImportService: ReservationImportService) {}
 
   @Post('parse-screenshot')
@@ -32,7 +44,10 @@ export class ReservationImportController {
     }
     try {
       return await this.reservationImportService.extractFromScreenshot(file.buffer);
-    } catch {
+    } catch (error) {
+      // Log only the error message — never the file buffer, filename, or OCR'd text,
+      // all of which may carry guest PII.
+      this.logger.warn(`Screenshot OCR failed: ${(error as Error).message}`);
       throw new BadRequestException('Could not process the uploaded image');
     }
   }

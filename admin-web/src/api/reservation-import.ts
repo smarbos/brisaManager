@@ -8,8 +8,12 @@ export interface ExtractedReservationFields {
   externalReference: string | null;
 }
 
+const SCREENSHOT_IMPORT_TIMEOUT_MS = 60_000;
+
 export function parseScreenshot(file: File): Promise<ExtractedReservationFields> {
   const formData = new FormData();
   formData.append('file', file);
-  return apiClient.upload('/reservation-import/parse-screenshot', formData);
+  return apiClient.upload('/reservation-import/parse-screenshot', formData, {
+    signal: AbortSignal.timeout(SCREENSHOT_IMPORT_TIMEOUT_MS),
+  });
 }
