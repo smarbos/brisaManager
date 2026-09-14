@@ -8,6 +8,7 @@ import { ChannelSyncService } from './channel-sync.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { EmailService } from '../email/email.service';
+import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 
 describe('ChannelSyncService', () => {
   let service: ChannelSyncService;
@@ -17,6 +18,7 @@ describe('ChannelSyncService', () => {
   };
   let settingsService: { get: jest.Mock };
   let emailService: { sendAlert: jest.Mock };
+  let googleCalendarPushService: { pushReservation: jest.Mock };
   let fromURLMock: jest.Mock;
 
   beforeEach(async () => {
@@ -33,6 +35,7 @@ describe('ChannelSyncService', () => {
     };
     settingsService = { get: jest.fn() };
     emailService = { sendAlert: jest.fn() };
+    googleCalendarPushService = { pushReservation: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -40,6 +43,7 @@ describe('ChannelSyncService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: SettingsService, useValue: settingsService },
         { provide: EmailService, useValue: emailService },
+        { provide: GoogleCalendarPushService, useValue: googleCalendarPushService },
       ],
     }).compile();
 
@@ -97,6 +101,22 @@ describe('ChannelSyncService', () => {
       }),
       update: { missingFromChannelAt: null },
     });
+  });
+
+  it('pushes the upserted reservation to Google Calendar for every synced booking', async () => {
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({
+      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
+    });
+    const upserted = { id: 'res-1', source: 'BOOKING', externalReference: 'uid-1' };
+    prisma.reservation.upsert.mockResolvedValue(upserted);
+
+    await service.syncAll();
+
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(upserted);
   });
 
   it('does not recreate or modify an already-synced reservation still present in the feed', async () => {

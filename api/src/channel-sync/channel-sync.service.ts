@@ -3,6 +3,7 @@ import * as ical from 'node-ical';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { EmailService } from '../email/email.service';
+import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 import { ReservationSource } from '@prisma/client';
 
 interface PlatformConfig {
@@ -22,6 +23,7 @@ export class ChannelSyncService {
     private readonly prisma: PrismaService,
     private readonly settingsService: SettingsService,
     private readonly emailService: EmailService,
+    private readonly googleCalendarPushService: GoogleCalendarPushService,
   ) {}
 
   async syncAll(): Promise<void> {
@@ -79,7 +81,7 @@ export class ChannelSyncService {
       // Atomic upsert keyed on the (source, externalReference) unique constraint: this both
       // avoids a race between overlapping sync runs (cron tick vs. manual "Sync now") for the
       // same UID, and un-flags the reservation if it had been marked missing and reappeared.
-      await this.prisma.reservation.upsert({
+      const upserted = await this.prisma.reservation.upsert({
         where: {
           source_externalReference: { source: config.source, externalReference: event.uid },
         },
@@ -100,6 +102,12 @@ export class ChannelSyncService {
           missingFromChannelAt: null,
         },
       });
+
+      // BOOKING/AIRBNB reservations are written directly through Prisma here (bypassing
+      // ReservationsService, intentionally — see this module's plan), so they'd otherwise never
+      // reach Google Calendar at all. pushReservation is idempotent and never throws, so it's
+      // safe to call unconditionally for every event in the feed.
+      await this.googleCalendarPushService.pushReservation(upserted);
     }
 
     const existingSynced = await this.prisma.reservation.findMany({

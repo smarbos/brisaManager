@@ -54,6 +54,11 @@ export class GoogleCalendarPullService {
         where: { id: 'singleton' },
         data: { lastCalendarSyncAt: new Date(), lastCalendarSyncError: (error as Error).message },
       });
+      if (this.authService.isInvalidGrantError(error)) {
+        // Google has revoked/expired our refresh token — clear the stored credentials so
+        // Settings correctly shows "not connected" / prompts reconnecting.
+        await this.authService.disconnect().catch(() => undefined);
+      }
     }
   }
 
@@ -90,7 +95,26 @@ export class GoogleCalendarPullService {
     return { items, nextSyncToken };
   }
 
+  private parseEventDetails(
+    event: calendar_v3.Schema$Event,
+  ): { checkIn: Date; checkOut: Date; guestName: string } | null {
+    const checkIn = eventDate(event.start);
+    const checkOut = eventDate(event.end);
+    if (!checkIn || !checkOut || !event.summary) {
+      return null;
+    }
+    return { checkIn, checkOut, guestName: stripSourceSuffix(event.summary) };
+  }
+
   private async applyEvent(event: calendar_v3.Schema$Event): Promise<void> {
+    // Defense in depth: pull() already only calls applyEvent for events with an id, but this
+    // function guards the sub-project's most important invariant (never mutate BOOKING/AIRBNB),
+    // and its very first line does a findFirst keyed on event.id — an undefined id there would
+    // make the filter absent and could match an arbitrary reservation. Guard here too.
+    if (!event.id) {
+      return;
+    }
+
     const existing = await this.prisma.reservation.findFirst({ where: { googleEventId: event.id } });
     const isCancelled = event.status === 'cancelled';
 
@@ -108,15 +132,14 @@ export class GoogleCalendarPullService {
         return;
       }
 
-      const checkIn = eventDate(event.start);
-      const checkOut = eventDate(event.end);
-      if (!checkIn || !checkOut || !event.summary) {
+      const details = this.parseEventDetails(event);
+      if (!details) {
         return;
       }
 
       await this.prisma.reservation.update({
         where: { id: existing.id },
-        data: { guestName: stripSourceSuffix(event.summary), checkIn, checkOut },
+        data: { guestName: details.guestName, checkIn: details.checkIn, checkOut: details.checkOut },
       });
       return;
     }
@@ -125,17 +148,16 @@ export class GoogleCalendarPullService {
       return;
     }
 
-    const checkIn = eventDate(event.start);
-    const checkOut = eventDate(event.end);
-    if (!checkIn || !checkOut || !event.summary) {
+    const details = this.parseEventDetails(event);
+    if (!details) {
       return;
     }
 
     await this.prisma.reservation.create({
       data: {
-        guestName: stripSourceSuffix(event.summary),
-        checkIn,
-        checkOut,
+        guestName: details.guestName,
+        checkIn: details.checkIn,
+        checkOut: details.checkOut,
         paxCount: 1,
         source: 'DIRECT',
         totalAmount: 0,

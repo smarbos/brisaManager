@@ -51,7 +51,7 @@ describe('GoogleCalendarAuthService', () => {
     service = moduleRef.get(GoogleCalendarAuthService);
   });
 
-  it('builds a consent URL requesting offline access to the calendar scope', () => {
+  it('builds a consent URL requesting offline access to the calendar scope and a CSRF state', () => {
     const url = service.getConsentUrl();
 
     expect(url).toBe('https://accounts.google.com/o/oauth2/auth?mock=1');
@@ -59,14 +59,17 @@ describe('GoogleCalendarAuthService', () => {
       access_type: 'offline',
       prompt: 'consent',
       scope: ['https://www.googleapis.com/auth/calendar'],
+      state: expect.any(String),
     });
   });
 
   it('exchanges the code, creates a dedicated calendar, and persists the refresh token', async () => {
+    service.getConsentUrl();
+    const state = generateAuthUrlMock.mock.calls[0][0].state;
     getTokenMock.mockResolvedValue({ tokens: { refresh_token: 'refresh-abc' } });
     insertCalendarMock.mockResolvedValue({ data: { id: 'calendar-abc' } });
 
-    await service.handleOAuthCallback('auth-code-1');
+    await service.handleOAuthCallback('auth-code-1', state);
 
     expect(getTokenMock).toHaveBeenCalledWith('auth-code-1');
     expect(setCredentialsMock).toHaveBeenCalledWith({ refresh_token: 'refresh-abc' });
@@ -80,10 +83,25 @@ describe('GoogleCalendarAuthService', () => {
   });
 
   it('throws if Google does not return a refresh token', async () => {
+    service.getConsentUrl();
+    const state = generateAuthUrlMock.mock.calls[0][0].state;
     getTokenMock.mockResolvedValue({ tokens: {} });
 
-    await expect(service.handleOAuthCallback('auth-code-1')).rejects.toThrow(UnauthorizedException);
+    await expect(service.handleOAuthCallback('auth-code-1', state)).rejects.toThrow(UnauthorizedException);
     expect(prisma.settings.update).not.toHaveBeenCalled();
+  });
+
+  it('throws UnauthorizedException and does not exchange the code when the state does not match', async () => {
+    service.getConsentUrl();
+
+    await expect(service.handleOAuthCallback('auth-code-1', 'wrong-state')).rejects.toThrow(UnauthorizedException);
+    expect(getTokenMock).not.toHaveBeenCalled();
+    expect(prisma.settings.update).not.toHaveBeenCalled();
+  });
+
+  it('throws UnauthorizedException when no consent URL was ever generated (no pending state)', async () => {
+    await expect(service.handleOAuthCallback('auth-code-1', 'some-state')).rejects.toThrow(UnauthorizedException);
+    expect(getTokenMock).not.toHaveBeenCalled();
   });
 
   it('clears the stored credentials on disconnect', async () => {

@@ -6,7 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 describe('GoogleCalendarPullService', () => {
   let service: GoogleCalendarPullService;
-  let authService: { getAuthorizedCalendarClient: jest.Mock };
+  let authService: { getAuthorizedCalendarClient: jest.Mock; isInvalidGrantError: jest.Mock; disconnect: jest.Mock };
   let settingsService: { get: jest.Mock };
   let prisma: {
     reservation: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
@@ -19,7 +19,11 @@ describe('GoogleCalendarPullService', () => {
     listMock = jest.fn();
     calendarClient = { events: { list: listMock } };
 
-    authService = { getAuthorizedCalendarClient: jest.fn() };
+    authService = {
+      getAuthorizedCalendarClient: jest.fn(),
+      isInvalidGrantError: jest.fn().mockReturnValue(false),
+      disconnect: jest.fn().mockResolvedValue(undefined),
+    };
     settingsService = { get: jest.fn().mockResolvedValue({ googleSyncToken: null }) };
     prisma = {
       reservation: { findFirst: jest.fn(), update: jest.fn(), create: jest.fn() },
@@ -193,5 +197,25 @@ describe('GoogleCalendarPullService', () => {
       where: { id: 'singleton' },
       data: { lastCalendarSyncAt: expect.any(Date), lastCalendarSyncError: expect.stringContaining('network down') },
     });
+  });
+
+  it('disconnects when the Calendar API reports an invalid_grant error', async () => {
+    authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+    authService.isInvalidGrantError.mockReturnValue(true);
+    listMock.mockRejectedValue(new Error('invalid_grant: token revoked'));
+
+    await service.pull();
+
+    expect(authService.disconnect).toHaveBeenCalled();
+  });
+
+  it('does not disconnect for an error that is not an invalid_grant error', async () => {
+    authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+    authService.isInvalidGrantError.mockReturnValue(false);
+    listMock.mockRejectedValue(new Error('network down'));
+
+    await service.pull();
+
+    expect(authService.disconnect).not.toHaveBeenCalled();
   });
 });

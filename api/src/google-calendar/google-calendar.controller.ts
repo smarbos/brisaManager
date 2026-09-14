@@ -18,14 +18,18 @@ export class GoogleCalendarController {
   }
 
   @Get('oauth/callback')
-  async callback(@Query('code') code: string | undefined, @Res() res: Response) {
+  async callback(
+    @Query('code') code: string | undefined,
+    @Query('state') state: string | undefined,
+    @Res() res: Response,
+  ) {
     const adminOrigin = process.env.ADMIN_WEB_ORIGIN ?? '';
     if (!code) {
       res.redirect(`${adminOrigin}/settings?googleCalendar=error`);
       return;
     }
     try {
-      await this.authService.handleOAuthCallback(code);
+      await this.authService.handleOAuthCallback(code, state ?? '');
       res.redirect(`${adminOrigin}/settings?googleCalendar=connected`);
     } catch {
       res.redirect(`${adminOrigin}/settings?googleCalendar=error`);
