@@ -70,7 +70,14 @@ export class ChannelSyncService {
       return;
     }
 
-    const parsed = await ical.async.fromURL(config.icalUrl, { signal: AbortSignal.timeout(ICAL_FETCH_TIMEOUT_MS) });
+    // node-ical's .d.ts mistypes the 2-argument (url, options) call as returning `void` — it
+    // resolves to the callback-style overload even though the runtime always returns a Promise
+    // when no callback is passed. Cast the function reference to the signature it actually has.
+    const fromURLWithOptions = ical.async.fromURL as (
+      url: string,
+      options: { signal: AbortSignal },
+    ) => Promise<ical.CalendarResponse>;
+    const parsed = await fromURLWithOptions(config.icalUrl, { signal: AbortSignal.timeout(ICAL_FETCH_TIMEOUT_MS) });
 
     const events = Object.values(parsed).filter(
       (component): component is ical.VEvent => component !== undefined && component.type === 'VEVENT',
