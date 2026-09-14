@@ -20,17 +20,39 @@ Scoped to Booking.com only, and to the single-reservation detail-page screenshot
 
 ## Data extracted
 
-From the detail-page screenshot (see the two real examples this design was built against), via OCR text parsing:
+Calibrated against real `tesseract.js` (`spa` language data) output run on an actual sample screenshot — not just the visual layout. The raw OCR text for the sample came out as (abridged, status-bar and bottom-nav noise omitted):
 
-| Field | Source line in the screenshot | Notes |
+```
+Weber Clara
+< SS
+La Brisa
+Weber Clara
+5459856627 Genius
+...
+Check-in Check-out
+vie, 6 nov 2026 dom, 8 nov 2026
+No se ha especificado
+hora
+Solicitar cambio de fechas
+2 Apartamento de 2
+E: 2 noches — dormitorios
+22 3 adultos
+1 habitación
+...
+```
+
+Two things the visual layout didn't predict, confirmed by this real output: (1) the two dates land on **one shared line**, space-separated, not one under each column header — extraction takes the two date matches *in order* rather than associating each with its own label; (2) the reservation ID shares a line with the "Genius" badge text ("5459856627 Genius"), and the nights/room-type icon rows bleed into each other ("E: 2 noches — dormitorios") — global pattern matching across the whole text (not line-by-line) sidesteps both, since a global match only cares about the pattern itself, not what garbage surrounds it on the line.
+
+| Field | Extraction rule (applied to the full OCR text, not line-by-line) | Verified against the real sample |
 |---|---|---|
-| Reservation ID | A bare run of 8-12 digits, on its own line, not matching the date or phone-number patterns | Used for dedup — see below. This is the anchor the other two fields below are found relative to, since it's the least ambiguous pattern to match. |
-| Guest name | The non-empty text line immediately preceding the reservation-ID line | The guest's name appears twice in the screenshot (once in the top nav bar, once as the heading directly above the ID) — anchoring off the ID's position, rather than trying to distinguish "nav bar" from "heading" text some other way, picks the correct occurrence without needing positional/pixel information OCR text alone doesn't carry. |
-| Check-in | Under the "Check-in" label: weekday + day + Spanish month abbreviation + year (e.g. "vie, 6 nov 2026") | Parsed with a Spanish weekday/month regex, converted to an ISO date. |
-| Check-out | Same pattern under "Check-out" | |
-| Pax count | The number preceding "adultos" (e.g. "3 adultos") | Children, if shown separately on some reservations, are out of scope for this pass — not present in either example. |
+| Reservation ID | First 8-12 digit run matching `\b\d{8,12}\b` | `5459856627` ✓ |
+| Guest name | The non-empty line immediately preceding the line containing the reservation-ID match | `Weber Clara` ✓ — correctly picks the heading occurrence over the nav-bar occurrence of the same name, since only the heading sits directly above the ID line |
+| Check-in / Check-out | All matches of `(lun|mar|mié|jue|vie|sáb|dom),\s*(\d{1,2})\s+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\s+(\d{4})`, in order — first match is check-in, second is check-out | `vie, 6 nov 2026` → check-in, `dom, 8 nov 2026` → check-out ✓ |
+| Pax count | First match of `(\d+)\s*adultos` | `3` ✓ (the `22` immediately before it in the raw text, an OCR misread of the person icon, is not captured — the regex only takes digits immediately adjacent to "adultos") |
 
-Anything not confidently matched comes back as `null` from the extraction endpoint — the frontend never guesses on the backend's behalf, and a `null` field is simply left for staff to fill in by hand.
+Nights and room type are visible in the screenshot but not extracted — nights are already implied by check-in/check-out, and this app doesn't track room/unit type. Children, if shown separately on some reservations, are out of scope for this pass — not present in the calibration sample.
+
+Anything not confidently matched comes back as `null` from the extraction endpoint — the frontend never guesses on the backend's behalf, and a `null` field is simply left for staff to fill in by hand. OCR misreads of the matched text itself (e.g. an accented character in a guest's name coming out wrong) are a real residual risk this design accepts — staff review the pre-filled form before saving, same as they would catch a typo in fully manual entry.
 
 ## Backend
 
@@ -71,4 +93,4 @@ New module `api/src/reservation-import/`:
 
 - **Backend:** unit tests for `parseExtractedText()` against canned OCR-output text fixtures built from the real screenshot content (including the exact Spanish weekday/month strings, the "N noches"/"N adultos" patterns, and edge cases: missing pax line, missing reservation ID, garbled/partial text). Unit tests for `ReservationImportService.extractFromScreenshot()` mocking the `tesseract.js` call so the OCR engine itself is never invoked in the test suite. An e2e test for the controller covering the auth-required case and one successful mocked-OCR path.
 - **Frontend:** a test for the import control's merge-into-form behavior — a successful response with a mix of populated and `null` fields updates only the populated ones and leaves user-typed values in the null ones untouched; a failed/empty response shows the fallback notice without disturbing the form.
-- **Calibration note:** the parsing regexes in this spec are designed against the screenshot's visual layout, not against real `tesseract.js` output (which this design process had no way to generate). The implementation plan should expect a calibration step — running the real OCR engine against the actual example screenshots and adjusting the parsing patterns to match what it actually outputs, before the unit tests' fixtures are finalized.
+- **Calibration:** already done as part of this design — the extraction rules above were verified by running real `tesseract.js` (`spa` language data) against an actual sample screenshot and adjusting the patterns to match its real output (see the raw OCR text captured in "Data extracted" above). That captured raw text is the canonical fixture the unit tests are built from.
