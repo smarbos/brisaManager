@@ -34,6 +34,17 @@ enum ReservationEventType {
   FINAL_EMAIL_FAILED
 }
 
+enum CampaignFilterType {
+  ALL
+  STAYED_WITHIN_MONTHS
+  NOT_STAYED_WITHIN_MONTHS
+}
+
+enum CampaignRecipientStatus {
+  SENT
+  FAILED
+}
+
 model Reservation {
   id                            String            @id @default(uuid())
   guestName                     String
@@ -63,6 +74,9 @@ model Reservation {
   googleEventId                 String?
   createdAt                     DateTime          @default(now())
   updatedAt                     DateTime          @updatedAt
+
+  guestId String?
+  guest   Guest?  @relation(fields: [guestId], references: [id])
 
   @@unique([source, externalReference])
 }
@@ -97,4 +111,51 @@ model AdminUser {
   email        String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
+}
+
+model Guest {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  name               String
+  phone              String?
+  totalStays         Int                 @default(0)
+  lastStayAt         DateTime?
+  unsubscribedAt     DateTime?
+  unsubscribeToken   String              @unique @default(uuid())
+  reservations       Reservation[]
+  campaignRecipients CampaignRecipient[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model CampaignTemplate {
+  id        String     @id @default(uuid())
+  name      String
+  subject   String
+  bodyHtml  String
+  campaigns Campaign[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Campaign {
+  id             String                 @id @default(uuid())
+  templateId     String
+  template       CampaignTemplate       @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  filterType     CampaignFilterType
+  filterMonths   Int?
+  recipientCount Int
+  recipients     CampaignRecipient[]
+  sentAt         DateTime               @default(now())
+}
+
+model CampaignRecipient {
+  id         String                  @id @default(uuid())
+  campaignId String
+  campaign   Campaign                @relation(fields: [campaignId], references: [id])
+  guestId    String
+  guest      Guest                   @relation(fields: [guestId], references: [id])
+  status     CampaignRecipientStatus
+  error      String?
+  createdAt  DateTime                @default(now())
 }
