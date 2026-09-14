@@ -1,0 +1,103 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CampaignsPage } from './CampaignsPage';
+import * as campaignsApi from '../api/campaigns';
+import * as templatesApi from '../api/campaign-templates';
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <CampaignsPage />
+    </MemoryRouter>,
+  );
+}
+
+describe('CampaignsPage', () => {
+  beforeEach(() => {
+    vi.spyOn(templatesApi, 'listCampaignTemplates').mockResolvedValue([
+      { id: 'tpl-1', name: 'Welcome back', subject: 'Hi {{guestName}}', bodyHtml: '<p>Hi</p>' },
+    ]);
+    vi.spyOn(campaignsApi, 'listCampaignHistory').mockResolvedValue([]);
+  });
+
+  it('previews the recipient count when a template and filter are chosen', async () => {
+    const previewSpy = vi.spyOn(campaignsApi, 'previewCampaign').mockResolvedValue({ recipientCount: 5 });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'ALL' } });
+
+    await waitFor(() => expect(previewSpy).toHaveBeenCalledWith({ templateId: 'tpl-1', filterType: 'ALL' }));
+    expect(await screen.findByText(/5 recipient/i)).toBeInTheDocument();
+  });
+
+  it('requires confirmation before sending, then sends', async () => {
+    vi.spyOn(campaignsApi, 'previewCampaign').mockResolvedValue({ recipientCount: 5 });
+    const sendSpy = vi.spyOn(campaignsApi, 'sendCampaign').mockResolvedValue({
+      id: 'camp-1',
+      templateId: 'tpl-1',
+      template: { name: 'Welcome back' },
+      filterType: 'ALL',
+      filterMonths: null,
+      recipientCount: 5,
+      sentAt: '2026-09-13T12:00:00.000Z',
+      recipients: [],
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'ALL' } });
+    await waitFor(() => expect(screen.getByText(/5 recipient/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /send campaign/i }));
+
+    await waitFor(() => expect(sendSpy).toHaveBeenCalledWith({ templateId: 'tpl-1', filterType: 'ALL' }));
+  });
+
+  it('does not send when the confirmation is declined', async () => {
+    vi.spyOn(campaignsApi, 'previewCampaign').mockResolvedValue({ recipientCount: 5 });
+    const sendSpy = vi.spyOn(campaignsApi, 'sendCampaign');
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'ALL' } });
+    await waitFor(() => expect(screen.getByText(/5 recipient/i)).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /send campaign/i }));
+
+    expect(sendSpy).not.toHaveBeenCalled();
+  });
+
+  it('loads and displays campaign history', async () => {
+    vi.spyOn(campaignsApi, 'listCampaignHistory').mockResolvedValue([
+      {
+        id: 'camp-1',
+        templateId: 'tpl-1',
+        template: { name: 'Welcome back' },
+        filterType: 'ALL',
+        filterMonths: null,
+        recipientCount: 5,
+        sentAt: '2026-09-13T12:00:00.000Z',
+        recipients: [
+          { id: 'r1', guestId: 'g1', status: 'SENT', error: null },
+          { id: 'r2', guestId: 'g2', status: 'FAILED', error: 'bounced' },
+        ],
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText('Welcome back')).toBeInTheDocument();
+    expect(screen.getByText(/5 recipient/i)).toBeInTheDocument();
+  });
+});

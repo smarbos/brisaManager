@@ -39,6 +39,7 @@ export function ReservationListPage() {
       <Link to="/settings">Settings</Link>
       <Link to="/guests">Guests</Link>
       <Link to="/templates">Templates</Link>
+      <Link to="/campaigns">Campaigns</Link>
       <Link to="/reservations/new">New reservation</Link>
       <div>
         <label>
