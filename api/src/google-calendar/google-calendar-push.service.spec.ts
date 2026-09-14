@@ -18,6 +18,7 @@ describe('GoogleCalendarPushService', () => {
     guestName: 'Jane Doe',
     guestPhone: null,
     guestEmail: null,
+    guestId: null,
     checkIn: new Date('2026-05-01'),
     checkOut: new Date('2026-05-05'),
     paxCount: 2,
