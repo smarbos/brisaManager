@@ -4,6 +4,7 @@ import { ReservationEventsService } from '../reservation-events/reservation-even
 import { EmailService } from '../email/email.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
+import { GuestsService } from '../guests/guests.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { QueryReservationDto } from './dto/query-reservation.dto';
@@ -17,6 +18,7 @@ export class ReservationsService {
     private readonly emailService: EmailService,
     private readonly confirmationService: ReservationConfirmationService,
     private readonly googleCalendarPushService: GoogleCalendarPushService,
+    private readonly guestsService: GuestsService,
   ) {}
 
   private validateDates(checkIn: string, checkOut: string) {
@@ -45,6 +47,14 @@ export class ReservationsService {
     // internally), but it makes a network round-trip to Google with no timeout — awaiting it
     // would needlessly hold the HTTP response open on every reservation create.
     void this.googleCalendarPushService.pushReservation(reservation);
+
+    if (reservation.guestEmail) {
+      void this.guestsService.syncFromReservation(reservation.id, {
+        email: reservation.guestEmail,
+        name: reservation.guestName,
+        phone: reservation.guestPhone,
+      });
+    }
 
     return reservation;
   }
@@ -114,6 +124,14 @@ export class ReservationsService {
 
     // Fire-and-forget: see the comment in create() above.
     void this.googleCalendarPushService.pushReservation(updated);
+
+    if (updated.guestEmail) {
+      void this.guestsService.syncFromReservation(updated.id, {
+        email: updated.guestEmail,
+        name: updated.guestName,
+        phone: updated.guestPhone,
+      });
+    }
 
     return updated;
   }
