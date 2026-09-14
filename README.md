@@ -45,6 +45,10 @@
      serves double duty: besides being a CORS-allowed origin, it's also the base URL the API
      embeds in the initial confirmation email sent to guests — left at its localhost default,
      guests receive broken links.
+   - **`API_ORIGIN`:** must be the API's own public origin, e.g. `https://api.labrisa.com.ar`
+     (whatever `API_DOMAIN` resolves to). The API embeds it in the unsubscribe link appended to
+     every marketing email — left at its localhost default, every campaign email ships a broken
+     unsubscribe link, silently, with the campaign still recorded as sent.
 2. Point DNS A records for `admin.labrisa.com.ar`, `reservas.labrisa.com.ar`, and `api.labrisa.com.ar` at the server's IP
 3. Start: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`
 4. Run migrations and seed as above, using the same `docker compose -f ... exec` commands
