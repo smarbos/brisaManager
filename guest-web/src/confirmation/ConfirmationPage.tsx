@@ -4,6 +4,7 @@ import { ApiError } from '../api/client';
 import { acceptContract, confirmDates, getReservationByToken } from '../api/publicReservations';
 import { GuestReservation } from './types';
 import { PageContainer, Alert, Button, FormField, Input } from '../ui';
+import { formatDate } from '../lib/date';
 
 export function ConfirmationPage() {
   const { token } = useParams<{ token: string }>();
@@ -96,8 +97,8 @@ export function ConfirmationPage() {
       <h2 className="mt-1 font-heading text-lg font-semibold text-heading">
         Reservation for {reservation.guestName}
       </h2>
-      <p className="mt-4 text-text">Check-in: {reservation.checkIn.slice(0, 10)}</p>
-      <p className="text-text">Check-out: {reservation.checkOut.slice(0, 10)}</p>
+      <p className="mt-4 text-text">Check-in: {formatDate(reservation.checkIn)}</p>
+      <p className="text-text">Check-out: {formatDate(reservation.checkOut)}</p>
       <p className="text-text">Guests: {reservation.paxCount}</p>
       <p className="text-text">
         Total: {reservation.totalAmount} {reservation.currency}

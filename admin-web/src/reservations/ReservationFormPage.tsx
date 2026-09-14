@@ -12,6 +12,7 @@ import {
 } from '../api/reservations';
 import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } from './types';
 import { PageContainer, Alert, Button, FormField, Input, Select, Textarea } from '../ui';
+import { formatDate, formatDateTime } from '../lib/date';
 
 const emptyForm = {
   guestName: '',
@@ -143,7 +144,7 @@ export function ReservationFormPage() {
             <ul className="mt-1 list-disc pl-5">
               {overlaps.map((o) => (
                 <li key={o.id}>
-                  {o.guestName} ({o.source}): {o.checkIn.slice(0, 10)} – {o.checkOut.slice(0, 10)}
+                  {o.guestName} ({o.source}): {formatDate(o.checkIn)} – {formatDate(o.checkOut)}
                 </li>
               ))}
             </ul>
@@ -220,7 +221,7 @@ export function ReservationFormPage() {
           {reservationRecord.missingFromChannelAt && (
             <Alert>
               No longer found in the channel's calendar as of{' '}
-              {new Date(reservationRecord.missingFromChannelAt).toLocaleString()} — confirm with the guest or cancel
+              {formatDateTime(reservationRecord.missingFromChannelAt)} — confirm with the guest or cancel
               this reservation.
             </Alert>
           )}
@@ -269,7 +270,7 @@ export function ReservationFormPage() {
           <ul className="flex flex-col gap-1 text-sm text-text-muted">
             {events.map((event) => (
               <li key={event.id}>
-                {event.type} — {new Date(event.createdAt).toLocaleString()}
+                {event.type} — {formatDateTime(event.createdAt)}
                 {event.detail ? `: ${event.detail}` : ''}
               </li>
             ))}

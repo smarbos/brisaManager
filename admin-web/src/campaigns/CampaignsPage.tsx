@@ -8,6 +8,7 @@ import {
   CampaignFilterType,
 } from '../api/campaigns';
 import { PageContainer, PageHeader, Alert, Badge, Button, FormField, Input, Select } from '../ui';
+import { formatDateTime } from '../lib/date';
 
 export function CampaignsPage() {
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
@@ -128,7 +129,7 @@ export function CampaignsPage() {
           {history.map((c) => (
             <li key={c.id} className="border-b border-border pb-4">
               <p>
-                {c.template.name} — {c.recipientCount} recipient(s) — {new Date(c.sentAt).toLocaleString()}
+                {c.template.name} — {c.recipientCount} recipient(s) — {formatDateTime(c.sentAt)}
               </p>
               <ul className="mt-2 flex flex-col gap-1">
                 {c.recipients.map((r) => (

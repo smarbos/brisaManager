@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listGuests, Guest } from '../api/guests';
 import { PageContainer, PageHeader, Alert, Table, Badge, tableThClass as thClass, tableTdClass as tdClass } from '../ui';
+import { formatDate } from '../lib/date';
 
 export function GuestListPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
@@ -34,7 +35,7 @@ export function GuestListPage() {
               <td className={tdClass}>{g.email}</td>
               <td className={tdClass}>{g.phone ?? '—'}</td>
               <td className={tdClass}>{g.totalStays}</td>
-              <td className={tdClass}>{g.lastStayAt ? new Date(g.lastStayAt).toLocaleDateString() : '—'}</td>
+              <td className={tdClass}>{g.lastStayAt ? formatDate(g.lastStayAt) : '—'}</td>
               <td className={tdClass}>
                 <Badge tone={g.unsubscribedAt ? 'warning' : 'success'}>
                   {g.unsubscribedAt ? 'Unsubscribed' : 'Subscribed'}
