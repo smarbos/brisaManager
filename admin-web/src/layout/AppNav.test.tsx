@@ -22,6 +22,7 @@ describe('AppNav', () => {
     expect(screen.getByRole('link', { name: 'Guests' })).toHaveAttribute('href', '/guests');
     expect(screen.getByRole('link', { name: 'Templates' })).toHaveAttribute('href', '/templates');
     expect(screen.getByRole('link', { name: 'Campaigns' })).toHaveAttribute('href', '/campaigns');
+    expect(screen.getByRole('link', { name: 'Activity Log' })).toHaveAttribute('href', '/activity');
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
   });
 

@@ -8,6 +8,7 @@ import { SettingsPage } from './settings/SettingsPage';
 import { GuestListPage } from './guests/GuestListPage';
 import { TemplatesPage } from './templates/TemplatesPage';
 import { CampaignsPage } from './campaigns/CampaignsPage';
+import { ActivityLogPage } from './activity/ActivityLogPage';
 
 export function App() {
   return (
@@ -23,6 +24,7 @@ export function App() {
             <Route path="/guests" element={<GuestListPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
+            <Route path="/activity" element={<ActivityLogPage />} />
           </Route>
         </Routes>
       </AuthProvider>

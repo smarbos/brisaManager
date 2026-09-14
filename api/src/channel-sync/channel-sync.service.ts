@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { EmailService } from '../email/email.service';
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
+import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { ReservationSource } from '@prisma/client';
 
 interface PlatformConfig {
@@ -24,6 +25,7 @@ export class ChannelSyncService {
     private readonly settingsService: SettingsService,
     private readonly emailService: EmailService,
     private readonly googleCalendarPushService: GoogleCalendarPushService,
+    private readonly eventsService: ReservationEventsService,
   ) {}
 
   async syncAll(): Promise<void> {
@@ -85,13 +87,18 @@ export class ChannelSyncService {
     const currentUids = new Set(events.map((event) => event.uid));
 
     for (const event of events) {
+      const where = { source_externalReference: { source: config.source, externalReference: event.uid } };
+
+      // Checked before the upsert so we know whether this event is genuinely new — the upsert
+      // itself can't tell us that after the fact, and staff need to know which reservations on
+      // the activity log were auto-created from a sync versus already existing.
+      const existing = await this.prisma.reservation.findUnique({ where });
+
       // Atomic upsert keyed on the (source, externalReference) unique constraint: this both
       // avoids a race between overlapping sync runs (cron tick vs. manual "Sync now") for the
       // same UID, and un-flags the reservation if it had been marked missing and reappeared.
       const upserted = await this.prisma.reservation.upsert({
-        where: {
-          source_externalReference: { source: config.source, externalReference: event.uid },
-        },
+        where,
         create: {
           guestName: config.guestNamePlaceholder,
           checkIn: event.start,
@@ -109,6 +116,14 @@ export class ChannelSyncService {
           missingFromChannelAt: null,
         },
       });
+
+      if (!existing) {
+        await this.eventsService.record(
+          upserted.id,
+          'RESERVATION_CREATED',
+          `Created via ${config.displayName} calendar sync`,
+        );
+      }
 
       // BOOKING/AIRBNB reservations are written directly through Prisma here (bypassing
       // ReservationsService, intentionally — see this module's plan), so they'd otherwise never

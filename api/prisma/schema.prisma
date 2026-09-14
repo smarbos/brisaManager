@@ -22,6 +22,7 @@ enum ReservationStatus {
 }
 
 enum ReservationEventType {
+  RESERVATION_CREATED
   DATES_CONFIRMED
   CONTRACT_ACCEPTED
   PAYMENT_RECEIVED

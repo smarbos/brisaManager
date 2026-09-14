@@ -7,6 +7,7 @@ const sections = [
   { to: '/guests', label: 'Guests' },
   { to: '/templates', label: 'Templates' },
   { to: '/campaigns', label: 'Campaigns' },
+  { to: '/activity', label: 'Activity Log' },
   { to: '/settings', label: 'Settings' },
 ];
 

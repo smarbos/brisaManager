@@ -81,6 +81,14 @@ describe('ReservationsService', () => {
     expect(prisma.reservation.create).toHaveBeenCalled();
   });
 
+  it('records a RESERVATION_CREATED event on create', async () => {
+    prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto });
+
+    await service.create(validDto);
+
+    expect(eventsService.record).toHaveBeenCalledWith('1', 'RESERVATION_CREATED', 'Created manually by staff');
+  });
+
   it('normalizes an empty-string externalReference to null on create', async () => {
     prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto, externalReference: null });
 
