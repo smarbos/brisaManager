@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ReservationFormPage } from './ReservationFormPage';
 import * as reservationsApi from '../api/reservations';
+import * as reservationImportApi from '../api/reservation-import';
 
 describe('ReservationFormPage', () => {
   it('submits a new reservation', async () => {
@@ -23,6 +24,78 @@ describe('ReservationFormPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
     await waitFor(() => expect(createSpy).toHaveBeenCalled());
+  });
+
+  it('imports fields from a screenshot and pre-fills the form', async () => {
+    vi.spyOn(reservationImportApi, 'parseScreenshot').mockResolvedValue({
+      guestName: 'Weber Clara',
+      checkIn: '2026-11-06',
+      checkOut: '2026-11-08',
+      paxCount: 3,
+      externalReference: 'booking-manual-5459856627',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const file = new File(['fake-image-bytes'], 'screenshot.jpg', { type: 'image/jpeg' });
+    const input = screen.getByLabelText(/importar desde captura de booking\.com/i);
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByLabelText(/nombre del huésped/i)).toHaveValue('Weber Clara'));
+    expect(screen.getByLabelText(/check-in/i)).toHaveValue('2026-11-06');
+    expect(screen.getByLabelText(/check-out/i)).toHaveValue('2026-11-08');
+    expect(screen.getByLabelText(/huéspedes/i)).toHaveValue(3);
+  });
+
+  it('does not overwrite a field the user already typed when the extraction returns null for it', async () => {
+    vi.spyOn(reservationImportApi, 'parseScreenshot').mockResolvedValue({
+      guestName: null,
+      checkIn: '2026-11-06',
+      checkOut: '2026-11-08',
+      paxCount: 3,
+      externalReference: 'booking-manual-5459856627',
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText(/nombre del huésped/i), { target: { value: 'Ya escrito' } });
+
+    const file = new File(['fake-image-bytes'], 'screenshot.jpg', { type: 'image/jpeg' });
+    const input = screen.getByLabelText(/importar desde captura de booking\.com/i);
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByLabelText(/check-in/i)).toHaveValue('2026-11-06'));
+    expect(screen.getByLabelText(/nombre del huésped/i)).toHaveValue('Ya escrito');
+  });
+
+  it('shows a fallback notice when the import fails', async () => {
+    vi.spyOn(reservationImportApi, 'parseScreenshot').mockRejectedValue(new Error('network error'));
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const file = new File(['fake-image-bytes'], 'screenshot.jpg', { type: 'image/jpeg' });
+    const input = screen.getByLabelText(/importar desde captura de booking\.com/i);
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no pudimos leer los datos de la captura/i);
   });
 
   it('marks the 30% payment as received and refreshes the progress list', async () => {

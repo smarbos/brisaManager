@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, ClipboardEvent, FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   checkOverlap,
@@ -14,6 +14,7 @@ import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } f
 import { PageContainer, Alert, Button, FormField, Input, Select, Textarea } from '../ui';
 import { formatDate, formatDateTime } from '../lib/date';
 import { sourceLabel, eventTypeLabel } from '../lib/labels';
+import { parseScreenshot } from '../api/reservation-import';
 
 const emptyForm = {
   guestName: '',
@@ -40,6 +41,8 @@ export function ReservationFormPage() {
   const [reservationRecord, setReservationRecord] = useState<Reservation | null>(null);
   const [events, setEvents] = useState<ReservationEvent[]>([]);
   const [overlaps, setOverlaps] = useState<Reservation[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const guestWebUrl = import.meta.env.VITE_GUEST_WEB_URL as string;
 
   function loadReservation() {
@@ -118,6 +121,42 @@ export function ReservationFormPage() {
     navigator.clipboard.writeText(`${guestWebUrl}/r/${reservationRecord.confirmationToken}`);
   }
 
+  async function applyExtractedFields(file: File) {
+    setImportError(null);
+    setImporting(true);
+    try {
+      const extracted = await parseScreenshot(file);
+      setForm((prev) => ({
+        ...prev,
+        guestName: extracted.guestName ?? prev.guestName,
+        checkIn: extracted.checkIn ?? prev.checkIn,
+        checkOut: extracted.checkOut ?? prev.checkOut,
+        paxCount: extracted.paxCount ?? prev.paxCount,
+        externalReference: extracted.externalReference ?? prev.externalReference,
+        source: 'BOOKING',
+      }));
+    } catch {
+      setImportError('No pudimos leer los datos de la captura — completá el formulario manualmente.');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleScreenshotFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) {
+      void applyExtractedFields(file);
+    }
+  }
+
+  function handleScreenshotPaste(event: ClipboardEvent<HTMLDivElement>) {
+    const file = Array.from(event.clipboardData.files).find((f) => f.type.startsWith('image/'));
+    if (file) {
+      void applyExtractedFields(file);
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -139,6 +178,28 @@ export function ReservationFormPage() {
         <h1 className="font-heading text-2xl font-semibold text-heading">
           {isEditing ? 'Editar reserva' : 'Nueva reserva'}
         </h1>
+        {!isEditing && (
+          <div
+            tabIndex={0}
+            onPaste={handleScreenshotPaste}
+            className="flex flex-col gap-2 rounded border border-dashed border-border p-4"
+          >
+            <FormField label="Importar desde captura de Booking.com">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleScreenshotFileChange}
+                disabled={importing}
+                className="text-sm text-text"
+              />
+            </FormField>
+            <p className="text-xs text-text-muted">
+              También podés pegar una captura copiada (Ctrl+V) haciendo clic acá primero.
+            </p>
+            {importing && <p className="text-sm text-text-muted">Leyendo captura...</p>}
+            {importError && <Alert>{importError}</Alert>}
+          </div>
+        )}
         {overlaps.length > 0 && (
           <Alert>
             <p>Estas fechas se superponen con otra(s) reserva(s):</p>
