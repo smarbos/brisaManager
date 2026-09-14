@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { acceptContract, confirmDates, getReservationByToken } from '../api/publicReservations';
 import { GuestReservation } from './types';
+import { PageContainer, Alert, Button, FormField, Input } from '../ui';
 
 export function ConfirmationPage() {
   const { token } = useParams<{ token: string }>();
@@ -56,27 +57,29 @@ export function ConfirmationPage() {
 
   if (notFound) {
     return (
-      <main className="container">
-        <h1>Reservation not found</h1>
-        <p>This confirmation link is invalid. Please contact us directly.</p>
-      </main>
+      <PageContainer>
+        <h1 className="font-heading text-2xl font-semibold text-heading">Reservation not found</h1>
+        <p className="mt-2 text-text-muted">This confirmation link is invalid. Please contact us directly.</p>
+      </PageContainer>
     );
   }
 
   if (loadError) {
     return (
-      <main className="container">
-        <h1>Unable to load reservation</h1>
-        <p>Something went wrong loading your reservation. Please try again or contact us directly.</p>
-      </main>
+      <PageContainer>
+        <h1 className="font-heading text-2xl font-semibold text-heading">Unable to load reservation</h1>
+        <p className="mt-2 text-text-muted">
+          Something went wrong loading your reservation. Please try again or contact us directly.
+        </p>
+      </PageContainer>
     );
   }
 
   if (!reservation) {
     return (
-      <main className="container">
-        <p>Loading...</p>
-      </main>
+      <PageContainer>
+        <p className="text-text-muted">Loading...</p>
+      </PageContainer>
     );
   }
 
@@ -88,58 +91,59 @@ export function ConfirmationPage() {
   );
 
   return (
-    <main className="container">
-      <h1>La Brisa de Mar del Plata</h1>
-      <h2>Reservation for {reservation.guestName}</h2>
-      <p>Check-in: {reservation.checkIn.slice(0, 10)}</p>
-      <p>Check-out: {reservation.checkOut.slice(0, 10)}</p>
-      <p>Guests: {reservation.paxCount}</p>
-      <p>
+    <PageContainer>
+      <h1 className="font-heading text-2xl font-semibold text-heading">La Brisa de Mar del Plata</h1>
+      <h2 className="mt-1 font-heading text-lg font-semibold text-heading">
+        Reservation for {reservation.guestName}
+      </h2>
+      <p className="mt-4 text-text">Check-in: {reservation.checkIn.slice(0, 10)}</p>
+      <p className="text-text">Check-out: {reservation.checkOut.slice(0, 10)}</p>
+      <p className="text-text">Guests: {reservation.paxCount}</p>
+      <p className="text-text">
         Total: {reservation.totalAmount} {reservation.currency}
       </p>
 
-      {error && <p role="alert">{error}</p>}
+      {error && <Alert>{error}</Alert>}
 
-      <section>
-        <h3>1. Confirm your dates</h3>
+      <section className="mt-6">
+        <h3 className="mb-2 font-heading text-base font-semibold text-heading">1. Confirm your dates</h3>
         {reservation.datesConfirmedAt ? (
-          <p>Confirmed.</p>
+          <p className="text-text">Confirmed.</p>
         ) : (
-          <button type="button" className="btn" onClick={handleConfirmDates}>
+          <Button type="button" onClick={handleConfirmDates}>
             Confirm dates and guests
-          </button>
+          </Button>
         )}
       </section>
 
-      <section>
-        <h3>2. Accept the house rules</h3>
-        <p style={{ whiteSpace: 'pre-wrap' }}>{reservation.houseRulesText}</p>
+      <section className="mt-6">
+        <h3 className="mb-2 font-heading text-base font-semibold text-heading">2. Accept the house rules</h3>
+        <p className="whitespace-pre-wrap text-text">{reservation.houseRulesText}</p>
         {reservation.contractAcceptedAt ? (
-          <p>Accepted by {reservation.contractAcceptedName}.</p>
+          <p className="text-text">Accepted by {reservation.contractAcceptedName}.</p>
         ) : (
-          <form onSubmit={handleAcceptContract}>
-            <label>
-              Full name
-              <input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-            </label>
-            <button type="submit" className="btn">
-              I accept the house rules
-            </button>
+          <form onSubmit={handleAcceptContract} className="mt-3 flex flex-col gap-3">
+            <FormField label="Full name">
+              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+            </FormField>
+            <Button type="submit">I accept the house rules</Button>
           </form>
         )}
       </section>
 
-      <section>
-        <h3>3. Payment</h3>
-        <p style={{ whiteSpace: 'pre-wrap' }}>{reservation.paymentInstructions}</p>
-        <p>
+      <section className="mt-6">
+        <h3 className="mb-2 font-heading text-base font-semibold text-heading">3. Payment</h3>
+        <p className="whitespace-pre-wrap text-text">{reservation.paymentInstructions}</p>
+        <p className="mt-2 text-text">
           30% confirmation payment ({reservation.confirmationPaymentAmount} {reservation.currency}):{' '}
           {reservation.confirmationPaymentReceivedAt ? 'Received' : 'Pending'}
         </p>
-        <p>Security deposit: {reservation.depositReceivedAt ? 'Received' : 'Pending'}</p>
+        <p className="text-text">Security deposit: {reservation.depositReceivedAt ? 'Received' : 'Pending'}</p>
       </section>
 
-      {allDone && <p>Your reservation is fully confirmed. We look forward to hosting you!</p>}
-    </main>
+      {allDone && (
+        <p className="mt-6 text-text">Your reservation is fully confirmed. We look forward to hosting you!</p>
+      )}
+    </PageContainer>
   );
 }
