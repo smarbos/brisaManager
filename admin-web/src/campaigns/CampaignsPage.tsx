@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { listCampaignTemplates, CampaignTemplate } from '../api/campaign-templates';
 import {
   previewCampaign,
@@ -87,14 +86,7 @@ export function CampaignsPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Campaigns"
-        nav={
-          <Link to="/" className="text-accent hover:underline">
-            Reservations
-          </Link>
-        }
-      />
+      <PageHeader title="Campaigns" />
       {error && <Alert>{error}</Alert>}
       <section className="mb-8">
         <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Compose</h2>
