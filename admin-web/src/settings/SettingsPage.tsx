@@ -6,6 +6,7 @@ import {
   disconnectGoogleCalendar,
   runGoogleCalendarSync,
 } from '../api/google-calendar';
+import { PageContainer, Alert, Button, FormField, Input, Textarea } from '../ui';
 
 export function SettingsPage() {
   const [houseRulesText, setHouseRulesText] = useState('');
@@ -132,72 +133,72 @@ export function SettingsPage() {
   }
 
   return (
-    <>
-      <form onSubmit={handleSubmit}>
-        <h1>Settings</h1>
-        {loadError && <p role="alert">{loadError}</p>}
-        {saveError && <p role="alert">{saveError}</p>}
-        <label>
-          House rules
-          <textarea value={houseRulesText} onChange={(e) => setHouseRulesText(e.target.value)} rows={8} />
-        </label>
-        <label>
-          Payment instructions
-          <textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={8} />
-        </label>
-        <label>
-          Booking.com iCal URL
-          <input value={bookingIcalUrl} onChange={(e) => setBookingIcalUrl(e.target.value)} />
-        </label>
-        <label>
-          Airbnb iCal URL
-          <input value={airbnbIcalUrl} onChange={(e) => setAirbnbIcalUrl(e.target.value)} />
-        </label>
-        {saved && <p role="status">Saved</p>}
-        <button type="submit">Save</button>
+    <PageContainer>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <h1 className="font-heading text-2xl font-semibold text-heading">Settings</h1>
+        {loadError && <Alert>{loadError}</Alert>}
+        {saveError && <Alert>{saveError}</Alert>}
+        <FormField label="House rules">
+          <Textarea value={houseRulesText} onChange={(e) => setHouseRulesText(e.target.value)} rows={8} />
+        </FormField>
+        <FormField label="Payment instructions">
+          <Textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={8} />
+        </FormField>
+        <FormField label="Booking.com iCal URL">
+          <Input value={bookingIcalUrl} onChange={(e) => setBookingIcalUrl(e.target.value)} />
+        </FormField>
+        <FormField label="Airbnb iCal URL">
+          <Input value={airbnbIcalUrl} onChange={(e) => setAirbnbIcalUrl(e.target.value)} />
+        </FormField>
+        {saved && <Alert tone="success">Saved</Alert>}
+        <Button type="submit">Save</Button>
       </form>
-      <section>
-        <h2>Channel sync</h2>
+      <section className="mt-8">
+        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Channel sync</h2>
         {lastSyncError ? (
-          <p role="alert">Last sync failed: {lastSyncError}</p>
+          <Alert>Last sync failed: {lastSyncError}</Alert>
         ) : (
-          <p>Last synced: {lastSyncAt ? new Date(lastSyncAt).toLocaleString() : 'never'}</p>
+          <p className="text-sm text-text-muted">
+            Last synced: {lastSyncAt ? new Date(lastSyncAt).toLocaleString() : 'never'}
+          </p>
         )}
-        {syncActionError && <p role="alert">{syncActionError}</p>}
-        <button type="button" onClick={handleSyncNow} disabled={syncing}>
+        {syncActionError && <Alert>{syncActionError}</Alert>}
+        <Button type="button" variant="secondary" className="mt-3" onClick={handleSyncNow} disabled={syncing}>
           Sync now
-        </button>
+        </Button>
       </section>
-      <section>
-        <h2>Google Calendar</h2>
-        {googleCallbackStatus === 'connected' && <p role="status">Google Calendar connected.</p>}
-        {googleCallbackStatus === 'error' && (
-          <p role="alert">Could not connect Google Calendar. Please try again.</p>
-        )}
-        {googleActionError && <p role="alert">{googleActionError}</p>}
+      <section className="mt-8">
+        <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Google Calendar</h2>
+        {googleCallbackStatus === 'connected' && <Alert tone="success">Google Calendar connected.</Alert>}
+        {googleCallbackStatus === 'error' && <Alert>Could not connect Google Calendar. Please try again.</Alert>}
+        {googleActionError && <Alert>{googleActionError}</Alert>}
         {googleConnected ? (
           <>
             {googleLastSyncError ? (
-              <p role="alert">Last sync failed: {googleLastSyncError}</p>
+              <Alert>Last sync failed: {googleLastSyncError}</Alert>
             ) : (
-              <p>Connected — last synced: {googleLastSyncAt ? new Date(googleLastSyncAt).toLocaleString() : 'never'}</p>
+              <p className="text-sm text-text-muted">
+                Connected — last synced: {googleLastSyncAt ? new Date(googleLastSyncAt).toLocaleString() : 'never'}
+              </p>
             )}
-            <button type="button" onClick={handleSyncGoogleCalendarNow} disabled={googleSyncing}>
-              Sync Google Calendar now
-            </button>
-            <button type="button" onClick={handleDisconnectGoogleCalendar}>
-              Disconnect
-            </button>
+            <div className="mt-3 flex gap-3">
+              <Button type="button" variant="secondary" onClick={handleSyncGoogleCalendarNow} disabled={googleSyncing}>
+                Sync Google Calendar now
+              </Button>
+              <Button type="button" variant="danger" onClick={handleDisconnectGoogleCalendar}>
+                Disconnect
+              </Button>
+            </div>
           </>
         ) : (
           <>
-            <p>Not connected.</p>
-            <button type="button" onClick={handleConnectGoogleCalendar}>
+            <p className="text-sm text-text-muted">Not connected.</p>
+            <Button type="button" className="mt-3" onClick={handleConnectGoogleCalendar}>
               Connect Google Calendar
-            </button>
+            </Button>
           </>
         )}
       </section>
-    </>
+    </PageContainer>
   );
 }
