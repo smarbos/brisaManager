@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { listReservations } from '../api/reservations';
 import { Reservation, ReservationSource, ReservationStatus } from './types';
 import { PageContainer, PageHeader, Button, FormField, Select, Alert, Table, tableThClass as thClass, tableTdClass as tdClass } from '../ui';
+import { formatDate } from '../lib/date';
 
 export function ReservationListPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -71,8 +72,8 @@ export function ReservationListPage() {
                 </Link>
                 {r.missingFromChannelAt && <span> ⚠ No longer in channel feed</span>}
               </td>
-              <td className={tdClass}>{r.checkIn}</td>
-              <td className={tdClass}>{r.checkOut}</td>
+              <td className={tdClass}>{formatDate(r.checkIn)}</td>
+              <td className={tdClass}>{formatDate(r.checkOut)}</td>
               <td className={tdClass}>{r.source}</td>
               <td className={tdClass}>{r.status}</td>
             </tr>

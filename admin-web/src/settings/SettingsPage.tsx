@@ -7,6 +7,7 @@ import {
   runGoogleCalendarSync,
 } from '../api/google-calendar';
 import { PageContainer, Alert, Button, FormField, Input, Textarea } from '../ui';
+import { formatDateTime } from '../lib/date';
 
 export function SettingsPage() {
   const [houseRulesText, setHouseRulesText] = useState('');
@@ -159,7 +160,7 @@ export function SettingsPage() {
           <Alert>Last sync failed: {lastSyncError}</Alert>
         ) : (
           <p className="text-sm text-text-muted">
-            Last synced: {lastSyncAt ? new Date(lastSyncAt).toLocaleString() : 'never'}
+            Last synced: {lastSyncAt ? formatDateTime(lastSyncAt) : 'never'}
           </p>
         )}
         {syncActionError && <Alert>{syncActionError}</Alert>}
@@ -178,7 +179,7 @@ export function SettingsPage() {
               <Alert>Last sync failed: {googleLastSyncError}</Alert>
             ) : (
               <p className="text-sm text-text-muted">
-                Connected — last synced: {googleLastSyncAt ? new Date(googleLastSyncAt).toLocaleString() : 'never'}
+                Connected — last synced: {googleLastSyncAt ? formatDateTime(googleLastSyncAt) : 'never'}
               </p>
             )}
             <div className="mt-3 flex gap-3">
