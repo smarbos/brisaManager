@@ -78,6 +78,74 @@ describe('CampaignsPage', () => {
     expect(sendSpy).not.toHaveBeenCalled();
   });
 
+  it('clears the displayed recipient count while a new preview is pending', async () => {
+    vi.spyOn(templatesApi, 'listCampaignTemplates').mockResolvedValue([
+      { id: 'tpl-1', name: 'Welcome back', subject: 'Hi {{guestName}}', bodyHtml: '<p>Hi</p>' },
+      { id: 'tpl-2', name: 'Reminder', subject: 'Hi {{guestName}}', bodyHtml: '<p>Hi</p>' },
+    ]);
+
+    let resolveSecondPreview: (value: { recipientCount: number }) => void = () => {};
+    const previewSpy = vi
+      .spyOn(campaignsApi, 'previewCampaign')
+      .mockResolvedValueOnce({ recipientCount: 5 })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecondPreview = resolve;
+          }),
+      );
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'ALL' } });
+    expect(await screen.findByText(/5 recipient/i)).toBeInTheDocument();
+
+    // Switch to a different (still valid) template while a slower preview is in flight.
+    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-2' } });
+
+    // The stale count must disappear immediately, before the new preview resolves.
+    await waitFor(() => expect(screen.queryByText(/5 recipient/i)).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /send campaign/i })).toBeDisabled();
+
+    resolveSecondPreview({ recipientCount: 9 });
+
+    expect(await screen.findByText(/9 recipient/i)).toBeInTheDocument();
+    expect(previewSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('discards an out-of-order preview response from a superseded request', async () => {
+    let resolveFirstPreview: (value: { recipientCount: number }) => void = () => {};
+    vi.spyOn(campaignsApi, 'previewCampaign')
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstPreview = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({ recipientCount: 9 });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/template/i), { target: { value: 'tpl-1' } });
+    // This triggers the first (slow) preview request, using the default N months of 6.
+    fireEvent.change(screen.getByLabelText(/filter/i), { target: { value: 'STAYED_WITHIN_MONTHS' } });
+
+    // Changing N months before the first request resolves supersedes it with a second request.
+    fireEvent.change(screen.getByLabelText(/N months/i), { target: { value: '3' } });
+
+    expect(await screen.findByText(/9 recipient/i)).toBeInTheDocument();
+
+    // The stale first response resolves late; it must not overwrite the current count.
+    resolveFirstPreview({ recipientCount: 5 });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.getByText(/9 recipient/i)).toBeInTheDocument();
+    expect(screen.queryByText(/5 recipient/i)).not.toBeInTheDocument();
+  });
+
   it('loads and displays campaign history', async () => {
     vi.spyOn(campaignsApi, 'listCampaignHistory').mockResolvedValue([
       {
