@@ -12,3 +12,6 @@ export function Table({ children, className = '' }: TableProps) {
     </div>
   );
 }
+
+export const tableThClass = 'border-b border-border px-3 py-2 text-left font-semibold text-text-muted';
+export const tableTdClass = 'border-b border-border px-3 py-2';

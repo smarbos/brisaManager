@@ -3,10 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { listReservations } from '../api/reservations';
 import { useAuth } from '../auth/AuthContext';
 import { Reservation, ReservationSource, ReservationStatus } from './types';
-import { PageContainer, PageHeader, Button, FormField, Select, Alert, Table } from '../ui';
-
-const thClass = 'border-b border-border px-3 py-2 text-left font-semibold text-text-muted';
-const tdClass = 'border-b border-border px-3 py-2';
+import { PageContainer, PageHeader, Button, FormField, Select, Alert, Table, tableThClass as thClass, tableTdClass as tdClass } from '../ui';
 
 export function ReservationListPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
