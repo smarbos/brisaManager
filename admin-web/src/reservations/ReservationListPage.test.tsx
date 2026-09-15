@@ -75,4 +75,88 @@ describe('ReservationListPage', () => {
 
     expect(await screen.findByText(/ya no está en el calendario del canal/i)).toBeInTheDocument();
   });
+
+  it('cancels a reservation after confirming and reloads the list', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const listSpy = vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Jane Doe',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 100000,
+        currency: 'ARS',
+        status: 'PENDING',
+      } as never,
+    ]);
+    const cancelSpy = vi.spyOn(reservationsApi, 'cancelReservation').mockResolvedValue({ id: '1' } as never);
+
+    renderPage();
+
+    const button = await screen.findByRole('button', { name: /cancelar/i });
+    fireEvent.click(button);
+
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Jane Doe'));
+    await waitFor(() => expect(cancelSpy).toHaveBeenCalledWith('1'));
+    await waitFor(() => expect(listSpy).toHaveBeenCalledTimes(2));
+  });
+
+  it('does not cancel when the confirmation dialog is dismissed', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Jane Doe',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 100000,
+        currency: 'ARS',
+        status: 'PENDING',
+      } as never,
+    ]);
+    const cancelSpy = vi.spyOn(reservationsApi, 'cancelReservation').mockResolvedValue({ id: '1' } as never);
+
+    renderPage();
+
+    const button = await screen.findByRole('button', { name: /cancelar/i });
+    fireEvent.click(button);
+
+    expect(cancelSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not show a cancel button for an already-cancelled or completed reservation', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Cancelled Guest',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 100000,
+        currency: 'ARS',
+        status: 'CANCELLED',
+      } as never,
+      {
+        id: '2',
+        guestName: 'Completed Guest',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 100000,
+        currency: 'ARS',
+        status: 'COMPLETED',
+      } as never,
+    ]);
+
+    renderPage();
+
+    await screen.findByText('Cancelled Guest');
+    expect(screen.queryByRole('button', { name: /cancelar/i })).not.toBeInTheDocument();
+  });
 });

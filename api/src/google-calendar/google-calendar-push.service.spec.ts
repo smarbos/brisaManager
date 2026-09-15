@@ -96,6 +96,26 @@ describe('GoogleCalendarPushService', () => {
     });
   });
 
+  it('colors a PENDING reservation differently from a CONFIRMED one', async () => {
+    authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+    insertMock.mockResolvedValue({ data: { id: 'event-1' } });
+
+    await service.pushReservation(baseReservation); // status: PENDING
+
+    expect(insertMock).toHaveBeenCalledWith({
+      calendarId: 'cal-1',
+      requestBody: expect.objectContaining({ colorId: '5' }),
+    });
+
+    insertMock.mockClear();
+    await service.pushReservation({ ...baseReservation, status: 'CONFIRMED' });
+
+    expect(insertMock).toHaveBeenCalledWith({
+      calendarId: 'cal-1',
+      requestBody: expect.objectContaining({ colorId: '10' }),
+    });
+  });
+
   it('updates the existing event in place when googleEventId is already set', async () => {
     authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
     const reservation = { ...baseReservation, googleEventId: 'event-1' };

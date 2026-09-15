@@ -1,5 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
+import { SettingsService } from '../settings/settings.service';
+
+function formatDateOnly(date: Date): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC' }).format(date);
+}
+
+// Simple string-replace substitution, not a template engine: `{{key}}` in the staff-edited
+// template text is replaced with vars[key]. split/join avoids needing to escape `{{...}}` as
+// a regex, since it's matched as a literal string.
+function renderTemplate(template: string, vars: Record<string, string>): string {
+  return Object.entries(vars).reduce((result, [key, value]) => result.split(`{{${key}}}`).join(value), template);
+}
 
 @Injectable()
 export class EmailService {
@@ -8,12 +20,44 @@ export class EmailService {
   private readonly from = process.env.EMAIL_FROM as string;
   private readonly alertEmail = process.env.ALERT_EMAIL ?? process.env.ADMIN_SEED_EMAIL;
 
+  // Named EMAIL_* rather than a bare DEBUG env var deliberately: several transitive
+  // dependencies (Express included) treat a bare DEBUG env var as their own logging
+  // namespace switch, which would enable unrelated verbose logging as a side effect.
+  private readonly debugMode = process.env.EMAIL_DEBUG_MODE === 'true';
+  private readonly debugRecipient = process.env.EMAIL_DEBUG_RECIPIENT;
+
+  constructor(private readonly settingsService: SettingsService) {}
+
+  // Redirects every outbound email to EMAIL_DEBUG_RECIPIENT when debug mode is on — for
+  // testing guest-facing flows (like the reservation confirmation email) against a real
+  // send pipeline without ever emailing a real guest. Falls back to the real recipient
+  // (with a warning) if debug mode is on but no recipient is configured, rather than
+  // silently doing nothing.
+  private resolveRecipient(to: string): string {
+    if (!this.debugMode) {
+      return to;
+    }
+    if (!this.debugRecipient) {
+      this.logger.warn('EMAIL_DEBUG_MODE is enabled but EMAIL_DEBUG_RECIPIENT is not set — sending to the real recipient.');
+      return to;
+    }
+    return this.debugRecipient;
+  }
+
+  private subjectForDebug(subject: string, realTo: string): string {
+    return this.debugMode && this.debugRecipient ? `[DEBUG → ${realTo}] ${subject}` : subject;
+  }
+
+  // guestName/confirmationUrl are the only variables this template supports.
   async sendInitialConfirmationEmail(to: string, guestName: string, confirmationUrl: string): Promise<void> {
+    const settings = await this.settingsService.get();
+    const html = renderTemplate(settings.initialEmailTemplate, { guestName, confirmationUrl });
+
     const { error } = await this.resend.emails.send({
       from: this.from,
-      to,
-      subject: 'Confirmá tu reserva en La Brisa de Mar del Plata',
-      html: `<p>Hola ${guestName},</p><p>Por favor confirmá tu reserva y completá unos pasos rápidos:</p><p><a href="${confirmationUrl}">${confirmationUrl}</a></p>`,
+      to: this.resolveRecipient(to),
+      subject: this.subjectForDebug('Confirmá tu reserva en La Brisa de Mar del Plata', to),
+      html,
     });
 
     if (error) {
@@ -21,12 +65,45 @@ export class EmailService {
     }
   }
 
+  // guestName/propertyAddress/googleMapsUrl are the only variables this template supports —
+  // both come from Settings, fetched here rather than passed in by the caller.
   async sendFinalConfirmationEmail(to: string, guestName: string): Promise<void> {
+    const settings = await this.settingsService.get();
+    const html = renderTemplate(settings.finalEmailTemplate, {
+      guestName,
+      propertyAddress: settings.propertyAddress,
+      googleMapsUrl: settings.googleMapsUrl,
+    });
+
     const { error } = await this.resend.emails.send({
       from: this.from,
-      to,
-      subject: '¡Tu reserva está confirmada!',
-      html: `<p>Hola ${guestName},</p><p>Tu reserva en La Brisa de Mar del Plata está completamente confirmada. ¡Te esperamos!</p>`,
+      to: this.resolveRecipient(to),
+      subject: this.subjectForDebug('¡Tu reserva está confirmada!', to),
+      html,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  // guestName/checkIn/checkOut are the only variables this template supports. Dates are
+  // formatted DD/MM/YYYY (en-GB, pinned to UTC) to match the rest of this app's
+  // guest-facing date formatting — checkIn/checkOut are stored as UTC midnight with no
+  // real time-of-day component.
+  async sendCancellationEmail(to: string, guestName: string, checkIn: Date, checkOut: Date): Promise<void> {
+    const settings = await this.settingsService.get();
+    const html = renderTemplate(settings.cancellationEmailTemplate, {
+      guestName,
+      checkIn: formatDateOnly(checkIn),
+      checkOut: formatDateOnly(checkOut),
+    });
+
+    const { error } = await this.resend.emails.send({
+      from: this.from,
+      to: this.resolveRecipient(to),
+      subject: this.subjectForDebug('Tu reserva fue cancelada', to),
+      html,
     });
 
     if (error) {
@@ -35,7 +112,12 @@ export class EmailService {
   }
 
   async sendMarketingEmail(to: string, subject: string, html: string): Promise<void> {
-    const { error } = await this.resend.emails.send({ from: this.from, to, subject, html });
+    const { error } = await this.resend.emails.send({
+      from: this.from,
+      to: this.resolveRecipient(to),
+      subject: this.subjectForDebug(subject, to),
+      html,
+    });
 
     if (error) {
       throw new Error(error.message);
@@ -50,8 +132,8 @@ export class EmailService {
     try {
       await this.resend.emails.send({
         from: this.from,
-        to: this.alertEmail,
-        subject: `[Alert] ${subject}`,
+        to: this.resolveRecipient(this.alertEmail),
+        subject: this.subjectForDebug(`[Alert] ${subject}`, this.alertEmail),
         html: `<p>${message}</p>`,
       });
     } catch (error) {

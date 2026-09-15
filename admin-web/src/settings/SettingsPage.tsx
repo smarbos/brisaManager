@@ -12,6 +12,12 @@ import { formatDateTime } from '../lib/date';
 export function SettingsPage() {
   const [houseRulesText, setHouseRulesText] = useState('');
   const [paymentInstructions, setPaymentInstructions] = useState('');
+  const [depositInstructions, setDepositInstructions] = useState('');
+  const [propertyAddress, setPropertyAddress] = useState('');
+  const [googleMapsUrl, setGoogleMapsUrl] = useState('');
+  const [initialEmailTemplate, setInitialEmailTemplate] = useState('');
+  const [finalEmailTemplate, setFinalEmailTemplate] = useState('');
+  const [cancellationEmailTemplate, setCancellationEmailTemplate] = useState('');
   const [bookingIcalUrl, setBookingIcalUrl] = useState('');
   const [airbnbIcalUrl, setAirbnbIcalUrl] = useState('');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
@@ -33,6 +39,12 @@ export function SettingsPage() {
       .then((settings) => {
         setHouseRulesText(settings.houseRulesText);
         setPaymentInstructions(settings.paymentInstructions);
+        setDepositInstructions(settings.depositInstructions);
+        setPropertyAddress(settings.propertyAddress);
+        setGoogleMapsUrl(settings.googleMapsUrl);
+        setInitialEmailTemplate(settings.initialEmailTemplate);
+        setFinalEmailTemplate(settings.finalEmailTemplate);
+        setCancellationEmailTemplate(settings.cancellationEmailTemplate);
         setBookingIcalUrl(settings.bookingIcalUrl ?? '');
         setAirbnbIcalUrl(settings.airbnbIcalUrl ?? '');
         setLastSyncAt(settings.lastChannelSyncAt);
@@ -72,6 +84,12 @@ export function SettingsPage() {
       await updateSettings({
         houseRulesText,
         paymentInstructions,
+        depositInstructions,
+        propertyAddress,
+        googleMapsUrl,
+        initialEmailTemplate,
+        finalEmailTemplate,
+        cancellationEmailTemplate,
         bookingIcalUrl,
         airbnbIcalUrl,
         lastChannelSyncAt: lastSyncAt,
@@ -145,12 +163,51 @@ export function SettingsPage() {
         <FormField label="Instrucciones de pago">
           <Textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={8} />
         </FormField>
+        <FormField label="Descripción del depósito de garantía">
+          <Textarea value={depositInstructions} onChange={(e) => setDepositInstructions(e.target.value)} rows={8} />
+        </FormField>
+        <FormField label="Dirección del alojamiento">
+          <Input value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} />
+        </FormField>
+        <FormField label="Link de Google Maps">
+          <Input value={googleMapsUrl} onChange={(e) => setGoogleMapsUrl(e.target.value)} placeholder="https://maps.google.com/..." />
+        </FormField>
         <FormField label="URL de iCal de Booking.com">
           <Input value={bookingIcalUrl} onChange={(e) => setBookingIcalUrl(e.target.value)} />
         </FormField>
         <FormField label="URL de iCal de Airbnb">
           <Input value={airbnbIcalUrl} onChange={(e) => setAirbnbIcalUrl(e.target.value)} />
         </FormField>
+
+        <div className="mt-4">
+          <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Plantillas de email</h2>
+          <p className="mb-4 text-sm text-text-muted">
+            Se envían automáticamente en cada paso del proceso de reserva. Podés usar las
+            variables entre llaves dobles indicadas debajo de cada una — se reemplazan por el
+            dato real al enviar el email.
+          </p>
+        </div>
+        <FormField label="Email inicial (con el link de confirmación)">
+          <Textarea value={initialEmailTemplate} onChange={(e) => setInitialEmailTemplate(e.target.value)} rows={6} />
+        </FormField>
+        <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{confirmationUrl}}'}</p>
+
+        <FormField label="Email de confirmación final">
+          <Textarea value={finalEmailTemplate} onChange={(e) => setFinalEmailTemplate(e.target.value)} rows={6} />
+        </FormField>
+        <p className="-mt-2 text-xs text-text-muted">
+          Variables: {'{{guestName}} {{propertyAddress}} {{googleMapsUrl}}'}
+        </p>
+
+        <FormField label="Email de cancelación">
+          <Textarea
+            value={cancellationEmailTemplate}
+            onChange={(e) => setCancellationEmailTemplate(e.target.value)}
+            rows={6}
+          />
+        </FormField>
+        <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{checkOut}}'}</p>
+
         {saved && <Alert tone="success">Guardado</Alert>}
         <Button type="submit">Guardar</Button>
       </form>

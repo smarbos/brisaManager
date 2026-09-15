@@ -10,6 +10,24 @@ const DEFAULT_HOUSE_RULES =
 const DEFAULT_PAYMENT_INSTRUCTIONS =
   'Bank transfer details pending setup — please contact us directly for payment instructions.';
 
+const DEFAULT_DEPOSIT_INSTRUCTIONS =
+  'El depósito de garantía se cobra al check-in y se devuelve al finalizar la estadía, una vez verificado que no haya daños.';
+
+const DEFAULT_PROPERTY_ADDRESS = 'Dirección pendiente de configurar — completala en Configuración.';
+
+const DEFAULT_GOOGLE_MAPS_URL = '';
+
+// {{placeholders}} are substituted by EmailService.renderTemplate() before sending — see
+// its own comment for exactly which variables each template supports.
+const DEFAULT_INITIAL_EMAIL_TEMPLATE =
+  'Hola {{guestName}},<br><br>Por favor confirmá tu reserva y completá unos pasos rápidos:<br><a href="{{confirmationUrl}}">{{confirmationUrl}}</a>';
+
+const DEFAULT_FINAL_EMAIL_TEMPLATE =
+  'Hola {{guestName}},<br><br>Tu reserva en La Brisa de Mar del Plata está completamente confirmada. ¡Te esperamos!<br><br>Dirección: {{propertyAddress}} — <a href="{{googleMapsUrl}}">Ver en Google Maps</a>';
+
+const DEFAULT_CANCELLATION_EMAIL_TEMPLATE =
+  'Hola {{guestName}},<br><br>Te confirmamos que tu reserva del {{checkIn}} al {{checkOut}} en La Brisa de Mar del Plata fue cancelada. Si creés que esto es un error, por favor contactanos.';
+
 @Injectable()
 export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -25,6 +43,12 @@ export class SettingsService {
         id: SETTINGS_ID,
         houseRulesText: DEFAULT_HOUSE_RULES,
         paymentInstructions: DEFAULT_PAYMENT_INSTRUCTIONS,
+        depositInstructions: DEFAULT_DEPOSIT_INSTRUCTIONS,
+        propertyAddress: DEFAULT_PROPERTY_ADDRESS,
+        googleMapsUrl: DEFAULT_GOOGLE_MAPS_URL,
+        initialEmailTemplate: DEFAULT_INITIAL_EMAIL_TEMPLATE,
+        finalEmailTemplate: DEFAULT_FINAL_EMAIL_TEMPLATE,
+        cancellationEmailTemplate: DEFAULT_CANCELLATION_EMAIL_TEMPLATE,
       },
     });
   }

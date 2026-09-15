@@ -38,10 +38,7 @@ export class ReservationConfirmationService {
     }
 
     try {
-      await this.emailService.sendFinalConfirmationEmail(
-        reservation.guestEmail,
-        reservation.guestName,
-      );
+      await this.emailService.sendFinalConfirmationEmail(reservation.guestEmail, reservation.guestName);
       await this.prisma.reservation.update({
         where: { id: reservationId },
         data: { finalConfirmationEmailSentAt: new Date() },

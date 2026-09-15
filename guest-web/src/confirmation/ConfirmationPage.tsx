@@ -139,6 +139,7 @@ export function ConfirmationPage() {
           Pago de confirmación del 30% ({reservation.confirmationPaymentAmount} {reservation.currency}):{' '}
           {reservation.confirmationPaymentReceivedAt ? 'Recibido' : 'Pendiente'}
         </p>
+        <p className="mt-2 whitespace-pre-wrap text-text">{reservation.depositInstructions}</p>
         <p className="text-text">Depósito de garantía: {reservation.depositReceivedAt ? 'Recibido' : 'Pendiente'}</p>
       </section>
 

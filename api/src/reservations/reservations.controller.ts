@@ -51,6 +51,16 @@ export class ReservationsController {
     return this.reservationsService.markDepositReturned(id);
   }
 
+  @Post(':id/cancel')
+  cancel(@Param('id') id: string) {
+    return this.reservationsService.cancel(id);
+  }
+
+  @Post(':id/resend-initial-email')
+  resendInitialEmail(@Param('id') id: string) {
+    return this.reservationsService.resendInitialEmail(id);
+  }
+
   @Get(':id/events')
   listEvents(@Param('id') id: string) {
     return this.reservationsService.listEvents(id);

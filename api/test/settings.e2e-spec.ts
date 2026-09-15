@@ -10,7 +10,18 @@ describe('SettingsController (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let accessToken: string;
-  let originalSettings: { houseRulesText: string; paymentInstructions: string; bookingIcalUrl: string | null; airbnbIcalUrl: string | null } | null;
+  let originalSettings: {
+    houseRulesText: string;
+    paymentInstructions: string;
+    depositInstructions: string;
+    propertyAddress: string;
+    googleMapsUrl: string;
+    initialEmailTemplate: string;
+    finalEmailTemplate: string;
+    cancellationEmailTemplate: string;
+    bookingIcalUrl: string | null;
+    airbnbIcalUrl: string | null;
+  } | null;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -55,6 +66,12 @@ describe('SettingsController (e2e)', () => {
       .send({
         houseRulesText: 'E2E house rules',
         paymentInstructions: 'E2E payment instructions',
+        depositInstructions: 'E2E deposit instructions',
+        propertyAddress: 'E2E property address',
+        googleMapsUrl: 'https://maps.example/e2e',
+        initialEmailTemplate: 'E2E initial template {{guestName}}',
+        finalEmailTemplate: 'E2E final template {{guestName}}',
+        cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
         bookingIcalUrl: 'https://booking.example/e2e-cal.ics',
         airbnbIcalUrl: 'https://airbnb.example/e2e-cal.ics',
       })

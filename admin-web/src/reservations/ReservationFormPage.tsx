@@ -1,6 +1,7 @@
 import { ChangeEvent, ClipboardEvent, FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  cancelReservation,
   checkOverlap,
   createReservation,
   getReservation,
@@ -8,6 +9,7 @@ import {
   markDepositReceived,
   markDepositReturned,
   markPaymentReceived,
+  resendInitialEmail,
   updateReservation,
 } from '../api/reservations';
 import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } from './types';
@@ -113,6 +115,34 @@ export function ReservationFormPage() {
       loadReservation();
     } catch {
       setActionError('No se pudo marcar el depósito como devuelto. Por favor, intentá de nuevo.');
+    }
+  }
+
+  async function handleResendInitialEmail() {
+    if (!id) return;
+    setActionError(null);
+    try {
+      const { sent } = await resendInitialEmail(id);
+      loadReservation();
+      if (!sent) {
+        setActionError('El email no pudo enviarse. Revisá el historial de eventos para más detalles.');
+      }
+    } catch {
+      setActionError('No se pudo reenviar el email de confirmación. Por favor, intentá de nuevo.');
+    }
+  }
+
+  async function handleCancel() {
+    if (!id || !reservationRecord) return;
+    if (!window.confirm(`¿Cancelar la reserva de ${reservationRecord.guestName}?`)) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await cancelReservation(id);
+      loadReservation();
+    } catch {
+      setActionError('No se pudo cancelar la reserva. Por favor, intentá de nuevo.');
     }
   }
 
@@ -302,6 +332,21 @@ export function ReservationFormPage() {
             </Alert>
           )}
           <ul className="flex flex-col gap-2">
+            <li>
+              Email inicial:{' '}
+              {!reservationRecord.guestEmail ? (
+                'La reserva no tiene un email de huésped'
+              ) : (
+                <>
+                  {reservationRecord.confirmationEmailSentAt
+                    ? `Enviado el ${formatDateTime(reservationRecord.confirmationEmailSentAt)}`
+                    : 'No enviado'}{' '}
+                  <Button type="button" variant="secondary" onClick={handleResendInitialEmail}>
+                    Reenviar email de confirmación
+                  </Button>
+                </>
+              )}
+            </li>
             <li>Fechas confirmadas: {reservationRecord.datesConfirmedAt ? 'Sí' : 'No'}</li>
             <li>
               Contrato aceptado:{' '}
@@ -341,6 +386,11 @@ export function ReservationFormPage() {
           <Button type="button" variant="secondary" className="mt-3" onClick={copyGuestLink}>
             Copiar link de confirmación para el huésped
           </Button>
+          {reservationRecord.status !== 'CANCELLED' && reservationRecord.status !== 'COMPLETED' && (
+            <Button type="button" variant="danger" className="ml-3 mt-3" onClick={handleCancel}>
+              Cancelar reserva
+            </Button>
+          )}
 
           <h2 className="mb-3 mt-6 font-heading text-lg font-semibold text-heading">Historial de eventos</h2>
           <ul className="flex flex-col gap-1 text-sm text-text-muted">
