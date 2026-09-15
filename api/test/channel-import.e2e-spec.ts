@@ -1,0 +1,149 @@
+import { Test } from '@nestjs/testing';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import request from 'supertest';
+import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { ReservationsService } from '../src/reservations/reservations.service';
+
+describe('ChannelImportController (e2e)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+  const apiKey = process.env.EXTENSION_API_KEY as string;
+
+  const basePayload = {
+    source: 'booking.com',
+    hotel_id: '9586863',
+    res_id: 'e2e-test-res-id',
+    guest_name: null,
+    guest_email: null,
+    check_in: null,
+    check_out: null,
+    guests: null,
+    total_price: null,
+    currency: null,
+    status: null,
+    unverified_fields: ['guest_name', 'check_in', 'check_out', 'guests', 'total_price', 'currency', 'status'],
+  };
+
+  beforeAll(async () => {
+    // Any reservation with a guest_email now triggers a real confirmation-email attempt
+    // (see ChannelImportService.import()), independent of whether other fields are
+    // verified. ReservationsService.sendInitialEmail is fire-and-forget (`void ...`) —
+    // mocking only EmailService still leaves its own internal Prisma writes (marking
+    // confirmationEmailSentAt, recording an event) live, which raced against this test
+    // file's own cleanup and crashed on a foreign-key violation once the reservation was
+    // already deleted. Overriding the whole service removes that downstream write
+    // entirely, not just the outbound Resend call — the exact call to sendInitialEmail is
+    // already verified with mocks in channel-import.service.spec.ts, so this file doesn't
+    // need to re-observe it, only confirm nothing here reaches a real external API.
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(ReservationsService)
+      .useValue({ sendInitialEmail: jest.fn().mockResolvedValue(undefined) })
+      .compile();
+    app = moduleRef.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    await app.init();
+
+    prisma = moduleRef.get(PrismaService);
+  });
+
+  afterAll(async () => {
+    const where = { source: 'BOOKING' as const, externalReference: { startsWith: 'booking-extranet-e2e-test' } };
+    const created = await prisma.reservation.findMany({ where, select: { id: true } });
+    await prisma.reservationEvent.deleteMany({ where: { reservationId: { in: created.map((r) => r.id) } } });
+    await prisma.reservation.deleteMany({ where });
+    await prisma.guest.deleteMany({ where: { email: 'e2e-test-guest@example.com' } });
+    await app.close();
+  });
+
+  it('requires a valid API key', async () => {
+    await request(app.getHttpServer()).post('/reservations/import').send(basePayload).expect(401);
+
+    await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', 'Bearer wrong-key')
+      .send(basePayload)
+      .expect(401);
+  });
+
+  it('creates a placeholder reservation when every field is unverified', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send(basePayload)
+      .expect(201);
+
+    expect(response.body.created).toBe(true);
+    expect(response.body.guestName).toBe('Huésped de Booking.com (pendiente de completar)');
+    expect(response.body.status).toBe('PENDING');
+
+    const stored = await prisma.reservation.findUnique({
+      where: { id: response.body.id },
+    });
+    expect(stored?.externalReference).toBe('booking-extranet-e2e-test-res-id');
+    expect(stored?.notes).toContain('Campos sin verificar');
+  });
+
+  it('does not create a duplicate when the same res_id is imported again', async () => {
+    const first = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send({ ...basePayload, res_id: 'e2e-test-dedupe' })
+      .expect(201);
+    expect(first.body.created).toBe(true);
+
+    const second = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send({ ...basePayload, res_id: 'e2e-test-dedupe' })
+      .expect(201);
+
+    expect(second.body.created).toBe(false);
+    expect(second.body.id).toBe(first.body.id);
+  });
+
+  it('stores the guest email and forces status to PENDING when a scraped status is present too', async () => {
+    // Even with every core field verified (so this DOES reach the email-sending branch),
+    // no real email goes out — EmailService is overridden for this whole file. Only the
+    // reliable, synchronous outcomes are asserted: the fire-and-forget send call itself
+    // (and the guest-record sync) are verified with mocks in channel-import.service.spec.ts,
+    // not raced against here.
+    const response = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send({
+        ...basePayload,
+        res_id: 'e2e-test-guest-email',
+        guest_name: 'E2E Test Guest',
+        guest_email: 'E2E-Test-Guest@example.com',
+        check_in: '2026-11-06',
+        check_out: '2026-11-08',
+        guests: 2,
+        total_price: '$100',
+        currency: 'ARS',
+        status: 'confirmed',
+        unverified_fields: [],
+      })
+      .expect(201);
+
+    expect(response.body.status).toBe('PENDING');
+
+    const stored = await prisma.reservation.findUnique({ where: { id: response.body.id } });
+    expect(stored?.guestEmail).toBe('e2e-test-guest@example.com');
+    expect(stored?.status).toBe('PENDING');
+  });
+
+  it('rejects a payload where check_out is not after check_in', async () => {
+    await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send({
+        ...basePayload,
+        res_id: 'e2e-test-bad-dates',
+        check_in: '2026-11-08',
+        check_out: '2026-11-06',
+        unverified_fields: [],
+      })
+      .expect(400);
+  });
+});

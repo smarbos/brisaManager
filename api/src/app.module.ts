@@ -14,6 +14,7 @@ import { GuestsModule } from './guests/guests.module';
 import { CampaignTemplatesModule } from './campaign-templates/campaign-templates.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { ReservationImportModule } from './reservation-import/reservation-import.module';
+import { ChannelImportModule } from './channel-import/channel-import.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ReservationImportModule } from './reservation-import/reservation-import
     CampaignTemplatesModule,
     CampaignsModule,
     ReservationImportModule,
+    ChannelImportModule,
   ],
   controllers: [AppController],
 })
