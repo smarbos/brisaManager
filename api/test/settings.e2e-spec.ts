@@ -72,6 +72,10 @@ describe('SettingsController (e2e)', () => {
         initialEmailTemplate: 'E2E initial template {{guestName}}',
         finalEmailTemplate: 'E2E final template {{guestName}}',
         cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
+        reservationReminderDaysBefore: 3,
+        depositReminderDaysAfter: 3,
+        reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
+        depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
         bookingIcalUrl: 'https://booking.example/e2e-cal.ics',
         airbnbIcalUrl: 'https://airbnb.example/e2e-cal.ics',
       })
