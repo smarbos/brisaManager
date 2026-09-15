@@ -13,4 +13,5 @@ export interface GuestReservation {
   depositReceivedAt: string | null;
   houseRulesText: string;
   paymentInstructions: string;
+  depositInstructions: string;
 }

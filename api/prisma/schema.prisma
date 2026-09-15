@@ -29,10 +29,13 @@ enum ReservationEventType {
   DEPOSIT_RECEIVED
   DEPOSIT_RETURNED
   RESERVATION_CONFIRMED
+  RESERVATION_CANCELLED
   INITIAL_EMAIL_SENT
   INITIAL_EMAIL_FAILED
   FINAL_EMAIL_SENT
   FINAL_EMAIL_FAILED
+  CANCELLATION_EMAIL_SENT
+  CANCELLATION_EMAIL_FAILED
 }
 
 enum CampaignFilterType {
@@ -47,7 +50,7 @@ enum CampaignRecipientStatus {
 }
 
 model Reservation {
-  id                            String            @id @default(uuid())
+  id                            String             @id @default(uuid())
   guestName                     String
   guestPhone                    String?
   guestEmail                    String?
@@ -56,11 +59,11 @@ model Reservation {
   paxCount                      Int
   source                        ReservationSource
   externalReference             String?
-  totalAmount                   Decimal           @db.Decimal(10, 2)
+  totalAmount                   Decimal            @db.Decimal(10, 2)
   currency                      String
-  status                        ReservationStatus @default(PENDING)
+  status                        ReservationStatus  @default(PENDING)
   notes                         String?
-  confirmationToken             String            @unique @default(uuid())
+  confirmationToken             String             @unique @default(uuid())
   datesConfirmedAt              DateTime?
   contractAcceptedAt            DateTime?
   contractAcceptedName          String?
@@ -73,8 +76,8 @@ model Reservation {
   events                        ReservationEvent[]
   missingFromChannelAt          DateTime?
   googleEventId                 String?
-  createdAt                     DateTime          @default(now())
-  updatedAt                     DateTime          @updatedAt
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
 
   guestId String?
   guest   Guest?  @relation(fields: [guestId], references: [id])
@@ -83,19 +86,25 @@ model Reservation {
 }
 
 model Settings {
-  id                    String    @id
-  houseRulesText        String
-  paymentInstructions   String
-  bookingIcalUrl        String?
-  airbnbIcalUrl         String?
-  lastChannelSyncAt     DateTime?
-  lastChannelSyncError  String?
-  googleRefreshToken    String?
-  googleCalendarId      String?
-  googleSyncToken       String?
-  lastCalendarSyncAt    DateTime?
-  lastCalendarSyncError String?
-  updatedAt             DateTime  @updatedAt
+  id                        String    @id
+  houseRulesText            String
+  paymentInstructions       String
+  depositInstructions       String    @default("")
+  propertyAddress           String    @default("")
+  googleMapsUrl             String    @default("")
+  initialEmailTemplate      String    @default("")
+  finalEmailTemplate        String    @default("")
+  cancellationEmailTemplate String    @default("")
+  bookingIcalUrl            String?
+  airbnbIcalUrl             String?
+  lastChannelSyncAt         DateTime?
+  lastChannelSyncError      String?
+  googleRefreshToken        String?
+  googleCalendarId          String?
+  googleSyncToken           String?
+  lastCalendarSyncAt        DateTime?
+  lastCalendarSyncError     String?
+  updatedAt                 DateTime  @updatedAt
 }
 
 model ReservationEvent {
@@ -140,14 +149,14 @@ model CampaignTemplate {
 }
 
 model Campaign {
-  id             String                 @id @default(uuid())
+  id             String              @id @default(uuid())
   templateId     String
-  template       CampaignTemplate       @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  template       CampaignTemplate    @relation(fields: [templateId], references: [id], onDelete: Restrict)
   filterType     CampaignFilterType
   filterMonths   Int?
   recipientCount Int
   recipients     CampaignRecipient[]
-  sentAt         DateTime               @default(now())
+  sentAt         DateTime            @default(now())
 }
 
 model CampaignRecipient {

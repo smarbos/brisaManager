@@ -42,6 +42,19 @@ export function markDepositReturned(id: string): Promise<Reservation> {
   return apiClient.request(`/reservations/${id}/mark-deposit-returned`, { method: 'POST' });
 }
 
+export function cancelReservation(id: string): Promise<Reservation> {
+  return apiClient.request(`/reservations/${id}/cancel`, { method: 'POST' });
+}
+
+export interface ResendInitialEmailResult {
+  sent: boolean;
+  reservation: Reservation;
+}
+
+export function resendInitialEmail(id: string): Promise<ResendInitialEmailResult> {
+  return apiClient.request(`/reservations/${id}/resend-initial-email`, { method: 'POST' });
+}
+
 export function listReservationEvents(id: string): Promise<ReservationEvent[]> {
   return apiClient.request(`/reservations/${id}/events`);
 }

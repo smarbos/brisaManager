@@ -3,6 +3,12 @@ import { apiClient } from './client';
 export interface Settings {
   houseRulesText: string;
   paymentInstructions: string;
+  depositInstructions: string;
+  propertyAddress: string;
+  googleMapsUrl: string;
+  initialEmailTemplate: string;
+  finalEmailTemplate: string;
+  cancellationEmailTemplate: string;
   bookingIcalUrl: string | null;
   airbnbIcalUrl: string | null;
   lastChannelSyncAt: string | null;

@@ -30,6 +30,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   DEPOSIT_RECEIVED: 'Depósito recibido',
   DEPOSIT_RETURNED: 'Depósito devuelto',
   RESERVATION_CONFIRMED: 'Reserva confirmada',
+  RESERVATION_CANCELLED: 'Reserva cancelada',
   INITIAL_EMAIL_SENT: 'Email inicial enviado',
   INITIAL_EMAIL_FAILED: 'Falló el email inicial',
   FINAL_EMAIL_SENT: 'Email final enviado',

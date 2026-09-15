@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listReservations } from '../api/reservations';
+import { cancelReservation, listReservations } from '../api/reservations';
 import { Reservation, ReservationSource, ReservationStatus } from './types';
 import { PageContainer, PageHeader, Button, FormField, Select, Alert, Table, tableThClass as thClass, tableTdClass as tdClass } from '../ui';
 import { formatDate } from '../lib/date';
@@ -11,8 +11,9 @@ export function ReservationListPage() {
   const [source, setSource] = useState<ReservationSource | ''>('');
   const [status, setStatus] = useState<ReservationStatus | ''>('');
   const [error, setError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  function load() {
     setError(null);
     listReservations({
       source: source || undefined,
@@ -23,7 +24,26 @@ export function ReservationListPage() {
         console.error('Failed to load reservations', err);
         setError('No se pudieron cargar las reservas.');
       });
-  }, [source, status]);
+  }
+
+  useEffect(load, [source, status]);
+
+  async function handleCancel(reservation: Reservation) {
+    if (!window.confirm(`¿Cancelar la reserva de ${reservation.guestName}?`)) {
+      return;
+    }
+    setCancellingId(reservation.id);
+    setError(null);
+    try {
+      await cancelReservation(reservation.id);
+      load();
+    } catch (err) {
+      console.error('Failed to cancel the reservation', err);
+      setError('No se pudo cancelar la reserva. Por favor, intentá de nuevo.');
+    } finally {
+      setCancellingId(null);
+    }
+  }
 
   return (
     <PageContainer>
@@ -62,6 +82,7 @@ export function ReservationListPage() {
             <th className={thClass}>Check-out</th>
             <th className={thClass}>Canal</th>
             <th className={thClass}>Estado</th>
+            <th className={thClass}>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -77,6 +98,18 @@ export function ReservationListPage() {
               <td className={tdClass}>{formatDate(r.checkOut)}</td>
               <td className={tdClass}>{sourceLabel(r.source)}</td>
               <td className={tdClass}>{statusLabel(r.status)}</td>
+              <td className={tdClass}>
+                {r.status !== 'CANCELLED' && r.status !== 'COMPLETED' && (
+                  <Button
+                    type="button"
+                    variant="danger"
+                    disabled={cancellingId === r.id}
+                    onClick={() => handleCancel(r)}
+                  >
+                    Cancelar
+                  </Button>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

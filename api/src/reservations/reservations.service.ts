@@ -61,7 +61,12 @@ export class ReservationsService {
     return reservation;
   }
 
-  private async sendInitialEmail(reservation: Reservation): Promise<void> {
+  // Public (not just used internally by create()) so ChannelImportService can send the
+  // same confirmation email once a scraped reservation's core fields are all verified,
+  // and so resendInitialEmail() below can retry it on demand. Returns whether it actually
+  // sent — existing fire-and-forget callers (`void this.sendInitialEmail(...)`) simply
+  // discard that, so this is not a breaking change for them.
+  async sendInitialEmail(reservation: Reservation): Promise<boolean> {
     const confirmationUrl = `${process.env.GUEST_WEB_ORIGIN}/r/${reservation.confirmationToken}`;
 
     try {
@@ -75,13 +80,28 @@ export class ReservationsService {
         data: { confirmationEmailSentAt: new Date() },
       });
       await this.eventsService.record(reservation.id, 'INITIAL_EMAIL_SENT');
+      return true;
     } catch (error) {
       await this.eventsService.record(reservation.id, 'INITIAL_EMAIL_FAILED', (error as Error).message);
       await this.emailService.sendAlert(
         'Falló el email de confirmación inicial',
         `Se creó la reserva ${reservation.id} para ${reservation.guestName} pero falló el envío del email de confirmación inicial: ${(error as Error).message}`,
       );
+      return false;
     }
+  }
+
+  // Explicit staff-triggered retry — unlike the automatic send in create()/channel-import,
+  // this always attempts the send regardless of whether one was already tried, since a
+  // prior failure (e.g. an unverified sender domain) may since have been fixed.
+  async resendInitialEmail(id: string): Promise<{ sent: boolean; reservation: Reservation }> {
+    const reservation = await this.findOne(id);
+    if (!reservation.guestEmail) {
+      throw new BadRequestException('This reservation has no guest email to send to');
+    }
+
+    const sent = await this.sendInitialEmail(reservation);
+    return { sent, reservation: await this.findOne(id) };
   }
 
   async findAll(query: QueryReservationDto) {
@@ -180,6 +200,48 @@ export class ReservationsService {
     });
     await this.eventsService.record(id, 'DEPOSIT_RETURNED');
     return updated;
+  }
+
+  async cancel(id: string) {
+    const reservation = await this.findOne(id);
+    if (reservation.status === 'CANCELLED') {
+      return reservation;
+    }
+
+    const updated = await this.prisma.reservation.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+    await this.eventsService.record(id, 'RESERVATION_CANCELLED');
+
+    // Removes the reservation from the shared Google Calendar: pushReservation already
+    // treats CANCELLED (and COMPLETED) as inactive and deletes the event instead of
+    // upserting it — same as any other status update, see update() above.
+    void this.googleCalendarPushService.pushReservation(updated);
+
+    if (updated.guestEmail) {
+      void this.sendCancellationEmail(updated);
+    }
+
+    return updated;
+  }
+
+  private async sendCancellationEmail(reservation: Reservation): Promise<void> {
+    try {
+      await this.emailService.sendCancellationEmail(
+        reservation.guestEmail as string,
+        reservation.guestName,
+        reservation.checkIn,
+        reservation.checkOut,
+      );
+      await this.eventsService.record(reservation.id, 'CANCELLATION_EMAIL_SENT');
+    } catch (error) {
+      await this.eventsService.record(reservation.id, 'CANCELLATION_EMAIL_FAILED', (error as Error).message);
+      await this.emailService.sendAlert(
+        'Falló el email de cancelación',
+        `Se canceló la reserva ${reservation.id} para ${reservation.guestName} pero falló el envío del email de cancelación: ${(error as Error).message}`,
+      );
+    }
   }
 
   listEvents(id: string) {

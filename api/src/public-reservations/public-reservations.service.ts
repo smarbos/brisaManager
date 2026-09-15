@@ -44,6 +44,7 @@ export class PublicReservationsService {
       depositReceivedAt: reservation.depositReceivedAt,
       houseRulesText: settings.houseRulesText,
       paymentInstructions: settings.paymentInstructions,
+      depositInstructions: settings.depositInstructions,
     };
   }
 

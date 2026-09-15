@@ -18,6 +18,15 @@ const STATUS_LABELS: Record<Reservation['status'], string> = {
   COMPLETED: 'Completada',
 };
 
+// Google Calendar's colorId is a string '1'-'11' picked from a fixed, unchangeable
+// palette (no custom hex) — see https://developers.google.com/calendar/api/v3/reference/colors.
+// Only PENDING and CONFIRMED need an entry: CANCELLED/COMPLETED reservations are removed
+// from the calendar entirely (see the isActive check below), never upserted with a color.
+const STATUS_COLOR_IDS: Partial<Record<Reservation['status'], string>> = {
+  PENDING: '5', // Banana (yellow) — still awaiting guest/staff confirmation
+  CONFIRMED: '10', // Basil (green) — confirmed, nothing pending
+};
+
 function toDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -94,6 +103,7 @@ export class GoogleCalendarPushService {
       description: `Huéspedes: ${reservation.paxCount}\nTotal: ${Number(reservation.totalAmount)} ${reservation.currency}\nEstado: ${STATUS_LABELS[reservation.status]}`,
       start: { date: toDateOnly(reservation.checkIn) },
       end: { date: toDateOnly(reservation.checkOut) },
+      colorId: STATUS_COLOR_IDS[reservation.status],
     };
 
     if (reservation.googleEventId) {

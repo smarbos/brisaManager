@@ -19,7 +19,7 @@ describe('ReservationsService', () => {
     };
   };
   let eventsService: { record: jest.Mock };
-  let emailService: { sendInitialConfirmationEmail: jest.Mock; sendAlert: jest.Mock };
+  let emailService: { sendInitialConfirmationEmail: jest.Mock; sendCancellationEmail: jest.Mock; sendAlert: jest.Mock };
   let confirmationService: { maybeAutoConfirm: jest.Mock };
   let googleCalendarPushService: { pushReservation: jest.Mock };
   let guestsService: { syncFromReservation: jest.Mock };
@@ -34,7 +34,11 @@ describe('ReservationsService', () => {
       },
     };
     eventsService = { record: jest.fn() };
-    emailService = { sendInitialConfirmationEmail: jest.fn(), sendAlert: jest.fn() };
+    emailService = {
+      sendInitialConfirmationEmail: jest.fn(),
+      sendCancellationEmail: jest.fn(),
+      sendAlert: jest.fn(),
+    };
     confirmationService = { maybeAutoConfirm: jest.fn() };
     googleCalendarPushService = { pushReservation: jest.fn() };
     guestsService = { syncFromReservation: jest.fn() };
@@ -271,6 +275,134 @@ describe('ReservationsService', () => {
       await service.markPaymentReceived('1');
 
       expect(prisma.reservation.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancel', () => {
+    it('marks the reservation as cancelled, records an event, and pushes the removal to the calendar', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', status: 'PENDING' });
+      const cancelled = { id: '1', status: 'CANCELLED' };
+      prisma.reservation.update.mockResolvedValue(cancelled);
+
+      const result = await service.cancel('1');
+
+      expect(prisma.reservation.update).toHaveBeenCalledWith({
+        where: { id: '1' },
+        data: { status: 'CANCELLED' },
+      });
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'RESERVATION_CANCELLED');
+      expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(cancelled);
+      expect(result).toBe(cancelled);
+    });
+
+    it('is a no-op when the reservation is already cancelled', async () => {
+      const existing = { id: '1', status: 'CANCELLED' };
+      prisma.reservation.findUnique.mockResolvedValue(existing);
+
+      const result = await service.cancel('1');
+
+      expect(prisma.reservation.update).not.toHaveBeenCalled();
+      expect(eventsService.record).not.toHaveBeenCalled();
+      expect(googleCalendarPushService.pushReservation).not.toHaveBeenCalled();
+      expect(result).toBe(existing);
+    });
+
+    it('sends a cancellation email when the reservation has a guest email', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', status: 'PENDING' });
+      const checkIn = new Date('2026-11-06');
+      const checkOut = new Date('2026-11-08');
+      const cancelled = { id: '1', status: 'CANCELLED', guestName: 'Jane Doe', guestEmail: 'jane@example.com', checkIn, checkOut };
+      prisma.reservation.update.mockResolvedValue(cancelled);
+      emailService.sendCancellationEmail.mockResolvedValue(undefined);
+
+      await service.cancel('1');
+      // sendCancellationEmail is fire-and-forget from cancel()'s perspective, and itself
+      // awaits before recording the event — flush the microtask queue so that inner
+      // continuation has actually run before asserting on it.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(emailService.sendCancellationEmail).toHaveBeenCalledWith('jane@example.com', 'Jane Doe', checkIn, checkOut);
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'CANCELLATION_EMAIL_SENT');
+    });
+
+    it('does not attempt a cancellation email when the reservation has no guest email', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', status: 'PENDING' });
+      const cancelled = { id: '1', status: 'CANCELLED', guestName: 'Jane Doe', guestEmail: null };
+      prisma.reservation.update.mockResolvedValue(cancelled);
+
+      await service.cancel('1');
+
+      expect(emailService.sendCancellationEmail).not.toHaveBeenCalled();
+    });
+
+    it('records a failure event and sends an alert when the cancellation email fails', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', status: 'PENDING' });
+      const cancelled = {
+        id: '1',
+        status: 'CANCELLED',
+        guestName: 'Jane Doe',
+        guestEmail: 'jane@example.com',
+        checkIn: new Date('2026-11-06'),
+        checkOut: new Date('2026-11-08'),
+      };
+      prisma.reservation.update.mockResolvedValue(cancelled);
+      emailService.sendCancellationEmail.mockRejectedValue(new Error('bounced'));
+
+      await service.cancel('1');
+      // The failure handling is inside a fire-and-forget call — flush the microtask queue.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'CANCELLATION_EMAIL_FAILED', 'bounced');
+      expect(emailService.sendAlert).toHaveBeenCalledWith(
+        'Falló el email de cancelación',
+        expect.stringContaining('bounced'),
+      );
+    });
+  });
+
+  describe('resendInitialEmail', () => {
+    it('resends the email and reports success', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: '1',
+        guestName: 'Jane Doe',
+        guestEmail: 'jane@example.com',
+        confirmationToken: 'tok-1',
+      });
+      emailService.sendInitialConfirmationEmail.mockResolvedValue(undefined);
+
+      const result = await service.resendInitialEmail('1');
+
+      expect(emailService.sendInitialConfirmationEmail).toHaveBeenCalledWith(
+        'jane@example.com',
+        'Jane Doe',
+        expect.stringContaining('tok-1'),
+      );
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'INITIAL_EMAIL_SENT');
+      expect(result.sent).toBe(true);
+    });
+
+    it('reports failure without throwing when the email provider rejects the send', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: '1',
+        guestName: 'Jane Doe',
+        guestEmail: 'jane@example.com',
+        confirmationToken: 'tok-1',
+      });
+      emailService.sendInitialConfirmationEmail.mockRejectedValue(new Error('domain not verified'));
+
+      const result = await service.resendInitialEmail('1');
+
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'INITIAL_EMAIL_FAILED', 'domain not verified');
+      expect(result.sent).toBe(false);
+    });
+
+    it('refuses to resend when the reservation has no guest email', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', guestName: 'Jane Doe', guestEmail: null });
+
+      await expect(service.resendInitialEmail('1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(emailService.sendInitialConfirmationEmail).not.toHaveBeenCalled();
     });
   });
 

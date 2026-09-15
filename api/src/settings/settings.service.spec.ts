@@ -32,6 +32,22 @@ describe('SettingsService', () => {
     expect(result.id).toBe('singleton');
   });
 
+  it('seeds the email templates and property fields alongside the house rules on first read', async () => {
+    prisma.settings.findUnique.mockResolvedValue(null);
+    prisma.settings.create.mockImplementation(({ data }) => Promise.resolve(data));
+
+    const result = await service.get();
+
+    expect(result.initialEmailTemplate).toContain('{{guestName}}');
+    expect(result.initialEmailTemplate).toContain('{{confirmationUrl}}');
+    expect(result.finalEmailTemplate).toContain('{{propertyAddress}}');
+    expect(result.finalEmailTemplate).toContain('{{googleMapsUrl}}');
+    expect(result.cancellationEmailTemplate).toContain('{{checkIn}}');
+    expect(result.cancellationEmailTemplate).toContain('{{checkOut}}');
+    expect(result.propertyAddress).toBeTruthy();
+    expect(result.googleMapsUrl).toBe('');
+  });
+
   it('returns existing settings without creating a new row', async () => {
     prisma.settings.findUnique.mockResolvedValue({
       id: 'singleton',
@@ -50,10 +66,21 @@ describe('SettingsService', () => {
       id: 'singleton',
       houseRulesText: 'new rules',
       paymentInstructions: 'new payment info',
+      depositInstructions: 'new deposit info',
     });
 
-    const result = await service.update({ houseRulesText: 'new rules', paymentInstructions: 'new payment info' });
+    const result = await service.update({
+      houseRulesText: 'new rules',
+      paymentInstructions: 'new payment info',
+      depositInstructions: 'new deposit info',
+      propertyAddress: 'new address',
+      googleMapsUrl: 'https://maps.example/new',
+      initialEmailTemplate: 'new initial template',
+      finalEmailTemplate: 'new final template',
+      cancellationEmailTemplate: 'new cancellation template',
+    });
 
     expect(result.houseRulesText).toBe('new rules');
+    expect(result.depositInstructions).toBe('new deposit info');
   });
 });

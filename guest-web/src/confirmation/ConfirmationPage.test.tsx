@@ -20,6 +20,7 @@ const baseReservation = {
   depositReceivedAt: null,
   houseRulesText: 'No parties.',
   paymentInstructions: 'Transfer to bank X.',
+  depositInstructions: 'Deposit charged at check-in.',
 };
 
 function renderAt(token: string) {
