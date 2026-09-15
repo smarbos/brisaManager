@@ -9,5 +9,6 @@ import { GuestsModule } from '../guests/guests.module';
   imports: [ReservationConfirmationModule, GoogleCalendarModule, GuestsModule],
   controllers: [ReservationsController],
   providers: [ReservationsService],
+  exports: [ReservationsService],
 })
 export class ReservationsModule {}

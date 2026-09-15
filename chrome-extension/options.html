@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>La Brisa Reservation Sync - Opciones</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 480px;
+        margin: 40px auto;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 18px;
+        margin-bottom: 4px;
+      }
+      p.hint {
+        color: #666;
+        font-size: 13px;
+        margin-top: 0;
+      }
+      label {
+        display: block;
+        margin-top: 16px;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 10px;
+        margin-top: 4px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      button {
+        margin-top: 20px;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        background: #0d6efd;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0b5ed7;
+      }
+      #status {
+        margin-top: 12px;
+        font-size: 13px;
+        min-height: 18px;
+      }
+      #status.success {
+        color: #146c2e;
+      }
+      #status.error {
+        color: #b02a37;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>La Brisa Reservation Sync</h1>
+    <p class="hint">
+      Configurá la conexión con la API de La Brisa. El token nunca se envía a
+      Booking.com, solo a la URL que configures acá.
+    </p>
+
+    <label for="apiBaseUrl">URL base de la API</label>
+    <input
+      id="apiBaseUrl"
+      type="text"
+      placeholder="https://api.labrisa.com.ar"
+    />
+
+    <label for="apiToken">Token de acceso</label>
+    <input id="apiToken" type="password" placeholder="•••••••••••" />
+
+    <button id="save">Guardar</button>
+    <div id="status"></div>
+
+    <script src="options.js"></script>
+  </body>
+</html>

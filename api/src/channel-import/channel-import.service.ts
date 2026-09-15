@@ -1,0 +1,170 @@
+import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { Reservation, ReservationSource, ReservationStatus } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { ReservationEventsService } from '../reservation-events/reservation-events.service';
+import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
+import { GuestsService } from '../guests/guests.service';
+import { ReservationsService } from '../reservations/reservations.service';
+import { ImportReservationDto } from './dto/import-reservation.dto';
+
+const SOURCE_MAP: Record<ImportReservationDto['source'], ReservationSource> = {
+  'booking.com': 'BOOKING',
+};
+
+const STATUS_MAP: Record<string, ReservationStatus> = {
+  confirmed: 'CONFIRMED',
+  ok: 'CONFIRMED',
+  cancelled: 'CANCELLED',
+  canceled: 'CANCELLED',
+  completed: 'COMPLETED',
+};
+
+function mapStatus(raw: string | null): ReservationStatus {
+  if (!raw) return 'PENDING';
+  return STATUS_MAP[raw.trim().toLowerCase()] ?? 'PENDING';
+}
+
+// Best-effort only: Booking.com's actual price formatting on the extranet page is unknown
+// until real Phase 2 selectors are confirmed, and total_price is always in unverified_fields
+// until then anyway. Handles the common "45.000" (thousands dot) and "45,50" (decimal comma)
+// shapes; refine once a real captured sample is available.
+function parseAmount(raw: string | null): number {
+  if (!raw) return 0;
+  const withoutThousandsDot = raw.replace(/\.(?=\d{3}(?:\D|$))/g, '');
+  const normalized = withoutThousandsDot.replace(/[^\d,.-]/g, '').replace(',', '.');
+  const value = Number(normalized);
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function buildNotes(dto: ImportReservationDto): string {
+  const base = `Creada desde la extensión de Chrome (Booking.com extranet, res_id ${dto.res_id}, hotel_id ${dto.hotel_id}).`;
+  if (dto.unverified_fields.length === 0) {
+    return base;
+  }
+  return `${base} Campos sin verificar, revisar y corregir manualmente: ${dto.unverified_fields.join(', ')}.`;
+}
+
+export interface ChannelImportResult {
+  reservation: Reservation;
+  created: boolean;
+}
+
+@Injectable()
+export class ChannelImportService {
+  private readonly logger = new Logger(ChannelImportService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventsService: ReservationEventsService,
+    private readonly googleCalendarPushService: GoogleCalendarPushService,
+    private readonly guestsService: GuestsService,
+    private readonly reservationsService: ReservationsService,
+  ) {}
+
+  async import(dto: ImportReservationDto): Promise<ChannelImportResult> {
+    // We only ever operate one property. A valid API key paired with a hotel_id that isn't
+    // ours is either a misconfigured extension or a leaked key being probed against other
+    // data — reject it outright rather than importing a reservation we have no business
+    // holding, and log it so a pattern of these stands out.
+    const expectedHotelId = process.env.BOOKING_HOTEL_ID;
+    if (!expectedHotelId || dto.hotel_id !== expectedHotelId) {
+      this.logger.warn(`Rejected import for unexpected hotel_id "${dto.hotel_id}" (res_id ${dto.res_id})`);
+      throw new ForbiddenException('Unexpected hotel_id');
+    }
+
+    const source = SOURCE_MAP[dto.source];
+    const externalReference = `booking-extranet-${dto.res_id}`;
+
+    const existing = await this.prisma.reservation.findUnique({
+      where: { source_externalReference: { source, externalReference } },
+    });
+
+    if (existing) {
+      // Never overwrite an already-imported reservation from here — staff may have already
+      // corrected fields by hand since the first import. Re-sending the same res_id (e.g.
+      // clicking the button twice, or re-testing the extension) is a safe no-op, not a
+      // silent clobber of anything staff already fixed.
+      return { reservation: existing, created: false };
+    }
+
+    const now = new Date();
+    const checkIn = dto.check_in ? new Date(dto.check_in) : now;
+    const checkOut = dto.check_out
+      ? new Date(dto.check_out)
+      : new Date(checkIn.getTime() + 24 * 60 * 60 * 1000);
+
+    if (checkOut <= checkIn) {
+      throw new BadRequestException('check_out must be after check_in');
+    }
+
+    const guestEmail = dto.guest_email?.trim().toLowerCase() || null;
+
+    // Sending the confirmation email invites the guest into the confirmation flow (accept
+    // dates, accept the contract, etc.) — the reservation is, by definition, awaiting that
+    // action, so it's forced to PENDING whenever we're about to email regardless of
+    // whatever mapStatus(dto.status) would otherwise say. In practice dto.status is always
+    // null today (Booking.com's extranet doesn't expose it as scrapeable text — see the
+    // file-header comment), so mapStatus(null) already returns PENDING anyway; this makes
+    // that invariant explicit and intentional rather than an accident of today's data gap.
+    const status = guestEmail ? 'PENDING' : mapStatus(dto.status);
+
+    const reservation = await this.prisma.reservation.create({
+      data: {
+        guestName: dto.guest_name?.trim() || 'Huésped de Booking.com (pendiente de completar)',
+        guestEmail,
+        checkIn,
+        checkOut,
+        paxCount: dto.guests ?? 1,
+        source,
+        externalReference,
+        totalAmount: parseAmount(dto.total_price),
+        currency: dto.currency?.trim() || 'ARS',
+        status,
+        notes: buildNotes(dto),
+      },
+    });
+
+    await this.eventsService.record(
+      reservation.id,
+      'RESERVATION_CREATED',
+      `Creada desde la extensión de Chrome (res_id ${dto.res_id}, hotel_id ${dto.hotel_id}).`,
+    );
+
+    // Link to (or create) the Guest record whenever we have an email — this is just CRM
+    // bookkeeping, not guest-facing, so it's safe even if other fields are still
+    // unverified: a later correction to name/dates doesn't invalidate the guest link.
+    if (guestEmail) {
+      void this.guestsService.syncFromReservation(reservation.id, {
+        email: guestEmail,
+        name: reservation.guestName,
+        phone: null,
+      });
+    }
+
+    // The confirmation email is sent whenever we have an email at all, independent of
+    // whether the other scraped fields are verified — it links the guest into the same
+    // confirmation flow a manually-created reservation uses, which is exactly where
+    // whatever's still missing or wrong (dates, pax count, etc.) gets reviewed and
+    // corrected, by the guest or by staff afterward. It's not a claim that the data is
+    // already right, just an invitation to complete it.
+    if (guestEmail) {
+      void this.reservationsService.sendInitialEmail(reservation);
+    }
+
+    // The shared Google Calendar round-trips back into Booking.com's own feed (see the
+    // channel-sync design doc), so an unverified/placeholder DATE has no business
+    // appearing on it — pushing a wrong date there contaminates a calendar other systems
+    // trust. This deliberately checks only check_in/check_out, not the full
+    // unverified_fields list: `status` is never scrapeable from Booking.com's page (see
+    // the file-header comment) and so is *always* unverified, which made the old
+    // "everything verified" gate permanently unreachable — no extension-imported
+    // reservation ever reached the calendar, no matter how accurate its dates were. Status
+    // doesn't affect calendar correctness, so it has no business gating this.
+    const datesVerified = !dto.unverified_fields.includes('check_in') && !dto.unverified_fields.includes('check_out');
+    if (datesVerified) {
+      void this.googleCalendarPushService.pushReservation(reservation);
+    }
+
+    return { reservation, created: true };
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "La Brisa - Booking.com Reservation Sync",
+  "version": "0.1.0",
+  "description": "Scrape a Booking.com extranet reservation page you're already viewing and send it to La Brisa's reservation system with one click.",
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "La Brisa Reservation Sync - click to open settings"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://admin.booking.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://localhost/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/booking.html*"
+      ],
+      "js": ["content_script.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
