@@ -78,6 +78,10 @@ describe('SettingsService', () => {
       initialEmailTemplate: 'new initial template',
       finalEmailTemplate: 'new final template',
       cancellationEmailTemplate: 'new cancellation template',
+      reservationReminderDaysBefore: 3,
+      depositReminderDaysAfter: 3,
+      reservationReminderWhatsappTemplate: 'new reservation reminder template',
+      depositReminderWhatsappTemplate: 'new deposit reminder template',
     });
 
     expect(result.houseRulesText).toBe('new rules');

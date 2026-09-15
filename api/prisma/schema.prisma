@@ -73,6 +73,8 @@ model Reservation {
   depositReturnedAt             DateTime?
   confirmationEmailSentAt       DateTime?
   finalConfirmationEmailSentAt  DateTime?
+  reservationReminderSentAt     DateTime?
+  depositReminderSentAt         DateTime?
   events                        ReservationEvent[]
   missingFromChannelAt          DateTime?
   googleEventId                 String?
@@ -95,6 +97,10 @@ model Settings {
   initialEmailTemplate      String    @default("")
   finalEmailTemplate        String    @default("")
   cancellationEmailTemplate String    @default("")
+  reservationReminderDaysBefore       Int    @default(3)
+  depositReminderDaysAfter            Int    @default(3)
+  reservationReminderWhatsappTemplate String @default("Hola {{guestName}}! Te recordamos tu reserva en La Brisa de Mar del Plata del {{checkIn}} al {{checkOut}}. ¡Te esperamos!")
+  depositReminderWhatsappTemplate     String @default("Hola {{guestName}}, todavía no registramos el depósito de tu reserva del {{checkIn}}. {{paymentInstructions}}")
   bookingIcalUrl            String?
   airbnbIcalUrl             String?
   lastChannelSyncAt         DateTime?
