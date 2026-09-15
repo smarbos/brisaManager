@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class UpdateSettingsDto {
   @IsString()
@@ -41,4 +41,20 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsString()
   airbnbIcalUrl?: string;
+
+  @IsInt()
+  @Min(1)
+  reservationReminderDaysBefore: number;
+
+  @IsInt()
+  @Min(1)
+  depositReminderDaysAfter: number;
+
+  @IsString()
+  @MinLength(1)
+  reservationReminderWhatsappTemplate: string;
+
+  @IsString()
+  @MinLength(1)
+  depositReminderWhatsappTemplate: string;
 }
