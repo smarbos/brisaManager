@@ -40,6 +40,11 @@ describe('GuestListPage', () => {
     await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
     expect(screen.getByText('John Smith')).toBeInTheDocument();
     expect(screen.getByText(/dado de baja/i)).toBeInTheDocument();
+
+    const nameLink = screen.getByRole('link', { name: 'Jane Doe' });
+    expect(nameLink).toHaveAttribute('href', '/guests/1');
+    const idLink = screen.getByRole('link', { name: '1' });
+    expect(idLink).toHaveAttribute('href', '/guests/1');
   });
 
   it('shows an alert when guests cannot be loaded', async () => {

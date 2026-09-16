@@ -77,6 +77,7 @@ export function ReservationListPage() {
       <Table>
         <thead>
           <tr>
+            <th className={thClass}>ID</th>
             <th className={thClass}>Huésped</th>
             <th className={thClass}>Check-in</th>
             <th className={thClass}>Check-out</th>
@@ -88,6 +89,11 @@ export function ReservationListPage() {
         <tbody>
           {reservations.map((r) => (
             <tr key={r.id}>
+              <td className={tdClass}>
+                <Link to={`/reservations/${r.id}`} className="font-mono text-xs text-accent hover:underline">
+                  {r.id}
+                </Link>
+              </td>
               <td className={tdClass}>
                 <Link to={`/reservations/${r.id}`} className="text-accent hover:underline">
                   {r.guestName}

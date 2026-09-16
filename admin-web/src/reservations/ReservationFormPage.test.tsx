@@ -151,6 +151,8 @@ describe('ReservationFormPage', () => {
       </MemoryRouter>,
     );
 
+    expect(await screen.findByText(/id de reserva: 1/i)).toBeInTheDocument();
+
     const button = await screen.findByRole('button', { name: /marcar pago del 30% como recibido/i });
     fireEvent.click(button);
 

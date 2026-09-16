@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CampaignFilterType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -49,6 +49,17 @@ export class GuestsService {
 
   findAll() {
     return this.prisma.guest.findMany({ orderBy: { lastStayAt: 'desc' } });
+  }
+
+  async findOne(id: string) {
+    const guest = await this.prisma.guest.findUnique({
+      where: { id },
+      include: { reservations: { orderBy: { checkIn: 'desc' } } },
+    });
+    if (!guest) {
+      throw new NotFoundException(`Guest ${id} not found`);
+    }
+    return guest;
   }
 
   findEligibleForCampaign(filterType: CampaignFilterType, filterMonths?: number) {

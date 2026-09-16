@@ -6,6 +6,7 @@ import { ReservationListPage } from './reservations/ReservationListPage';
 import { ReservationFormPage } from './reservations/ReservationFormPage';
 import { SettingsPage } from './settings/SettingsPage';
 import { GuestListPage } from './guests/GuestListPage';
+import { GuestDetailPage } from './guests/GuestDetailPage';
 import { TemplatesPage } from './templates/TemplatesPage';
 import { CampaignsPage } from './campaigns/CampaignsPage';
 import { ActivityLogPage } from './activity/ActivityLogPage';
@@ -23,6 +24,7 @@ export function App() {
             <Route path="/reservations/:id" element={<ReservationFormPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/guests" element={<GuestListPage />} />
+            <Route path="/guests/:id" element={<GuestDetailPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/activity" element={<ActivityLogPage />} />

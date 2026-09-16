@@ -48,4 +48,24 @@ describe('GuestsController (e2e)', () => {
 
     expect(response.body.some((g: { email: string }) => g.email === 'e2e-guest-1@example.com')).toBe(true);
   });
+
+  it('gets a single guest with their reservation history', async () => {
+    const guest = await prisma.guest.findUniqueOrThrow({ where: { email: 'e2e-guest-1@example.com' } });
+
+    const response = await request(app.getHttpServer())
+      .get(`/guests/${guest.id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(response.body.id).toBe(guest.id);
+    expect(response.body.email).toBe('e2e-guest-1@example.com');
+    expect(response.body.reservations).toEqual([]);
+  });
+
+  it('404s for an unknown guest id', async () => {
+    await request(app.getHttpServer())
+      .get('/guests/00000000-0000-0000-0000-000000000000')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(404);
+  });
 });

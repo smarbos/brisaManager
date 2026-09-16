@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { listGuests, Guest } from '../api/guests';
 import { PageContainer, PageHeader, Alert, Table, Badge, tableThClass as thClass, tableTdClass as tdClass } from '../ui';
 import { formatDate } from '../lib/date';
@@ -20,6 +21,7 @@ export function GuestListPage() {
       <Table>
         <thead>
           <tr>
+            <th className={thClass}>ID</th>
             <th className={thClass}>Nombre</th>
             <th className={thClass}>Email</th>
             <th className={thClass}>Teléfono</th>
@@ -31,7 +33,16 @@ export function GuestListPage() {
         <tbody>
           {guests.map((g) => (
             <tr key={g.id}>
-              <td className={tdClass}>{g.name}</td>
+              <td className={tdClass}>
+                <Link to={`/guests/${g.id}`} className="font-mono text-xs text-accent hover:underline">
+                  {g.id}
+                </Link>
+              </td>
+              <td className={tdClass}>
+                <Link to={`/guests/${g.id}`} className="text-accent hover:underline">
+                  {g.name}
+                </Link>
+              </td>
               <td className={tdClass}>{g.email}</td>
               <td className={tdClass}>{g.phone ?? '—'}</td>
               <td className={tdClass}>{g.totalStays}</td>

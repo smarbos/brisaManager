@@ -214,6 +214,7 @@ export function ReservationFormPage() {
         <h1 className="font-heading text-2xl font-semibold text-heading">
           {isEditing ? 'Editar reserva' : 'Nueva reserva'}
         </h1>
+        {isEditing && id && <p className="-mt-2 font-mono text-xs text-text-muted">ID de reserva: {id}</p>}
         {!isEditing && (
           <div
             tabIndex={0}
