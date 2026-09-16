@@ -39,6 +39,11 @@
    - **Email:** `RESEND_API_KEY`, `EMAIL_FROM`, `ALERT_EMAIL` — the API uses these to send the
      guest confirmation email and internal alerts via Resend. `EMAIL_FROM`'s domain must be
      verified in Resend before emails will actually send.
+   - **WhatsApp (Twilio):** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` — while
+     using Twilio's WhatsApp Sandbox, any phone number you want to test with must first text the
+     Sandbox's join code to the Sandbox number before it can receive anything. Real, un-prompted
+     guest messaging requires a verified WhatsApp Business Sender (a Twilio/Meta business
+     verification process, not a config change).
    - **CORS origins:** `ADMIN_WEB_ORIGIN=https://admin.labrisa.com.ar` and
      `GUEST_WEB_ORIGIN=https://reservas.labrisa.com.ar` — the API rejects browser requests from
      any other origin, so localhost defaults will break the deployed admin app. `GUEST_WEB_ORIGIN`

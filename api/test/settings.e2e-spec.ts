@@ -21,6 +21,10 @@ describe('SettingsController (e2e)', () => {
     cancellationEmailTemplate: string;
     bookingIcalUrl: string | null;
     airbnbIcalUrl: string | null;
+    reservationReminderDaysBefore: number;
+    depositReminderDaysAfter: number;
+    reservationReminderWhatsappTemplate: string;
+    depositReminderWhatsappTemplate: string;
   } | null;
 
   beforeAll(async () => {
@@ -91,5 +95,39 @@ describe('SettingsController (e2e)', () => {
 
     expect(getResponse.body.bookingIcalUrl).toBe('https://booking.example/e2e-cal.ics');
     expect(getResponse.body.airbnbIcalUrl).toBe('https://airbnb.example/e2e-cal.ics');
+  });
+
+  it('persists the WhatsApp reminder settings through PUT /settings', async () => {
+    const response = await request(app.getHttpServer())
+      .put('/settings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        houseRulesText: 'E2E house rules',
+        paymentInstructions: 'E2E payment instructions',
+        depositInstructions: 'E2E deposit instructions',
+        propertyAddress: 'E2E property address',
+        googleMapsUrl: 'https://maps.example/e2e',
+        initialEmailTemplate: 'E2E initial template {{guestName}}',
+        finalEmailTemplate: 'E2E final template {{guestName}}',
+        cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
+        reservationReminderDaysBefore: 5,
+        depositReminderDaysAfter: 4,
+        reservationReminderWhatsappTemplate: 'E2E WhatsApp reservation reminder {{guestName}}',
+        depositReminderWhatsappTemplate: 'E2E WhatsApp deposit reminder {{guestName}}',
+      })
+      .expect(200);
+
+    expect(response.body.reservationReminderDaysBefore).toBe(5);
+    expect(response.body.depositReminderDaysAfter).toBe(4);
+    expect(response.body.reservationReminderWhatsappTemplate).toBe('E2E WhatsApp reservation reminder {{guestName}}');
+    expect(response.body.depositReminderWhatsappTemplate).toBe('E2E WhatsApp deposit reminder {{guestName}}');
+
+    const getResponse = await request(app.getHttpServer())
+      .get('/settings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(getResponse.body.reservationReminderDaysBefore).toBe(5);
+    expect(getResponse.body.depositReminderDaysAfter).toBe(4);
   });
 });
