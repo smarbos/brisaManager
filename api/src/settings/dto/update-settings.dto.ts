@@ -1,4 +1,4 @@
-import { IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class UpdateSettingsDto {
   @IsString()
@@ -86,7 +86,12 @@ export class UpdateSettingsDto {
   bankName?: string;
 
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  securityDepositAmount?: number;
+  @IsInt()
+  @Min(1)
+  confirmationPaymentPercentage?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  securityDepositPercentage?: number;
 }

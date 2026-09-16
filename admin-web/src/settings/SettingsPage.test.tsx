@@ -25,7 +25,8 @@ const baseSettings: settingsApi.Settings = {
   bankCbu: '0000000000000000000000',
   bankAlias: 'JANE.DOE.ARS',
   bankName: 'Banco X',
-  securityDepositAmount: 150000,
+  confirmationPaymentPercentage: 30,
+  securityDepositPercentage: 15,
   bookingIcalUrl: null,
   airbnbIcalUrl: null,
   lastChannelSyncAt: null,
@@ -133,7 +134,7 @@ describe('SettingsPage', () => {
     );
   });
 
-  it('loads and saves the bank details and security deposit amount', async () => {
+  it('loads and saves the bank details and confirmation/deposit percentages', async () => {
     vi.spyOn(settingsApi, 'getSettings').mockResolvedValue(baseSettings);
     const updateSpy = vi.spyOn(settingsApi, 'updateSettings').mockResolvedValue(baseSettings);
 
@@ -145,7 +146,8 @@ describe('SettingsPage', () => {
     expect(screen.getByLabelText(/^cbu/i)).toHaveValue('0000000000000000000000');
     expect(screen.getByLabelText(/^alias/i)).toHaveValue('JANE.DOE.ARS');
     expect(screen.getByLabelText(/^banco/i)).toHaveValue('Banco X');
-    expect(screen.getByLabelText(/monto del depósito de garantía/i)).toHaveValue(150000);
+    expect(screen.getByLabelText(/porcentaje de pago de confirmación/i)).toHaveValue(30);
+    expect(screen.getByLabelText(/porcentaje del depósito de garantía/i)).toHaveValue(15);
 
     fireEvent.change(screen.getByLabelText(/^banco/i), { target: { value: 'Banco Nuevo' } });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
@@ -153,6 +155,20 @@ describe('SettingsPage', () => {
     await waitFor(() =>
       expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ bankName: 'Banco Nuevo' })),
     );
+  });
+
+  it('clears to empty (not stuck at "0") when a percentage field is cleared, and back to a typed digit', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue(baseSettings);
+    vi.spyOn(settingsApi, 'updateSettings').mockResolvedValue(baseSettings);
+
+    render(<SettingsPage />);
+
+    const depositPercentageInput = await screen.findByLabelText(/porcentaje del depósito de garantía/i);
+    fireEvent.change(depositPercentageInput, { target: { value: '' } });
+    expect(depositPercentageInput).toHaveValue(null);
+
+    fireEvent.change(depositPercentageInput, { target: { value: '5' } });
+    expect(depositPercentageInput).toHaveValue(5);
   });
 
   it('shows an alert when loading settings fails', async () => {

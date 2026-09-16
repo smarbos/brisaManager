@@ -36,6 +36,8 @@ describe('PublicReservationsService', () => {
       get: jest.fn().mockResolvedValue({
         houseRulesText: 'No parties.',
         paymentInstructions: 'Bank X.',
+        confirmationPaymentPercentage: 30,
+        securityDepositPercentage: 15,
       }),
     };
     eventsService = { record: jest.fn() };
@@ -97,6 +99,34 @@ describe('PublicReservationsService', () => {
     const result = await service.getByToken('tok-1');
 
     expect(result.confirmationPaymentAmount).toBe(37037.03);
+  });
+
+  it('computes confirmationPaymentAmount using the configured percentage, not a hardcoded 30%', async () => {
+    settingsService.get.mockResolvedValue({
+      houseRulesText: 'No parties.',
+      paymentInstructions: 'Bank X.',
+      confirmationPaymentPercentage: 20,
+      securityDepositPercentage: 15,
+    });
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      totalAmount: 100000,
+    });
+
+    const result = await service.getByToken('tok-1');
+
+    expect(result.confirmationPaymentAmount).toBe(20000);
+  });
+
+  it('computes securityDepositAmount as the configured percentage of totalAmount', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      totalAmount: 100000,
+    });
+
+    const result = await service.getByToken('tok-1');
+
+    expect(result.securityDepositAmount).toBe(15000);
   });
 
   it('confirms dates, saves the guest-provided name/phone/email, records an event, and checks auto-confirmation', async () => {
