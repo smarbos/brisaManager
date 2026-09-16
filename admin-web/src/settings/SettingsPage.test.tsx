@@ -27,6 +27,7 @@ const baseSettings: settingsApi.Settings = {
   bankName: 'Banco X',
   confirmationPaymentPercentage: 30,
   securityDepositPercentage: 15,
+  confirmationStepText: 'All done!',
   bookingIcalUrl: null,
   airbnbIcalUrl: null,
   lastChannelSyncAt: null,
@@ -148,6 +149,7 @@ describe('SettingsPage', () => {
     expect(screen.getByLabelText(/^banco/i)).toHaveValue('Banco X');
     expect(screen.getByLabelText(/porcentaje de pago de confirmación/i)).toHaveValue(30);
     expect(screen.getByLabelText(/porcentaje del depósito de garantía/i)).toHaveValue(15);
+    expect(screen.getByLabelText(/texto del paso de confirmación final/i)).toHaveValue('All done!');
 
     fireEvent.change(screen.getByLabelText(/^banco/i), { target: { value: 'Banco Nuevo' } });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));

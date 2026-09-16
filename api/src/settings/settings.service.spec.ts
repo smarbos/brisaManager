@@ -82,6 +82,7 @@ describe('SettingsService', () => {
       depositReminderDaysAfter: 3,
       reservationReminderWhatsappTemplate: 'new reservation reminder template',
       depositReminderWhatsappTemplate: 'new deposit reminder template',
+      confirmationStepText: 'new confirmation step text',
     });
 
     expect(result.houseRulesText).toBe('new rules');

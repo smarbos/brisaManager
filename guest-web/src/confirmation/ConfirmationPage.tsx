@@ -4,11 +4,11 @@ import { ApiError } from '../api/client';
 import { acceptContract, confirmDates, getReservationByToken } from '../api/publicReservations';
 import { GuestReservation } from './types';
 import { Alert, Badge, Button, FormField, Input } from '../ui';
-import { formatDate } from '../lib/date';
+import { formatDate, formatLongDate } from '../lib/date';
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
-const STEP_LABELS: Record<Step, string> = { 1: 'Reserva', 2: 'Reglas', 3: 'Pago' };
+const STEP_LABELS: Record<Step, string> = { 1: 'Reserva', 2: 'Reglas', 3: 'Pago', 4: 'Confirmación' };
 
 function currentStep(reservation: GuestReservation): Step {
   if (!reservation.datesConfirmedAt) {
@@ -17,7 +17,10 @@ function currentStep(reservation: GuestReservation): Step {
   if (!reservation.contractAcceptedAt) {
     return 2;
   }
-  return 3;
+  if (!(reservation.confirmationPaymentReceivedAt && reservation.depositReceivedAt)) {
+    return 3;
+  }
+  return 4;
 }
 
 function formatMoney(currency: string, amount: number): string {
@@ -47,7 +50,7 @@ function WaveIcon() {
 function StepIndicator({ step }: { step: Step }) {
   return (
     <div className="mx-auto flex max-w-md gap-2 px-4">
-      {([1, 2, 3] as Step[]).map((s) => (
+      {([1, 2, 3, 4] as Step[]).map((s) => (
         <div key={s} className="flex-1">
           <div className={`h-1 rounded-full ${s <= step ? 'bg-accent' : 'bg-border'}`} />
           <p className={`mt-1 text-xs ${s === step ? 'font-semibold text-heading' : 'text-text-muted'}`}>
@@ -88,6 +91,7 @@ export function ConfirmationPage() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [rulesChecked, setRulesChecked] = useState(false);
+  const [rulesRevealed, setRulesRevealed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function load() {
@@ -169,7 +173,7 @@ export function ConfirmationPage() {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
-  const fullyConfirmed = Boolean(reservation.confirmationPaymentReceivedAt && reservation.depositReceivedAt);
+  const remainingAtProperty = reservation.totalAmount - reservation.confirmationPaymentAmount;
 
   return (
     <PageShell>
@@ -373,10 +377,67 @@ export function ConfirmationPage() {
             <Button type="button" variant="secondary" className="mt-4 w-full" onClick={load}>
               Actualizar estado de los pagos
             </Button>
+          </>
+        )}
 
-            {fullyConfirmed && (
-              <p className="mt-4 text-center text-text">Tu reserva está completamente confirmada. ¡Te esperamos!</p>
+        {step === 4 && (
+          <>
+            <Badge tone="success">✓ Pago confirmado</Badge>
+            <h2 className="mt-2 font-heading text-xl font-bold text-heading">Confirmación</h2>
+            <p className="mt-1 text-sm text-text-muted">{reservation.confirmationStepText}</p>
+
+            <button
+              type="button"
+              onClick={() => setRulesRevealed((v) => !v)}
+              className="mt-4 text-sm font-semibold text-accent underline"
+            >
+              Ver reglas de la casa
+            </button>
+            {rulesRevealed && (
+              <div className="mt-2 rounded-lg bg-bg p-4">
+                <p className="whitespace-pre-wrap text-sm text-text">{reservation.contractSnapshot}</p>
+                {reservation.contractAcceptedAt && (
+                  <p className="mt-3 text-xs font-semibold uppercase text-text-muted">
+                    Aceptadas el {formatLongDate(reservation.contractAcceptedAt)}
+                  </p>
+                )}
+              </div>
             )}
+
+            <dl className="mt-6 flex flex-col gap-3 text-sm">
+              <div className="flex items-center justify-between">
+                <dt className="text-text-muted">Total a pagar</dt>
+                <dd className="font-semibold text-heading">
+                  {formatMoney(reservation.currency, reservation.totalAmount)}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-text-muted">Pago de reserva ({reservation.confirmationPaymentPercentage}%)</dt>
+                <dd className="font-semibold text-heading">
+                  {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
+                  {reservation.confirmationPaymentReceivedAt && (
+                    <span className="ml-1 text-success" aria-label="Recibido">
+                      ✓
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-text-muted">Restante a pagar en el lugar</dt>
+                <dd className="font-semibold text-heading">{formatMoney(reservation.currency, remainingAtProperty)}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-text-muted">Depósito de garantía</dt>
+                <dd className="font-semibold text-heading">
+                  {formatMoney(reservation.currency, reservation.securityDepositAmount)}
+                  {reservation.depositReceivedAt && (
+                    <span className="ml-1 text-success" aria-label="Recibido">
+                      ✓
+                    </span>
+                  )}
+                </dd>
+              </div>
+            </dl>
           </>
         )}
       </div>

@@ -109,6 +109,7 @@ model Settings {
   bankName                  String    @default("")
   confirmationPaymentPercentage Int   @default(30)
   securityDepositPercentage     Int   @default(15)
+  confirmationStepText          String @default("¡Todo listo! Completaste todos los pasos necesarios para tu estadía en La Brisa de Mar del Plata.")
   bookingIcalUrl            String?
   airbnbIcalUrl             String?
   lastChannelSyncAt         DateTime?

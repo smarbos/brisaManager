@@ -94,4 +94,8 @@ export class UpdateSettingsDto {
   @IsInt()
   @Min(1)
   securityDepositPercentage?: number;
+
+  @IsString()
+  @MinLength(1)
+  confirmationStepText: string;
 }

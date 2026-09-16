@@ -21,6 +21,7 @@ export interface Settings {
   bankName: string;
   confirmationPaymentPercentage: number;
   securityDepositPercentage: number;
+  confirmationStepText: string;
   bookingIcalUrl: string | null;
   airbnbIcalUrl: string | null;
   lastChannelSyncAt: string | null;
