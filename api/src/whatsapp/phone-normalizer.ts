@@ -16,6 +16,14 @@ export function normalizeArgentinePhoneForWhatsapp(raw: string): string | null {
     digits = digits.slice(1);
   }
 
+  // Never guess a country code when the guest gave one explicitly: an explicit "+"
+  // followed by digits that don't start with 54 is a foreign number (e.g. +52 for
+  // Mexico), and blindly overwriting it with 54 can produce a valid-looking Argentine
+  // number, silently sending a guest's reservation details to an unrelated stranger.
+  if (hasPlus && !digits.startsWith('54')) {
+    return null;
+  }
+
   // Assume Argentina when no country code is present.
   if (!digits.startsWith('54')) {
     digits = `54${digits}`;
