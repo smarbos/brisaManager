@@ -28,8 +28,8 @@ export function SettingsPage() {
   const [bankCbu, setBankCbu] = useState('');
   const [bankAlias, setBankAlias] = useState('');
   const [bankName, setBankName] = useState('');
-  const [confirmationPaymentPercentage, setConfirmationPaymentPercentage] = useState(30);
-  const [securityDepositPercentage, setSecurityDepositPercentage] = useState(15);
+  const [confirmationPaymentValue, setConfirmationPaymentValue] = useState('30%');
+  const [securityDepositValue, setSecurityDepositValue] = useState('15%');
   const [confirmationStepText, setConfirmationStepText] = useState('');
   const [bookingIcalUrl, setBookingIcalUrl] = useState('');
   const [airbnbIcalUrl, setAirbnbIcalUrl] = useState('');
@@ -68,8 +68,8 @@ export function SettingsPage() {
         setBankCbu(settings.bankCbu);
         setBankAlias(settings.bankAlias);
         setBankName(settings.bankName);
-        setConfirmationPaymentPercentage(settings.confirmationPaymentPercentage);
-        setSecurityDepositPercentage(settings.securityDepositPercentage);
+        setConfirmationPaymentValue(settings.confirmationPaymentValue);
+        setSecurityDepositValue(settings.securityDepositValue);
         setConfirmationStepText(settings.confirmationStepText);
         setBookingIcalUrl(settings.bookingIcalUrl ?? '');
         setAirbnbIcalUrl(settings.airbnbIcalUrl ?? '');
@@ -126,8 +126,8 @@ export function SettingsPage() {
         bankCbu,
         bankAlias,
         bankName,
-        confirmationPaymentPercentage,
-        securityDepositPercentage,
+        confirmationPaymentValue,
+        securityDepositValue,
         confirmationStepText,
         bookingIcalUrl,
         airbnbIcalUrl,
@@ -202,29 +202,29 @@ export function SettingsPage() {
         <FormField label="Instrucciones de pago">
           <Textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={8} />
         </FormField>
-        <FormField label="Porcentaje de pago de confirmación (%)">
+        <FormField label="Pago de confirmación">
           <Input
-            type="number"
-            min={1}
-            max={100}
-            value={confirmationPaymentPercentage === 0 ? '' : confirmationPaymentPercentage}
-            onChange={(e) =>
-              setConfirmationPaymentPercentage(e.target.value === '' ? 0 : Number(e.target.value))
-            }
+            value={confirmationPaymentValue}
+            onChange={(e) => setConfirmationPaymentValue(e.target.value)}
+            placeholder="30% o 210000"
           />
         </FormField>
+        <p className="-mt-2 text-xs text-text-muted">
+          Un porcentaje del total (30%) o un monto fijo en pesos (210000, sin puntos de miles).
+        </p>
         <FormField label="Descripción del depósito de garantía">
           <Textarea value={depositInstructions} onChange={(e) => setDepositInstructions(e.target.value)} rows={8} />
         </FormField>
-        <FormField label="Porcentaje del depósito de garantía (%)">
+        <FormField label="Depósito de garantía">
           <Input
-            type="number"
-            min={1}
-            max={100}
-            value={securityDepositPercentage === 0 ? '' : securityDepositPercentage}
-            onChange={(e) => setSecurityDepositPercentage(e.target.value === '' ? 0 : Number(e.target.value))}
+            value={securityDepositValue}
+            onChange={(e) => setSecurityDepositValue(e.target.value)}
+            placeholder="15% o 150000"
           />
         </FormField>
+        <p className="-mt-2 text-xs text-text-muted">
+          Un porcentaje del total (15%) o un monto fijo en pesos (150000, sin puntos de miles).
+        </p>
         <FormField label="Texto del paso de confirmación final">
           <Textarea value={confirmationStepText} onChange={(e) => setConfirmationStepText(e.target.value)} rows={4} />
         </FormField>

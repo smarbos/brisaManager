@@ -68,8 +68,8 @@ export class SettingsService {
         bankCbu: '',
         bankAlias: '',
         bankName: '',
-        confirmationPaymentPercentage: 30,
-        securityDepositPercentage: 15,
+        confirmationPaymentValue: '30%',
+        securityDepositValue: '15%',
         confirmationStepText: DEFAULT_CONFIRMATION_STEP_TEXT,
       },
     });

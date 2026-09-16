@@ -1,4 +1,8 @@
-import { IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsInt, IsOptional, IsString, Matches, Min, MinLength } from 'class-validator';
+
+// Either a plain ARS amount ("210000") or a percentage of the total ("30%") — see
+// api/src/settings/fee-value.ts for how this is parsed and resolved.
+const FEE_VALUE_PATTERN = /^\d+(\.\d+)?%?$/;
 
 export class UpdateSettingsDto {
   @IsString()
@@ -85,15 +89,13 @@ export class UpdateSettingsDto {
   @IsString()
   bankName?: string;
 
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  confirmationPaymentPercentage?: number;
+  @IsString()
+  @Matches(FEE_VALUE_PATTERN, { message: 'confirmationPaymentValue must be a plain amount (e.g. "210000") or a percentage (e.g. "30%")' })
+  confirmationPaymentValue: string;
 
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  securityDepositPercentage?: number;
+  @IsString()
+  @Matches(FEE_VALUE_PATTERN, { message: 'securityDepositValue must be a plain amount (e.g. "150000") or a percentage (e.g. "15%")' })
+  securityDepositValue: string;
 
   @IsString()
   @MinLength(1)

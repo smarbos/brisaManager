@@ -4,6 +4,7 @@ import { SettingsService } from '../settings/settings.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GuestsService } from '../guests/guests.service';
+import { parsePercentage, resolveFeeAmount } from '../settings/fee-value';
 
 @Injectable()
 export class PublicReservationsService {
@@ -35,9 +36,8 @@ export class PublicReservationsService {
       checkOut: reservation.checkOut,
       paxCount: reservation.paxCount,
       totalAmount: reservation.totalAmount,
-      confirmationPaymentAmount:
-        Math.round(Number(reservation.totalAmount) * (settings.confirmationPaymentPercentage / 100) * 100) / 100,
-      confirmationPaymentPercentage: settings.confirmationPaymentPercentage,
+      confirmationPaymentAmount: resolveFeeAmount(settings.confirmationPaymentValue, Number(reservation.totalAmount)),
+      confirmationPaymentPercentage: parsePercentage(settings.confirmationPaymentValue),
       currency: reservation.currency,
       datesConfirmedAt: reservation.datesConfirmedAt,
       contractAcceptedAt: reservation.contractAcceptedAt,
@@ -55,8 +55,7 @@ export class PublicReservationsService {
       bankCbu: settings.bankCbu,
       bankAlias: settings.bankAlias,
       bankName: settings.bankName,
-      securityDepositAmount:
-        Math.round(Number(reservation.totalAmount) * (settings.securityDepositPercentage / 100) * 100) / 100,
+      securityDepositAmount: resolveFeeAmount(settings.securityDepositValue, Number(reservation.totalAmount)),
     };
   }
 

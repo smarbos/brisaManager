@@ -107,8 +107,10 @@ model Settings {
   bankCbu                   String    @default("")
   bankAlias                 String    @default("")
   bankName                  String    @default("")
-  confirmationPaymentPercentage Int   @default(30)
-  securityDepositPercentage     Int   @default(15)
+  // Either a plain ARS amount (e.g. "210000") or a percentage of the reservation's total
+  // (e.g. "30%") — see api/src/settings/fee-value.ts for how this is parsed and resolved.
+  confirmationPaymentValue String @default("30%")
+  securityDepositValue     String @default("15%")
   confirmationStepText          String @default("¡Todo listo! Completaste todos los pasos necesarios para tu estadía en La Brisa de Mar del Plata.")
   bookingIcalUrl            String?
   airbnbIcalUrl             String?

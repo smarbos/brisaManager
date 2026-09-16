@@ -295,7 +295,9 @@ export function ConfirmationPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-heading">
-                    Confirmación de reserva ({reservation.confirmationPaymentPercentage}%)
+                    Confirmación de reserva
+                    {reservation.confirmationPaymentPercentage !== null &&
+                      ` (${reservation.confirmationPaymentPercentage}%)`}
                   </p>
                   <p className="text-sm text-text-muted">
                     {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
@@ -412,7 +414,11 @@ export function ConfirmationPage() {
                 </dd>
               </div>
               <div className="flex items-center justify-between">
-                <dt className="text-text-muted">Pago de reserva ({reservation.confirmationPaymentPercentage}%)</dt>
+                <dt className="text-text-muted">
+                  Pago de reserva
+                  {reservation.confirmationPaymentPercentage !== null &&
+                    ` (${reservation.confirmationPaymentPercentage}%)`}
+                </dt>
                 <dd className="font-semibold text-heading">
                   {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
                   {reservation.confirmationPaymentReceivedAt && (
