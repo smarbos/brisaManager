@@ -35,7 +35,9 @@ export class PublicReservationsService {
       checkOut: reservation.checkOut,
       paxCount: reservation.paxCount,
       totalAmount: reservation.totalAmount,
-      confirmationPaymentAmount: Math.round(Number(reservation.totalAmount) * 0.3 * 100) / 100,
+      confirmationPaymentAmount:
+        Math.round(Number(reservation.totalAmount) * (settings.confirmationPaymentPercentage / 100) * 100) / 100,
+      confirmationPaymentPercentage: settings.confirmationPaymentPercentage,
       currency: reservation.currency,
       datesConfirmedAt: reservation.datesConfirmedAt,
       contractAcceptedAt: reservation.contractAcceptedAt,
@@ -51,7 +53,8 @@ export class PublicReservationsService {
       bankCbu: settings.bankCbu,
       bankAlias: settings.bankAlias,
       bankName: settings.bankName,
-      securityDepositAmount: settings.securityDepositAmount,
+      securityDepositAmount:
+        Math.round(Number(reservation.totalAmount) * (settings.securityDepositPercentage / 100) * 100) / 100,
     };
   }
 

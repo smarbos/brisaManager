@@ -19,7 +19,8 @@ export interface Settings {
   bankCbu: string;
   bankAlias: string;
   bankName: string;
-  securityDepositAmount: number;
+  confirmationPaymentPercentage: number;
+  securityDepositPercentage: number;
   bookingIcalUrl: string | null;
   airbnbIcalUrl: string | null;
   lastChannelSyncAt: string | null;

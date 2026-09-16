@@ -5,6 +5,7 @@ export interface GuestReservation {
   paxCount: number;
   totalAmount: number;
   confirmationPaymentAmount: number;
+  confirmationPaymentPercentage: number;
   currency: string;
   datesConfirmedAt: string | null;
   contractAcceptedAt: string | null;

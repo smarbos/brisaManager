@@ -290,7 +290,9 @@ export function ConfirmationPage() {
             <div className="mt-4 rounded-lg bg-bg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-heading">Confirmación de reserva (30%)</p>
+                  <p className="font-semibold text-heading">
+                    Confirmación de reserva ({reservation.confirmationPaymentPercentage}%)
+                  </p>
                   <p className="text-sm text-text-muted">
                     {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
                   </p>
@@ -299,37 +301,53 @@ export function ConfirmationPage() {
                   {reservation.confirmationPaymentReceivedAt ? 'Recibido' : 'Pendiente'}
                 </Badge>
               </div>
-              <dl className="mt-4 grid grid-cols-2 gap-y-2 text-sm">
-                <dt className="text-text-muted">Titular</dt>
-                <dd className="text-right font-medium text-heading">{reservation.bankAccountHolder}</dd>
-                <dt className="text-text-muted">CUIL</dt>
-                <dd className="text-right font-medium text-heading">{reservation.bankCuil}</dd>
-                <dt className="text-text-muted">Caja de ahorro en pesos</dt>
-                <dd className="text-right font-medium text-heading">{reservation.bankAccountNumber}</dd>
-                <dt className="text-text-muted">CBU</dt>
-                <dd className="flex items-center justify-end gap-2 text-right font-medium text-heading">
-                  <span>{reservation.bankCbu}</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(reservation.bankCbu)}
-                    className="text-xs font-semibold text-accent underline"
-                  >
-                    Copiar
-                  </button>
-                </dd>
-                <dt className="text-text-muted">Alias</dt>
-                <dd className="flex items-center justify-end gap-2 text-right font-medium text-heading">
-                  <span>{reservation.bankAlias}</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(reservation.bankAlias)}
-                    className="text-xs font-semibold text-accent underline"
-                  >
-                    Copiar
-                  </button>
-                </dd>
-                <dt className="text-text-muted">Banco</dt>
-                <dd className="text-right font-medium text-heading">{reservation.bankName}</dd>
+              {/* Always stacked (label above, value below) rather than a viewport-based
+                  breakpoint: this card sits in a fixed max-w-md container regardless of
+                  device, so a long value like the CBU can overlap the label on any screen
+                  width, not just narrow ones. */}
+              <dl className="mt-4 flex flex-col gap-3 text-sm">
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-text-muted">Titular</dt>
+                  <dd className="font-medium text-heading">{reservation.bankAccountHolder}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-text-muted">CUIL</dt>
+                  <dd className="font-medium text-heading">{reservation.bankCuil}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-text-muted">Caja de ahorro en pesos</dt>
+                  <dd className="font-medium text-heading">{reservation.bankAccountNumber}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-text-muted">CBU</dt>
+                  <dd className="flex flex-wrap items-center gap-2 font-medium text-heading">
+                    <span className="break-all">{reservation.bankCbu}</span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(reservation.bankCbu)}
+                      className="shrink-0 text-xs font-semibold text-accent underline"
+                    >
+                      Copiar
+                    </button>
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-text-muted">Alias</dt>
+                  <dd className="flex flex-wrap items-center gap-2 font-medium text-heading">
+                    <span className="break-all">{reservation.bankAlias}</span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(reservation.bankAlias)}
+                      className="shrink-0 text-xs font-semibold text-accent underline"
+                    >
+                      Copiar
+                    </button>
+                  </dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <dt className="text-text-muted">Banco</dt>
+                  <dd className="font-medium text-heading">{reservation.bankName}</dd>
+                </div>
               </dl>
               <p className="mt-4 rounded bg-surface p-3 text-xs text-text-muted">
                 Una vez transferido, enviá el comprobante por WhatsApp o email para que actualicemos el estado del

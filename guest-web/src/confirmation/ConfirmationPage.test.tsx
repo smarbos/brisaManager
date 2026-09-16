@@ -12,6 +12,7 @@ const baseReservation = {
   paxCount: 2,
   totalAmount: 100000,
   confirmationPaymentAmount: 30000,
+  confirmationPaymentPercentage: 30,
   currency: 'ARS',
   datesConfirmedAt: null,
   contractAcceptedAt: null,

@@ -28,7 +28,8 @@ export function SettingsPage() {
   const [bankCbu, setBankCbu] = useState('');
   const [bankAlias, setBankAlias] = useState('');
   const [bankName, setBankName] = useState('');
-  const [securityDepositAmount, setSecurityDepositAmount] = useState(0);
+  const [confirmationPaymentPercentage, setConfirmationPaymentPercentage] = useState(30);
+  const [securityDepositPercentage, setSecurityDepositPercentage] = useState(15);
   const [bookingIcalUrl, setBookingIcalUrl] = useState('');
   const [airbnbIcalUrl, setAirbnbIcalUrl] = useState('');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
@@ -66,7 +67,8 @@ export function SettingsPage() {
         setBankCbu(settings.bankCbu);
         setBankAlias(settings.bankAlias);
         setBankName(settings.bankName);
-        setSecurityDepositAmount(settings.securityDepositAmount);
+        setConfirmationPaymentPercentage(settings.confirmationPaymentPercentage);
+        setSecurityDepositPercentage(settings.securityDepositPercentage);
         setBookingIcalUrl(settings.bookingIcalUrl ?? '');
         setAirbnbIcalUrl(settings.airbnbIcalUrl ?? '');
         setLastSyncAt(settings.lastChannelSyncAt);
@@ -122,7 +124,8 @@ export function SettingsPage() {
         bankCbu,
         bankAlias,
         bankName,
-        securityDepositAmount,
+        confirmationPaymentPercentage,
+        securityDepositPercentage,
         bookingIcalUrl,
         airbnbIcalUrl,
         lastChannelSyncAt: lastSyncAt,
@@ -196,15 +199,27 @@ export function SettingsPage() {
         <FormField label="Instrucciones de pago">
           <Textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={8} />
         </FormField>
+        <FormField label="Porcentaje de pago de confirmación (%)">
+          <Input
+            type="number"
+            min={1}
+            max={100}
+            value={confirmationPaymentPercentage === 0 ? '' : confirmationPaymentPercentage}
+            onChange={(e) =>
+              setConfirmationPaymentPercentage(e.target.value === '' ? 0 : Number(e.target.value))
+            }
+          />
+        </FormField>
         <FormField label="Descripción del depósito de garantía">
           <Textarea value={depositInstructions} onChange={(e) => setDepositInstructions(e.target.value)} rows={8} />
         </FormField>
-        <FormField label="Monto del depósito de garantía (ARS)">
+        <FormField label="Porcentaje del depósito de garantía (%)">
           <Input
             type="number"
-            min={0}
-            value={securityDepositAmount}
-            onChange={(e) => setSecurityDepositAmount(Number(e.target.value))}
+            min={1}
+            max={100}
+            value={securityDepositPercentage === 0 ? '' : securityDepositPercentage}
+            onChange={(e) => setSecurityDepositPercentage(e.target.value === '' ? 0 : Number(e.target.value))}
           />
         </FormField>
 
@@ -287,8 +302,10 @@ export function SettingsPage() {
           <Input
             type="number"
             min={1}
-            value={reservationReminderDaysBefore}
-            onChange={(e) => setReservationReminderDaysBefore(Number(e.target.value))}
+            value={reservationReminderDaysBefore === 0 ? '' : reservationReminderDaysBefore}
+            onChange={(e) =>
+              setReservationReminderDaysBefore(e.target.value === '' ? 0 : Number(e.target.value))
+            }
           />
         </FormField>
         <FormField label="Mensaje de recordatorio de reserva">
@@ -304,8 +321,8 @@ export function SettingsPage() {
           <Input
             type="number"
             min={1}
-            value={depositReminderDaysAfter}
-            onChange={(e) => setDepositReminderDaysAfter(Number(e.target.value))}
+            value={depositReminderDaysAfter === 0 ? '' : depositReminderDaysAfter}
+            onChange={(e) => setDepositReminderDaysAfter(e.target.value === '' ? 0 : Number(e.target.value))}
           />
         </FormField>
         <FormField label="Mensaje de recordatorio de depósito">

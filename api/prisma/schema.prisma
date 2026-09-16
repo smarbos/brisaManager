@@ -107,7 +107,8 @@ model Settings {
   bankCbu                   String    @default("")
   bankAlias                 String    @default("")
   bankName                  String    @default("")
-  securityDepositAmount     Decimal   @default(0) @db.Decimal(10, 2)
+  confirmationPaymentPercentage Int   @default(30)
+  securityDepositPercentage     Int   @default(15)
   bookingIcalUrl            String?
   airbnbIcalUrl             String?
   lastChannelSyncAt         DateTime?
