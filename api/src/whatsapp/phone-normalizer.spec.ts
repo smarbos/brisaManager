@@ -40,4 +40,12 @@ describe('normalizeArgentinePhoneForWhatsapp', () => {
   it('returns null for an empty string', () => {
     expect(normalizeArgentinePhoneForWhatsapp('')).toBeNull();
   });
+
+  it('rejects an explicit non-Argentine country code rather than guessing', () => {
+    expect(normalizeArgentinePhoneForWhatsapp('+52 55 1234 5678')).toBeNull(); // Mexico
+  });
+
+  it('rejects another explicit non-Argentine country code', () => {
+    expect(normalizeArgentinePhoneForWhatsapp('+57 300 1234567')).toBeNull(); // Colombia
+  });
 });
