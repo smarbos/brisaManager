@@ -105,4 +105,10 @@ describe('WhatsappReminderSchedulerService', () => {
       data: { reservationReminderSentAt: expect.any(Date) },
     });
   });
+
+  it('logs and does not throw when settingsService.get() rejects', async () => {
+    settingsService.get.mockRejectedValue(new Error('settings unavailable'));
+
+    await expect(scheduler.handleDailyReminders()).resolves.toBeUndefined();
+  });
 });

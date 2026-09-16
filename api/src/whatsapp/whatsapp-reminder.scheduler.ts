@@ -26,10 +26,14 @@ export class WhatsappReminderSchedulerService {
 
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
   async handleDailyReminders(): Promise<void> {
-    const settings = await this.settingsService.get();
+    try {
+      const settings = await this.settingsService.get();
 
-    await this.sendReservationReminders(settings);
-    await this.sendDepositReminders(settings);
+      await this.sendReservationReminders(settings);
+      await this.sendDepositReminders(settings);
+    } catch (error) {
+      this.logger.error(`Scheduled WhatsApp reminders failed: ${(error as Error).message}`, (error as Error).stack);
+    }
   }
 
   private async sendReservationReminders(settings: {
