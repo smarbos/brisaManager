@@ -26,4 +26,6 @@ COPY prisma ./prisma
 RUN npm ci --omit=dev
 RUN npx prisma generate
 COPY --from=build /app/dist ./dist
-CMD ["node", "dist/main.js"]
+# tsconfig.json also compiles prisma/seed.ts alongside src/, so tsc infers a project
+# root above src/ and preserves it in the output path: dist/src/main.js, not dist/main.js.
+CMD ["node", "dist/src/main.js"]
