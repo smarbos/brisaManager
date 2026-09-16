@@ -43,7 +43,10 @@
      using Twilio's WhatsApp Sandbox, any phone number you want to test with must first text the
      Sandbox's join code to the Sandbox number before it can receive anything. Real, un-prompted
      guest messaging requires a verified WhatsApp Business Sender (a Twilio/Meta business
-     verification process, not a config change).
+     verification process, not a config change). Note that even with a Business Sender, a
+     reminder is a business-initiated message outside the guest's 24-hour reply window, which
+     requires Meta to pre-approve the exact message template (via Twilio's Content API) before it
+     can be sent — editing the template text in Settings after that point requires re-approval.
    - **CORS origins:** `ADMIN_WEB_ORIGIN=https://admin.labrisa.com.ar` and
      `GUEST_WEB_ORIGIN=https://reservas.labrisa.com.ar` — the API rejects browser requests from
      any other origin, so localhost defaults will break the deployed admin app. `GUEST_WEB_ORIGIN`
