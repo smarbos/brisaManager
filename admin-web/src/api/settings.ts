@@ -13,6 +13,13 @@ export interface Settings {
   depositReminderDaysAfter: number;
   reservationReminderWhatsappTemplate: string;
   depositReminderWhatsappTemplate: string;
+  bankAccountHolder: string;
+  bankCuil: string;
+  bankAccountNumber: string;
+  bankCbu: string;
+  bankAlias: string;
+  bankName: string;
+  securityDepositAmount: number;
   bookingIcalUrl: string | null;
   airbnbIcalUrl: string | null;
   lastChannelSyncAt: string | null;

@@ -22,6 +22,13 @@ export function SettingsPage() {
   const [depositReminderDaysAfter, setDepositReminderDaysAfter] = useState(3);
   const [reservationReminderWhatsappTemplate, setReservationReminderWhatsappTemplate] = useState('');
   const [depositReminderWhatsappTemplate, setDepositReminderWhatsappTemplate] = useState('');
+  const [bankAccountHolder, setBankAccountHolder] = useState('');
+  const [bankCuil, setBankCuil] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankCbu, setBankCbu] = useState('');
+  const [bankAlias, setBankAlias] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [securityDepositAmount, setSecurityDepositAmount] = useState(0);
   const [bookingIcalUrl, setBookingIcalUrl] = useState('');
   const [airbnbIcalUrl, setAirbnbIcalUrl] = useState('');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
@@ -53,6 +60,13 @@ export function SettingsPage() {
         setDepositReminderDaysAfter(settings.depositReminderDaysAfter);
         setReservationReminderWhatsappTemplate(settings.reservationReminderWhatsappTemplate);
         setDepositReminderWhatsappTemplate(settings.depositReminderWhatsappTemplate);
+        setBankAccountHolder(settings.bankAccountHolder);
+        setBankCuil(settings.bankCuil);
+        setBankAccountNumber(settings.bankAccountNumber);
+        setBankCbu(settings.bankCbu);
+        setBankAlias(settings.bankAlias);
+        setBankName(settings.bankName);
+        setSecurityDepositAmount(settings.securityDepositAmount);
         setBookingIcalUrl(settings.bookingIcalUrl ?? '');
         setAirbnbIcalUrl(settings.airbnbIcalUrl ?? '');
         setLastSyncAt(settings.lastChannelSyncAt);
@@ -102,6 +116,13 @@ export function SettingsPage() {
         depositReminderDaysAfter,
         reservationReminderWhatsappTemplate,
         depositReminderWhatsappTemplate,
+        bankAccountHolder,
+        bankCuil,
+        bankAccountNumber,
+        bankCbu,
+        bankAlias,
+        bankName,
+        securityDepositAmount,
         bookingIcalUrl,
         airbnbIcalUrl,
         lastChannelSyncAt: lastSyncAt,
@@ -178,6 +199,40 @@ export function SettingsPage() {
         <FormField label="Descripción del depósito de garantía">
           <Textarea value={depositInstructions} onChange={(e) => setDepositInstructions(e.target.value)} rows={8} />
         </FormField>
+        <FormField label="Monto del depósito de garantía (ARS)">
+          <Input
+            type="number"
+            min={0}
+            value={securityDepositAmount}
+            onChange={(e) => setSecurityDepositAmount(Number(e.target.value))}
+          />
+        </FormField>
+
+        <div className="mt-4">
+          <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Datos bancarios</h2>
+          <p className="mb-4 text-sm text-text-muted">
+            Se muestran al huésped en el paso de pago, con botones para copiar el CBU y el alias.
+          </p>
+        </div>
+        <FormField label="Titular">
+          <Input value={bankAccountHolder} onChange={(e) => setBankAccountHolder(e.target.value)} />
+        </FormField>
+        <FormField label="CUIL">
+          <Input value={bankCuil} onChange={(e) => setBankCuil(e.target.value)} />
+        </FormField>
+        <FormField label="Número de cuenta (caja de ahorro en pesos)">
+          <Input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} />
+        </FormField>
+        <FormField label="CBU">
+          <Input value={bankCbu} onChange={(e) => setBankCbu(e.target.value)} />
+        </FormField>
+        <FormField label="Alias">
+          <Input value={bankAlias} onChange={(e) => setBankAlias(e.target.value)} />
+        </FormField>
+        <FormField label="Banco">
+          <Input value={bankName} onChange={(e) => setBankName(e.target.value)} />
+        </FormField>
+
         <FormField label="Dirección del alojamiento">
           <Input value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} />
         </FormField>

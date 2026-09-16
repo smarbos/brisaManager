@@ -59,6 +59,13 @@ export class SettingsService {
         depositReminderDaysAfter: 3,
         reservationReminderWhatsappTemplate: DEFAULT_RESERVATION_REMINDER_WHATSAPP_TEMPLATE,
         depositReminderWhatsappTemplate: DEFAULT_DEPOSIT_REMINDER_WHATSAPP_TEMPLATE,
+        bankAccountHolder: '',
+        bankCuil: '',
+        bankAccountNumber: '',
+        bankCbu: '',
+        bankAlias: '',
+        bankName: '',
+        securityDepositAmount: 0,
       },
     });
   }

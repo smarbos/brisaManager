@@ -45,28 +45,51 @@ export class PublicReservationsService {
       houseRulesText: settings.houseRulesText,
       paymentInstructions: settings.paymentInstructions,
       depositInstructions: settings.depositInstructions,
+      bankAccountHolder: settings.bankAccountHolder,
+      bankCuil: settings.bankCuil,
+      bankAccountNumber: settings.bankAccountNumber,
+      bankCbu: settings.bankCbu,
+      bankAlias: settings.bankAlias,
+      bankName: settings.bankName,
+      securityDepositAmount: settings.securityDepositAmount,
     };
   }
 
-  async confirmDates(token: string) {
+  async confirmDates(token: string, fullName: string, phone: string, email: string) {
     const reservation = await this.findByToken(token);
 
     if (reservation.datesConfirmedAt) {
       return { datesConfirmedAt: reservation.datesConfirmedAt };
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // The guest is the authoritative source for their own name/contact info at this point —
+    // this overwrites whatever was there before (a Booking.com placeholder, a typo from
+    // manual entry, or nothing at all), not just fills a gap.
     const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },
-      data: { datesConfirmedAt: new Date() },
+      data: {
+        datesConfirmedAt: new Date(),
+        guestName: fullName,
+        guestPhone: phone,
+        guestEmail: normalizedEmail,
+      },
     });
 
     await this.eventsService.record(reservation.id, 'DATES_CONFIRMED');
     await this.confirmationService.maybeAutoConfirm(reservation.id);
 
+    void this.guestsService.syncFromReservation(updated.id, {
+      email: normalizedEmail,
+      name: fullName,
+      phone,
+    });
+
     return { datesConfirmedAt: updated.datesConfirmedAt };
   }
 
-  async acceptContract(token: string, fullName: string) {
+  async acceptContract(token: string) {
     const reservation = await this.findByToken(token);
 
     if (reservation.contractAcceptedAt) {
@@ -79,21 +102,13 @@ export class PublicReservationsService {
       where: { id: reservation.id },
       data: {
         contractAcceptedAt: new Date(),
-        contractAcceptedName: fullName,
+        contractAcceptedName: reservation.guestName,
         contractSnapshot: settings.houseRulesText,
       },
     });
 
     await this.eventsService.record(reservation.id, 'CONTRACT_ACCEPTED');
     await this.confirmationService.maybeAutoConfirm(reservation.id);
-
-    if (updated.guestEmail) {
-      void this.guestsService.syncFromReservation(updated.id, {
-        email: updated.guestEmail,
-        name: fullName,
-        phone: updated.guestPhone,
-      });
-    }
 
     return { contractAcceptedAt: updated.contractAcceptedAt };
   }

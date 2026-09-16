@@ -101,6 +101,13 @@ model Settings {
   depositReminderDaysAfter            Int    @default(3)
   reservationReminderWhatsappTemplate String @default("Hola {{guestName}}! Te recordamos tu reserva en La Brisa de Mar del Plata del {{checkIn}} al {{checkOut}}. ¡Te esperamos!")
   depositReminderWhatsappTemplate     String @default("Hola {{guestName}}, todavía no registramos el depósito de tu reserva del {{checkIn}}. {{paymentInstructions}}")
+  bankAccountHolder         String    @default("")
+  bankCuil                  String    @default("")
+  bankAccountNumber         String    @default("")
+  bankCbu                   String    @default("")
+  bankAlias                 String    @default("")
+  bankName                  String    @default("")
+  securityDepositAmount     Decimal   @default(0) @db.Decimal(10, 2)
   bookingIcalUrl            String?
   airbnbIcalUrl             String?
   lastChannelSyncAt         DateTime?
