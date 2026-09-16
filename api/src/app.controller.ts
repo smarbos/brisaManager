@@ -10,4 +10,9 @@ export class AppController {
     await this.prisma.$queryRaw`SELECT 1`;
     return { status: 'ok' };
   }
+
+  @Get('config')
+  config() {
+    return { emailDebugMode: process.env.EMAIL_DEBUG_MODE === 'true' };
+  }
 }

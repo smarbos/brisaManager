@@ -9,6 +9,7 @@ import { GuestListPage } from './guests/GuestListPage';
 import { TemplatesPage } from './templates/TemplatesPage';
 import { CampaignsPage } from './campaigns/CampaignsPage';
 import { ActivityLogPage } from './activity/ActivityLogPage';
+import { DebugModeBanner } from './layout/DebugModeBanner';
 
 export function App() {
   return (
@@ -27,6 +28,7 @@ export function App() {
             <Route path="/activity" element={<ActivityLogPage />} />
           </Route>
         </Routes>
+        <DebugModeBanner />
       </AuthProvider>
     </BrowserRouter>
   );
