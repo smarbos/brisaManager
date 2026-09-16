@@ -18,6 +18,10 @@ export function SettingsPage() {
   const [initialEmailTemplate, setInitialEmailTemplate] = useState('');
   const [finalEmailTemplate, setFinalEmailTemplate] = useState('');
   const [cancellationEmailTemplate, setCancellationEmailTemplate] = useState('');
+  const [reservationReminderDaysBefore, setReservationReminderDaysBefore] = useState(3);
+  const [depositReminderDaysAfter, setDepositReminderDaysAfter] = useState(3);
+  const [reservationReminderWhatsappTemplate, setReservationReminderWhatsappTemplate] = useState('');
+  const [depositReminderWhatsappTemplate, setDepositReminderWhatsappTemplate] = useState('');
   const [bookingIcalUrl, setBookingIcalUrl] = useState('');
   const [airbnbIcalUrl, setAirbnbIcalUrl] = useState('');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
@@ -45,6 +49,10 @@ export function SettingsPage() {
         setInitialEmailTemplate(settings.initialEmailTemplate);
         setFinalEmailTemplate(settings.finalEmailTemplate);
         setCancellationEmailTemplate(settings.cancellationEmailTemplate);
+        setReservationReminderDaysBefore(settings.reservationReminderDaysBefore);
+        setDepositReminderDaysAfter(settings.depositReminderDaysAfter);
+        setReservationReminderWhatsappTemplate(settings.reservationReminderWhatsappTemplate);
+        setDepositReminderWhatsappTemplate(settings.depositReminderWhatsappTemplate);
         setBookingIcalUrl(settings.bookingIcalUrl ?? '');
         setAirbnbIcalUrl(settings.airbnbIcalUrl ?? '');
         setLastSyncAt(settings.lastChannelSyncAt);
@@ -90,6 +98,10 @@ export function SettingsPage() {
         initialEmailTemplate,
         finalEmailTemplate,
         cancellationEmailTemplate,
+        reservationReminderDaysBefore,
+        depositReminderDaysAfter,
+        reservationReminderWhatsappTemplate,
+        depositReminderWhatsappTemplate,
         bookingIcalUrl,
         airbnbIcalUrl,
         lastChannelSyncAt: lastSyncAt,
@@ -207,6 +219,48 @@ export function SettingsPage() {
           />
         </FormField>
         <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{checkOut}}'}</p>
+
+        <div className="mt-4">
+          <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Recordatorios de WhatsApp</h2>
+          <p className="mb-4 text-sm text-text-muted">
+            Se envían automáticamente por WhatsApp (vía Twilio) cuando el huésped tiene un
+            número de teléfono cargado. Podés usar las mismas variables entre llaves dobles
+            indicadas debajo de cada uno.
+          </p>
+        </div>
+        <FormField label="Días antes del check-in para el recordatorio de reserva">
+          <Input
+            type="number"
+            min={1}
+            value={reservationReminderDaysBefore}
+            onChange={(e) => setReservationReminderDaysBefore(Number(e.target.value))}
+          />
+        </FormField>
+        <FormField label="Mensaje de recordatorio de reserva">
+          <Textarea
+            value={reservationReminderWhatsappTemplate}
+            onChange={(e) => setReservationReminderWhatsappTemplate(e.target.value)}
+            rows={4}
+          />
+        </FormField>
+        <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{checkOut}}'}</p>
+
+        <FormField label="Días después del email inicial para el recordatorio de depósito">
+          <Input
+            type="number"
+            min={1}
+            value={depositReminderDaysAfter}
+            onChange={(e) => setDepositReminderDaysAfter(Number(e.target.value))}
+          />
+        </FormField>
+        <FormField label="Mensaje de recordatorio de depósito">
+          <Textarea
+            value={depositReminderWhatsappTemplate}
+            onChange={(e) => setDepositReminderWhatsappTemplate(e.target.value)}
+            rows={4}
+          />
+        </FormField>
+        <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{paymentInstructions}}'}</p>
 
         {saved && <Alert tone="success">Guardado</Alert>}
         <Button type="submit">Guardar</Button>
