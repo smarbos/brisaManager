@@ -9,6 +9,10 @@ export interface Settings {
   initialEmailTemplate: string;
   finalEmailTemplate: string;
   cancellationEmailTemplate: string;
+  reservationReminderDaysBefore: number;
+  depositReminderDaysAfter: number;
+  reservationReminderWhatsappTemplate: string;
+  depositReminderWhatsappTemplate: string;
   bookingIcalUrl: string | null;
   airbnbIcalUrl: string | null;
   lastChannelSyncAt: string | null;

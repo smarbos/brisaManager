@@ -15,6 +15,10 @@ const baseSettings: settingsApi.Settings = {
   initialEmailTemplate: 'Hi {{guestName}}, {{confirmationUrl}}',
   finalEmailTemplate: 'Hi {{guestName}}, {{propertyAddress}} {{googleMapsUrl}}',
   cancellationEmailTemplate: 'Hi {{guestName}}, {{checkIn}} to {{checkOut}}',
+  reservationReminderDaysBefore: 3,
+  depositReminderDaysAfter: 3,
+  reservationReminderWhatsappTemplate: 'Reminder for {{guestName}}: {{checkIn}} to {{checkOut}}',
+  depositReminderWhatsappTemplate: 'Deposit reminder for {{guestName}}: {{checkIn}}',
   bookingIcalUrl: null,
   airbnbIcalUrl: null,
   lastChannelSyncAt: null,
@@ -75,7 +79,7 @@ describe('SettingsPage', () => {
     );
     expect(screen.getByLabelText(/dirección del alojamiento/i)).toHaveValue('123 Main St');
     expect(screen.getByLabelText(/link de google maps/i)).toHaveValue('https://maps.example/labrisa');
-    expect(screen.getByLabelText(/email inicial/i)).toHaveValue('Hi {{guestName}}, {{confirmationUrl}}');
+    expect(screen.getByLabelText(/^email inicial/i)).toHaveValue('Hi {{guestName}}, {{confirmationUrl}}');
     expect(screen.getByLabelText(/email de confirmación final/i)).toHaveValue(
       'Hi {{guestName}}, {{propertyAddress}} {{googleMapsUrl}}',
     );
@@ -89,6 +93,35 @@ describe('SettingsPage', () => {
     await waitFor(() =>
       expect(updateSpy).toHaveBeenCalledWith(
         expect.objectContaining({ cancellationEmailTemplate: 'Updated cancellation copy' }),
+      ),
+    );
+  });
+
+  it('loads and saves the WhatsApp reminder settings', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue(baseSettings);
+    const updateSpy = vi.spyOn(settingsApi, 'updateSettings').mockResolvedValue(baseSettings);
+
+    render(<SettingsPage />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(/días antes del check-in/i)).toHaveValue(3),
+    );
+    expect(screen.getByLabelText(/mensaje de recordatorio de reserva/i)).toHaveValue(
+      'Reminder for {{guestName}}: {{checkIn}} to {{checkOut}}',
+    );
+    expect(screen.getByLabelText(/días después del email inicial/i)).toHaveValue(3);
+    expect(screen.getByLabelText(/mensaje de recordatorio de depósito/i)).toHaveValue(
+      'Deposit reminder for {{guestName}}: {{checkIn}}',
+    );
+
+    fireEvent.change(screen.getByLabelText(/mensaje de recordatorio de reserva/i), {
+      target: { value: 'Updated reservation reminder' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() =>
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ reservationReminderWhatsappTemplate: 'Updated reservation reminder' }),
       ),
     );
   });
