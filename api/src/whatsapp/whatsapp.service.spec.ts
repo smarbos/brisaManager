@@ -1,6 +1,7 @@
 const createMock = jest.fn();
+const mockTwilioConstructor = jest.fn().mockImplementation(() => ({ messages: { create: createMock } }));
 
-jest.mock('twilio', () => jest.fn().mockImplementation(() => ({ messages: { create: createMock } })));
+jest.mock('twilio', () => mockTwilioConstructor);
 
 import { WhatsappService } from './whatsapp.service';
 
@@ -9,6 +10,8 @@ describe('WhatsappService', () => {
 
   beforeEach(() => {
     createMock.mockReset();
+    mockTwilioConstructor.mockClear();
+    mockTwilioConstructor.mockImplementation(() => ({ messages: { create: createMock } }));
     process.env.TWILIO_ACCOUNT_SID = 'ACtest';
     process.env.TWILIO_AUTH_TOKEN = 'test-token';
     process.env.TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886';
@@ -41,5 +44,24 @@ describe('WhatsappService', () => {
     const result = await service.sendMessage('+5491122334455', 'Hola!');
 
     expect(result).toBe(false);
+  });
+
+  it('returns false, without throwing, when the Twilio client fails to construct', async () => {
+    mockTwilioConstructor.mockImplementationOnce(() => {
+      throw new Error('Authentication Error - invalid username');
+    });
+
+    const result = await service.sendMessage('+5491122334455', 'Hola!');
+
+    expect(result).toBe(false);
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('does not attempt to construct the Twilio client during instantiation', () => {
+    mockTwilioConstructor.mockClear();
+
+    new WhatsappService();
+
+    expect(mockTwilioConstructor).not.toHaveBeenCalled();
   });
 });
