@@ -99,18 +99,27 @@ describe('PublicReservationsService', () => {
     expect(result.confirmationPaymentAmount).toBe(37037.03);
   });
 
-  it('confirms dates, records an event, and checks auto-confirmation', async () => {
+  it('confirms dates, saves the guest-provided name/phone/email, records an event, and checks auto-confirmation', async () => {
     prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
     prisma.reservation.update.mockResolvedValue({
       ...baseReservation,
       datesConfirmedAt: new Date(),
+      guestName: 'Jane Doe',
+      guestPhone: '+54 9 223 555-1234',
+      guestEmail: 'jane@example.com',
     });
 
-    await service.confirmDates('tok-1');
+    await service.confirmDates('tok-1', 'Jane Doe', '+54 9 223 555-1234', 'Jane@Example.com');
 
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-1' },
-      data: { datesConfirmedAt: expect.any(Date) },
+      data: {
+        datesConfirmedAt: expect.any(Date),
+        guestName: 'Jane Doe',
+        guestPhone: '+54 9 223 555-1234',
+        // Normalized to lowercase, same as every other place this app stores a guest email.
+        guestEmail: 'jane@example.com',
+      },
     });
     expect(eventsService.record).toHaveBeenCalledWith(
       'res-1',
@@ -126,7 +135,7 @@ describe('PublicReservationsService', () => {
       datesConfirmedAt: alreadyConfirmedAt,
     });
 
-    const result = await service.confirmDates('tok-1');
+    const result = await service.confirmDates('tok-1', 'A Different Name', '+54911', 'a@example.com');
 
     expect(result).toEqual({ datesConfirmedAt: alreadyConfirmedAt });
     expect(prisma.reservation.update).not.toHaveBeenCalled();
@@ -134,14 +143,49 @@ describe('PublicReservationsService', () => {
     expect(confirmationService.maybeAutoConfirm).not.toHaveBeenCalled();
   });
 
-  it('accepts the contract, snapshotting the current house rules text', async () => {
+  it('syncs the guest with the self-provided name, phone, and email when dates are confirmed', async () => {
     prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
     prisma.reservation.update.mockResolvedValue({
       ...baseReservation,
-      contractAcceptedAt: new Date(),
+      datesConfirmedAt: new Date(),
+      guestEmail: 'jane@example.com',
+      guestPhone: '+54911',
     });
 
-    await service.acceptContract('tok-1', 'Jane Doe');
+    await service.confirmDates('tok-1', 'Jane Q. Doe', '+54911', 'jane@example.com');
+
+    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-1', {
+      email: 'jane@example.com',
+      name: 'Jane Q. Doe',
+      phone: '+54911',
+    });
+  });
+
+  it('does not sync a guest when dates were already confirmed', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: new Date('2026-01-01'),
+      guestEmail: 'jane@example.com',
+    });
+
+    await service.confirmDates('tok-1', 'A Different Name', '+54911', 'a@example.com');
+
+    expect(guestsService.syncFromReservation).not.toHaveBeenCalled();
+  });
+
+  it('accepts the contract, snapshotting the house rules and using the already-confirmed guest name', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      guestName: 'Jane Doe',
+      datesConfirmedAt: new Date('2026-01-01'),
+    });
+    prisma.reservation.update.mockResolvedValue({
+      ...baseReservation,
+      contractAcceptedAt: new Date(),
+      contractAcceptedName: 'Jane Doe',
+    });
+
+    await service.acceptContract('tok-1');
 
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-1' },
@@ -166,50 +210,11 @@ describe('PublicReservationsService', () => {
       contractAcceptedName: 'Original Name',
     });
 
-    const result = await service.acceptContract('tok-1', 'A Different Name');
+    const result = await service.acceptContract('tok-1');
 
     expect(result).toEqual({ contractAcceptedAt: alreadyAcceptedAt });
     expect(prisma.reservation.update).not.toHaveBeenCalled();
     expect(eventsService.record).not.toHaveBeenCalled();
     expect(confirmationService.maybeAutoConfirm).not.toHaveBeenCalled();
-  });
-
-  it('syncs the guest with the self-provided name when the contract is accepted', async () => {
-    prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation, guestEmail: 'jane@example.com', guestPhone: '+54911' });
-    prisma.reservation.update.mockResolvedValue({
-      ...baseReservation,
-      contractAcceptedAt: new Date(),
-      guestEmail: 'jane@example.com',
-      guestPhone: '+54911',
-    });
-
-    await service.acceptContract('tok-1', 'Jane Q. Doe');
-
-    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-1', {
-      email: 'jane@example.com',
-      name: 'Jane Q. Doe',
-      phone: '+54911',
-    });
-  });
-
-  it('does not sync a guest on contract acceptance when there is no guestEmail', async () => {
-    prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation, guestEmail: null });
-    prisma.reservation.update.mockResolvedValue({ ...baseReservation, contractAcceptedAt: new Date(), guestEmail: null });
-
-    await service.acceptContract('tok-1', 'Jane Q. Doe');
-
-    expect(guestsService.syncFromReservation).not.toHaveBeenCalled();
-  });
-
-  it('does not sync a guest when the contract was already accepted', async () => {
-    prisma.reservation.findUnique.mockResolvedValue({
-      ...baseReservation,
-      contractAcceptedAt: new Date('2026-01-01'),
-      guestEmail: 'jane@example.com',
-    });
-
-    await service.acceptContract('tok-1', 'A Different Name');
-
-    expect(guestsService.syncFromReservation).not.toHaveBeenCalled();
   });
 });

@@ -19,6 +19,13 @@ const baseSettings: settingsApi.Settings = {
   depositReminderDaysAfter: 3,
   reservationReminderWhatsappTemplate: 'Reminder for {{guestName}}: {{checkIn}} to {{checkOut}}',
   depositReminderWhatsappTemplate: 'Deposit reminder for {{guestName}}: {{checkIn}}',
+  bankAccountHolder: 'Jane Doe',
+  bankCuil: '27111111111',
+  bankAccountNumber: '1234567890',
+  bankCbu: '0000000000000000000000',
+  bankAlias: 'JANE.DOE.ARS',
+  bankName: 'Banco X',
+  securityDepositAmount: 150000,
   bookingIcalUrl: null,
   airbnbIcalUrl: null,
   lastChannelSyncAt: null,
@@ -123,6 +130,28 @@ describe('SettingsPage', () => {
       expect(updateSpy).toHaveBeenCalledWith(
         expect.objectContaining({ reservationReminderWhatsappTemplate: 'Updated reservation reminder' }),
       ),
+    );
+  });
+
+  it('loads and saves the bank details and security deposit amount', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue(baseSettings);
+    const updateSpy = vi.spyOn(settingsApi, 'updateSettings').mockResolvedValue(baseSettings);
+
+    render(<SettingsPage />);
+
+    await waitFor(() => expect(screen.getByLabelText(/titular/i)).toHaveValue('Jane Doe'));
+    expect(screen.getByLabelText(/cuil/i)).toHaveValue('27111111111');
+    expect(screen.getByLabelText(/número de cuenta/i)).toHaveValue('1234567890');
+    expect(screen.getByLabelText(/^cbu/i)).toHaveValue('0000000000000000000000');
+    expect(screen.getByLabelText(/^alias/i)).toHaveValue('JANE.DOE.ARS');
+    expect(screen.getByLabelText(/^banco/i)).toHaveValue('Banco X');
+    expect(screen.getByLabelText(/monto del depósito de garantía/i)).toHaveValue(150000);
+
+    fireEvent.change(screen.getByLabelText(/^banco/i), { target: { value: 'Banco Nuevo' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() =>
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ bankName: 'Banco Nuevo' })),
     );
   });
 

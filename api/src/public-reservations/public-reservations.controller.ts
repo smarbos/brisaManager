@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { PublicReservationsService } from './public-reservations.service';
-import { AcceptContractDto } from './dto/accept-contract.dto';
+import { ConfirmDatesDto } from './dto/confirm-dates.dto';
 
 @Controller('public/reservations')
 export class PublicReservationsController {
@@ -12,15 +12,12 @@ export class PublicReservationsController {
   }
 
   @Post(':token/confirm-dates')
-  confirmDates(@Param('token') token: string) {
-    return this.service.confirmDates(token);
+  confirmDates(@Param('token') token: string, @Body() dto: ConfirmDatesDto) {
+    return this.service.confirmDates(token, dto.fullName, dto.phone, dto.email);
   }
 
   @Post(':token/accept-contract')
-  acceptContract(
-    @Param('token') token: string,
-    @Body() dto: AcceptContractDto,
-  ) {
-    return this.service.acceptContract(token, dto.fullName);
+  acceptContract(@Param('token') token: string) {
+    return this.service.acceptContract(token);
   }
 }

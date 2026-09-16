@@ -27,6 +27,7 @@ describe('PublicReservationsController (e2e)', () => {
     await prisma.reservation.deleteMany({
       where: { guestName: 'Public E2E Guest' },
     });
+    await prisma.guest.deleteMany({ where: { email: 'public-e2e-guest@example.com' } });
     await app.close();
   });
 
@@ -61,13 +62,13 @@ describe('PublicReservationsController (e2e)', () => {
       .post(
         `/public/reservations/${reservation.confirmationToken}/confirm-dates`,
       )
+      .send({ fullName: 'Jane Doe', phone: '+54 9 223 555-9999', email: 'public-e2e-guest@example.com' })
       .expect(201);
 
     await request(app.getHttpServer())
       .post(
         `/public/reservations/${reservation.confirmationToken}/accept-contract`,
       )
-      .send({ fullName: 'Jane Doe' })
       .expect(201);
 
     const updated = await prisma.reservation.findUnique({
@@ -76,9 +77,11 @@ describe('PublicReservationsController (e2e)', () => {
     expect(updated?.datesConfirmedAt).not.toBeNull();
     expect(updated?.contractAcceptedName).toBe('Jane Doe');
     expect(updated?.contractSnapshot).toBeTruthy();
+    expect(updated?.guestPhone).toBe('+54 9 223 555-9999');
+    expect(updated?.guestEmail).toBe('public-e2e-guest@example.com');
   });
 
-  it('rejects contract acceptance with an empty name', async () => {
+  it('rejects date confirmation with an empty name', async () => {
     const reservation = await prisma.reservation.create({
       data: {
         guestName: 'Public E2E Guest',
@@ -93,9 +96,9 @@ describe('PublicReservationsController (e2e)', () => {
 
     await request(app.getHttpServer())
       .post(
-        `/public/reservations/${reservation.confirmationToken}/accept-contract`,
+        `/public/reservations/${reservation.confirmationToken}/confirm-dates`,
       )
-      .send({ fullName: '' })
+      .send({ fullName: '', phone: '+54911', email: 'a@example.com' })
       .expect(400);
   });
 });

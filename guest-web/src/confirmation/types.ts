@@ -14,4 +14,11 @@ export interface GuestReservation {
   houseRulesText: string;
   paymentInstructions: string;
   depositInstructions: string;
+  bankAccountHolder: string;
+  bankCuil: string;
+  bankAccountNumber: string;
+  bankCbu: string;
+  bankAlias: string;
+  bankName: string;
+  securityDepositAmount: number;
 }

@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class UpdateSettingsDto {
   @IsString()
@@ -57,4 +57,36 @@ export class UpdateSettingsDto {
   @IsString()
   @MinLength(1)
   depositReminderWhatsappTemplate: string;
+
+  // Optional, like the iCal URLs above: bank details may not be set up yet when Settings
+  // is first created, and the guest-facing payment step simply shows blank fields rather
+  // than a broken page until an admin fills these in.
+  @IsOptional()
+  @IsString()
+  bankAccountHolder?: string;
+
+  @IsOptional()
+  @IsString()
+  bankCuil?: string;
+
+  @IsOptional()
+  @IsString()
+  bankAccountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  bankCbu?: string;
+
+  @IsOptional()
+  @IsString()
+  bankAlias?: string;
+
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  securityDepositAmount?: number;
 }

@@ -37,6 +37,8 @@ describe('Full guest onboarding flow (e2e)', () => {
       where: { reservation: { guestName: 'Onboarding E2E Guest' } },
     });
     await prisma.reservation.deleteMany({ where: { guestName: 'Onboarding E2E Guest' } });
+    // acceptContract now always syncs a Guest record from the phone/email the guest submits.
+    await prisma.guest.deleteMany({ where: { email: 'onboarding-e2e-guest@example.com' } });
     await prisma.adminUser.deleteMany({ where: { email: 'e2e-onboarding@labrisa.com.ar' } });
     await app.close();
   });
@@ -74,12 +76,12 @@ describe('Full guest onboarding flow (e2e)', () => {
     let current = await prisma.reservation.findUnique({ where: { id: reservationId } });
     expect(current?.status).toBe('PENDING');
 
-    // Guest confirms dates and accepts the contract
-    await request(app.getHttpServer()).post(`/public/reservations/${token}/confirm-dates`).expect(201);
+    // Guest confirms dates (also giving name/phone/email) and accepts the contract
     await request(app.getHttpServer())
-      .post(`/public/reservations/${token}/accept-contract`)
-      .send({ fullName: 'Onboarding E2E Guest' })
+      .post(`/public/reservations/${token}/confirm-dates`)
+      .send({ fullName: 'Onboarding E2E Guest', phone: '+54 9 223 555-0000', email: 'onboarding-e2e-guest@example.com' })
       .expect(201);
+    await request(app.getHttpServer()).post(`/public/reservations/${token}/accept-contract`).expect(201);
 
     // Now all 4 conditions are met — reservation should be auto-confirmed
     current = await prisma.reservation.findUnique({ where: { id: reservationId } });
