@@ -80,6 +80,7 @@ describe('SettingsController (e2e)', () => {
         depositReminderDaysAfter: 3,
         reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
         depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
+        confirmationStepText: 'E2E confirmation step text',
         bookingIcalUrl: 'https://booking.example/e2e-cal.ics',
         airbnbIcalUrl: 'https://airbnb.example/e2e-cal.ics',
       })
@@ -114,6 +115,7 @@ describe('SettingsController (e2e)', () => {
         depositReminderDaysAfter: 4,
         reservationReminderWhatsappTemplate: 'E2E WhatsApp reservation reminder {{guestName}}',
         depositReminderWhatsappTemplate: 'E2E WhatsApp deposit reminder {{guestName}}',
+        confirmationStepText: 'E2E confirmation step text',
       })
       .expect(200);
 

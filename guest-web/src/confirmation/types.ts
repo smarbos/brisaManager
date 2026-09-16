@@ -10,11 +10,13 @@ export interface GuestReservation {
   datesConfirmedAt: string | null;
   contractAcceptedAt: string | null;
   contractAcceptedName: string | null;
+  contractSnapshot: string | null;
   confirmationPaymentReceivedAt: string | null;
   depositReceivedAt: string | null;
   houseRulesText: string;
   paymentInstructions: string;
   depositInstructions: string;
+  confirmationStepText: string;
   bankAccountHolder: string;
   bankCuil: string;
   bankAccountNumber: string;

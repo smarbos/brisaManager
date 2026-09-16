@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDateTime } from './date';
+import { formatDate, formatDateTime, formatLongDate } from './date';
 
 describe('formatDate', () => {
   it('formats an ISO date string as DD/MM/YYYY', () => {
@@ -16,5 +16,12 @@ describe('formatDateTime', () => {
     // The date component is timezone-dependent (this formats in the viewer's local time,
     // unlike formatDate), so only the overall DD/MM/YYYY, HH:mm shape is asserted here.
     expect(formatDateTime('2026-03-05T14:30:00.000Z')).toMatch(/^\d{2}\/\d{2}\/2026, \d{2}:\d{2}$/);
+  });
+});
+
+describe('formatLongDate', () => {
+  it('formats a timestamp as a Spanish "day de month de year" string', () => {
+    // Noon UTC keeps the local calendar day stable across any reasonable test-runner timezone.
+    expect(formatLongDate('2026-05-03T12:00:00.000Z')).toBe('3 de mayo de 2026');
   });
 });

@@ -30,6 +30,7 @@ export function SettingsPage() {
   const [bankName, setBankName] = useState('');
   const [confirmationPaymentPercentage, setConfirmationPaymentPercentage] = useState(30);
   const [securityDepositPercentage, setSecurityDepositPercentage] = useState(15);
+  const [confirmationStepText, setConfirmationStepText] = useState('');
   const [bookingIcalUrl, setBookingIcalUrl] = useState('');
   const [airbnbIcalUrl, setAirbnbIcalUrl] = useState('');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
@@ -69,6 +70,7 @@ export function SettingsPage() {
         setBankName(settings.bankName);
         setConfirmationPaymentPercentage(settings.confirmationPaymentPercentage);
         setSecurityDepositPercentage(settings.securityDepositPercentage);
+        setConfirmationStepText(settings.confirmationStepText);
         setBookingIcalUrl(settings.bookingIcalUrl ?? '');
         setAirbnbIcalUrl(settings.airbnbIcalUrl ?? '');
         setLastSyncAt(settings.lastChannelSyncAt);
@@ -126,6 +128,7 @@ export function SettingsPage() {
         bankName,
         confirmationPaymentPercentage,
         securityDepositPercentage,
+        confirmationStepText,
         bookingIcalUrl,
         airbnbIcalUrl,
         lastChannelSyncAt: lastSyncAt,
@@ -222,6 +225,13 @@ export function SettingsPage() {
             onChange={(e) => setSecurityDepositPercentage(e.target.value === '' ? 0 : Number(e.target.value))}
           />
         </FormField>
+        <FormField label="Texto del paso de confirmación final">
+          <Textarea value={confirmationStepText} onChange={(e) => setConfirmationStepText(e.target.value)} rows={4} />
+        </FormField>
+        <p className="-mt-2 text-xs text-text-muted">
+          Se muestra al huésped en el último paso, una vez que el pago de confirmación y el depósito de garantía
+          fueron marcados como recibidos.
+        </p>
 
         <div className="mt-4">
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Datos bancarios</h2>

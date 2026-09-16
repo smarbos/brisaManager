@@ -34,6 +34,9 @@ const DEFAULT_RESERVATION_REMINDER_WHATSAPP_TEMPLATE =
 const DEFAULT_DEPOSIT_REMINDER_WHATSAPP_TEMPLATE =
   'Hola {{guestName}}, todavía no registramos el depósito de tu reserva del {{checkIn}}. {{paymentInstructions}}';
 
+const DEFAULT_CONFIRMATION_STEP_TEXT =
+  '¡Todo listo! Completaste todos los pasos necesarios para tu estadía en La Brisa de Mar del Plata.';
+
 @Injectable()
 export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -67,6 +70,7 @@ export class SettingsService {
         bankName: '',
         confirmationPaymentPercentage: 30,
         securityDepositPercentage: 15,
+        confirmationStepText: DEFAULT_CONFIRMATION_STEP_TEXT,
       },
     });
   }

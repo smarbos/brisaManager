@@ -17,11 +17,13 @@ const baseReservation = {
   datesConfirmedAt: null,
   contractAcceptedAt: null,
   contractAcceptedName: null,
+  contractSnapshot: 'No parties.\nQuiet hours 10pm-8am.',
   confirmationPaymentReceivedAt: null,
   depositReceivedAt: null,
   houseRulesText: 'No parties.\nQuiet hours 10pm-8am.',
   paymentInstructions: 'Transfer to bank X.',
   depositInstructions: 'Deposit charged at check-in.',
+  confirmationStepText: 'All done, see you soon!',
   bankAccountHolder: 'Ana Pérez',
   bankCuil: '20123456789',
   bankAccountNumber: '0001234567',
@@ -160,11 +162,11 @@ describe('ConfirmationPage', () => {
     await waitFor(() => expect(getSpy).toHaveBeenCalledTimes(2));
   });
 
-  it('shows the final confirmed message once payment and deposit are both received', async () => {
+  it('resumes at step 4 (Confirmación) once payment and deposit are both received, showing the totals breakdown', async () => {
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
       datesConfirmedAt: '2026-01-01T00:00:00.000Z',
-      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-05-03T12:00:00.000Z',
       contractAcceptedName: 'Jane Doe',
       confirmationPaymentReceivedAt: '2026-01-02T00:00:00.000Z',
       depositReceivedAt: '2026-01-02T00:00:00.000Z',
@@ -172,6 +174,53 @@ describe('ConfirmationPage', () => {
 
     renderAt('tok-1');
 
-    expect(await screen.findByText(/completamente confirmada/i)).toBeInTheDocument();
+    expect(await screen.findByText('All done, see you soon!')).toBeInTheDocument();
+    expect(screen.getByText(/pago confirmado/i)).toBeInTheDocument();
+    expect(screen.getByText('Total a pagar')).toBeInTheDocument();
+    expect(screen.getByText('ARS 100.000')).toBeInTheDocument();
+    expect(screen.getByText(/pago de reserva \(30%\)/i)).toBeInTheDocument();
+    expect(screen.getByText('Restante a pagar en el lugar')).toBeInTheDocument();
+    expect(screen.getByText('ARS 70.000')).toBeInTheDocument();
+    // Two checkmarks: one for the reservation payment, one for the deposit
+    expect(screen.getAllByLabelText('Recibido')).toHaveLength(2);
+  });
+
+  it('reveals the accepted house rules and acceptance date when "Ver reglas de la casa" is clicked', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-05-03T12:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+      contractSnapshot: 'Snapshot rule text.',
+      confirmationPaymentReceivedAt: '2026-01-02T00:00:00.000Z',
+      depositReceivedAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    renderAt('tok-1');
+
+    await screen.findByText(/pago confirmado/i);
+    expect(screen.queryByText('Snapshot rule text.')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /ver reglas de la casa/i }));
+
+    expect(screen.getByText('Snapshot rule text.')).toBeInTheDocument();
+    expect(screen.getByText(/aceptadas el 3 de mayo de 2026/i)).toBeInTheDocument();
+  });
+
+  it('does not show a checkmark next to a payment that has not been received yet', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      confirmationPaymentReceivedAt: '2026-01-02T00:00:00.000Z',
+      depositReceivedAt: null,
+    });
+
+    renderAt('tok-1');
+
+    // Deposit still Pendiente, so still on step 3 — the deposit checkmark only ever
+    // appears on step 4, which isn't reached until both are received.
+    expect(await screen.findByText(/reglas aceptadas/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Recibido')).not.toBeInTheDocument();
   });
 });
