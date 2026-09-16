@@ -41,8 +41,10 @@ export class WhatsappReminderSchedulerService {
     reservationReminderWhatsappTemplate: string;
   }): Promise<void> {
     // checkIn/checkOut are stored as UTC midnight with no time-of-day component (same
-    // convention EmailService's cancellation email relies on), so an exact-date match
-    // is a plain equality check against that midnight timestamp.
+    // convention EmailService's cancellation email relies on), but that's not
+    // structurally guaranteed (e.g. channel-sync's node-ical import could construct
+    // local-not-UTC midnight depending on process TZ), so match the whole target day
+    // as a range rather than relying on exact equality against a computed midnight.
     const targetCheckIn = startOfUtcDayOffset(settings.reservationReminderDaysBefore);
 
     const reservations = await this.prisma.reservation.findMany({
@@ -50,7 +52,7 @@ export class WhatsappReminderSchedulerService {
         status: 'CONFIRMED',
         guestPhone: { not: null },
         reservationReminderSentAt: null,
-        checkIn: targetCheckIn,
+        checkIn: { gte: targetCheckIn, lt: startOfUtcDayOffset(settings.reservationReminderDaysBefore + 1) },
       },
     });
 
@@ -86,11 +88,12 @@ export class WhatsappReminderSchedulerService {
 
     const reservations = await this.prisma.reservation.findMany({
       where: {
-        status: { not: 'CANCELLED' },
+        status: { notIn: ['CANCELLED', 'COMPLETED'] },
         guestPhone: { not: null },
         confirmationPaymentReceivedAt: null,
         depositReminderSentAt: null,
         confirmationEmailSentAt: { not: null, lte: cutoff },
+        checkIn: { gte: startOfUtcDayOffset(0) },
       },
     });
 

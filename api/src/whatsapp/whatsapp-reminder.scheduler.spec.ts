@@ -53,6 +53,14 @@ describe('WhatsappReminderSchedulerService', () => {
       where: { id: 'res-1' },
       data: { reservationReminderSentAt: expect.any(Date) },
     });
+    expect(prisma.reservation.findMany).toHaveBeenNthCalledWith(1, {
+      where: expect.objectContaining({
+        status: 'CONFIRMED',
+        guestPhone: { not: null },
+        reservationReminderSentAt: null,
+        checkIn: { gte: expect.any(Date), lt: expect.any(Date) },
+      }),
+    });
   });
 
   it('does not stamp reservationReminderSentAt when the send fails', async () => {
@@ -85,6 +93,16 @@ describe('WhatsappReminderSchedulerService', () => {
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-2' },
       data: { depositReminderSentAt: expect.any(Date) },
+    });
+    expect(prisma.reservation.findMany).toHaveBeenNthCalledWith(2, {
+      where: expect.objectContaining({
+        status: { notIn: ['CANCELLED', 'COMPLETED'] },
+        guestPhone: { not: null },
+        confirmationPaymentReceivedAt: null,
+        depositReminderSentAt: null,
+        confirmationEmailSentAt: { not: null, lte: expect.any(Date) },
+        checkIn: { gte: expect.any(Date) },
+      }),
     });
   });
 
