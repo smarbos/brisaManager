@@ -1,17 +1,18 @@
 import { Test } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { GuestsService } from './guests.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('GuestsService', () => {
   let service: GuestsService;
   let prisma: {
-    guest: { upsert: jest.Mock; update: jest.Mock; findMany: jest.Mock; updateMany: jest.Mock };
+    guest: { upsert: jest.Mock; update: jest.Mock; findMany: jest.Mock; updateMany: jest.Mock; findUnique: jest.Mock };
     reservation: { update: jest.Mock; aggregate: jest.Mock };
   };
 
   beforeEach(async () => {
     prisma = {
-      guest: { upsert: jest.fn(), update: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
+      guest: { upsert: jest.fn(), update: jest.fn(), findMany: jest.fn(), updateMany: jest.fn(), findUnique: jest.fn() },
       reservation: { update: jest.fn(), aggregate: jest.fn() },
     };
 
@@ -62,6 +63,27 @@ describe('GuestsService', () => {
       await expect(
         service.syncFromReservation('res-1', { email: 'jane@example.com', name: 'Jane Doe' }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('findOne', () => {
+    it('returns the guest with their reservation history', async () => {
+      const guest = { id: 'guest-1', email: 'jane@example.com', reservations: [{ id: 'res-1' }] };
+      prisma.guest.findUnique.mockResolvedValue(guest);
+
+      const result = await service.findOne('guest-1');
+
+      expect(prisma.guest.findUnique).toHaveBeenCalledWith({
+        where: { id: 'guest-1' },
+        include: { reservations: { orderBy: { checkIn: 'desc' } } },
+      });
+      expect(result).toBe(guest);
+    });
+
+    it('throws NotFoundException for an unknown id', async () => {
+      prisma.guest.findUnique.mockResolvedValue(null);
+
+      await expect(service.findOne('missing')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

@@ -32,6 +32,7 @@ describe('ReservationListPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: '1' })).toHaveAttribute('href', '/reservations/1');
   });
 
   it('shows an error when the reservations cannot be loaded', async () => {
