@@ -83,6 +83,8 @@ describe('SettingsService', () => {
       reservationReminderWhatsappTemplate: 'new reservation reminder template',
       depositReminderWhatsappTemplate: 'new deposit reminder template',
       confirmationStepText: 'new confirmation step text',
+      confirmationPaymentValue: '30%',
+      securityDepositValue: '15%',
     });
 
     expect(result.houseRulesText).toBe('new rules');

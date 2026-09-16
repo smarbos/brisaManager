@@ -5,7 +5,8 @@ export interface GuestReservation {
   paxCount: number;
   totalAmount: number;
   confirmationPaymentAmount: number;
-  confirmationPaymentPercentage: number;
+  // null when the admin configured a fixed amount instead of a percentage for this fee.
+  confirmationPaymentPercentage: number | null;
   currency: string;
   datesConfirmedAt: string | null;
   contractAcceptedAt: string | null;

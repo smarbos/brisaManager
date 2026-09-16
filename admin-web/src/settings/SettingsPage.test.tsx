@@ -25,8 +25,8 @@ const baseSettings: settingsApi.Settings = {
   bankCbu: '0000000000000000000000',
   bankAlias: 'JANE.DOE.ARS',
   bankName: 'Banco X',
-  confirmationPaymentPercentage: 30,
-  securityDepositPercentage: 15,
+  confirmationPaymentValue: '30%',
+  securityDepositValue: '15%',
   confirmationStepText: 'All done!',
   bookingIcalUrl: null,
   airbnbIcalUrl: null,
@@ -147,8 +147,8 @@ describe('SettingsPage', () => {
     expect(screen.getByLabelText(/^cbu/i)).toHaveValue('0000000000000000000000');
     expect(screen.getByLabelText(/^alias/i)).toHaveValue('JANE.DOE.ARS');
     expect(screen.getByLabelText(/^banco/i)).toHaveValue('Banco X');
-    expect(screen.getByLabelText(/porcentaje de pago de confirmación/i)).toHaveValue(30);
-    expect(screen.getByLabelText(/porcentaje del depósito de garantía/i)).toHaveValue(15);
+    expect(screen.getByLabelText(/^pago de confirmación$/i)).toHaveValue('30%');
+    expect(screen.getByLabelText(/^depósito de garantía$/i)).toHaveValue('15%');
     expect(screen.getByLabelText(/texto del paso de confirmación final/i)).toHaveValue('All done!');
 
     fireEvent.change(screen.getByLabelText(/^banco/i), { target: { value: 'Banco Nuevo' } });
@@ -159,18 +159,25 @@ describe('SettingsPage', () => {
     );
   });
 
-  it('clears to empty (not stuck at "0") when a percentage field is cleared, and back to a typed digit', async () => {
+  it('accepts a fixed amount instead of a percentage for either fee field', async () => {
     vi.spyOn(settingsApi, 'getSettings').mockResolvedValue(baseSettings);
-    vi.spyOn(settingsApi, 'updateSettings').mockResolvedValue(baseSettings);
+    const updateSpy = vi.spyOn(settingsApi, 'updateSettings').mockResolvedValue(baseSettings);
 
     render(<SettingsPage />);
 
-    const depositPercentageInput = await screen.findByLabelText(/porcentaje del depósito de garantía/i);
-    fireEvent.change(depositPercentageInput, { target: { value: '' } });
-    expect(depositPercentageInput).toHaveValue(null);
+    const confirmationInput = await screen.findByLabelText(/^pago de confirmación$/i);
+    fireEvent.change(confirmationInput, { target: { value: '210000' } });
 
-    fireEvent.change(depositPercentageInput, { target: { value: '5' } });
-    expect(depositPercentageInput).toHaveValue(5);
+    const depositInput = screen.getByLabelText(/^depósito de garantía$/i);
+    fireEvent.change(depositInput, { target: { value: '150000' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() =>
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ confirmationPaymentValue: '210000', securityDepositValue: '150000' }),
+      ),
+    );
   });
 
   it('shows an alert when loading settings fails', async () => {

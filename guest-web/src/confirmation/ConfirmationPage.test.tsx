@@ -147,6 +147,22 @@ describe('ConfirmationPage', () => {
     expect(screen.queryByText(/acepto las reglas de la casa/i)).not.toBeInTheDocument();
   });
 
+  it('shows the confirmation payment label without a percentage when it is a fixed amount', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      confirmationPaymentAmount: 45000,
+      confirmationPaymentPercentage: null,
+    });
+
+    renderAt('tok-1');
+
+    expect(await screen.findByText('Confirmación de reserva')).toBeInTheDocument();
+    expect(screen.queryByText(/confirmación de reserva \(/i)).not.toBeInTheDocument();
+    expect(screen.getByText('ARS 45.000')).toBeInTheDocument();
+  });
+
   it('re-fetches the reservation when "Actualizar estado de los pagos" is clicked', async () => {
     const getSpy = vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,

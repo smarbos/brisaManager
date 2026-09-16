@@ -36,8 +36,8 @@ describe('PublicReservationsService', () => {
       get: jest.fn().mockResolvedValue({
         houseRulesText: 'No parties.',
         paymentInstructions: 'Bank X.',
-        confirmationPaymentPercentage: 30,
-        securityDepositPercentage: 15,
+        confirmationPaymentValue: '30%',
+        securityDepositValue: '15%',
       }),
     };
     eventsService = { record: jest.fn() };
@@ -105,8 +105,8 @@ describe('PublicReservationsService', () => {
     settingsService.get.mockResolvedValue({
       houseRulesText: 'No parties.',
       paymentInstructions: 'Bank X.',
-      confirmationPaymentPercentage: 20,
-      securityDepositPercentage: 15,
+      confirmationPaymentValue: '20%',
+      securityDepositValue: '15%',
     });
     prisma.reservation.findUnique.mockResolvedValue({
       ...baseReservation,
@@ -116,6 +116,41 @@ describe('PublicReservationsService', () => {
     const result = await service.getByToken('tok-1');
 
     expect(result.confirmationPaymentAmount).toBe(20000);
+  });
+
+  it('resolves confirmationPaymentAmount as a fixed amount when configured as one', async () => {
+    settingsService.get.mockResolvedValue({
+      houseRulesText: 'No parties.',
+      paymentInstructions: 'Bank X.',
+      confirmationPaymentValue: '45000',
+      securityDepositValue: '15%',
+    });
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      totalAmount: 100000,
+    });
+
+    const result = await service.getByToken('tok-1');
+
+    expect(result.confirmationPaymentAmount).toBe(45000);
+    expect(result.confirmationPaymentPercentage).toBeNull();
+  });
+
+  it('resolves securityDepositAmount as a fixed amount when configured as one', async () => {
+    settingsService.get.mockResolvedValue({
+      houseRulesText: 'No parties.',
+      paymentInstructions: 'Bank X.',
+      confirmationPaymentValue: '30%',
+      securityDepositValue: '150000',
+    });
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      totalAmount: 100000,
+    });
+
+    const result = await service.getByToken('tok-1');
+
+    expect(result.securityDepositAmount).toBe(150000);
   });
 
   it('computes securityDepositAmount as the configured percentage of totalAmount', async () => {
