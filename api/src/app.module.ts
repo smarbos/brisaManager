@@ -15,6 +15,7 @@ import { CampaignTemplatesModule } from './campaign-templates/campaign-templates
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { ReservationImportModule } from './reservation-import/reservation-import.module';
 import { ChannelImportModule } from './channel-import/channel-import.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ChannelImportModule } from './channel-import/channel-import.module';
     CampaignsModule,
     ReservationImportModule,
     ChannelImportModule,
+    WhatsappModule,
   ],
   controllers: [AppController],
 })
