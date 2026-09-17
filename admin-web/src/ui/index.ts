@@ -10,4 +10,5 @@ export * from './PageContainer';
 export * from './PageHeader';
 export * from './Select';
 export * from './Table';
+export * from './Tabs';
 export * from './Textarea';
