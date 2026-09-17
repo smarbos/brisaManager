@@ -87,8 +87,10 @@ describe('ChannelImportService', () => {
       'RESERVATION_CREATED',
       expect.stringContaining('5000000607'),
     );
-    // Nothing is verified, so nothing gets pushed to the shared calendar.
-    expect(googleCalendarPushService.pushReservation).not.toHaveBeenCalled();
+    // Even a placeholder reservation reaches the shared staff calendar — see the
+    // "pushes to the calendar even when..." test below for why this isn't gated on
+    // verification.
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
   });
 
   it('uses the real scraped values when present', async () => {
@@ -213,9 +215,9 @@ describe('ChannelImportService', () => {
     });
     // The confirmation email invites the guest into the same flow a manual reservation
     // uses, where whatever's still missing gets sorted out — it doesn't wait for the
-    // scrape to be fully verified first, unlike the calendar push below.
+    // scrape to be fully verified first, same as the calendar push below.
     expect(reservationsService.sendInitialEmail).toHaveBeenCalledWith(reservation);
-    expect(googleCalendarPushService.pushReservation).not.toHaveBeenCalled();
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
   });
 
   it('does not sync a guest or send an email when no email was captured', async () => {
@@ -289,10 +291,6 @@ describe('ChannelImportService', () => {
   });
 
   it('pushes to the calendar when dates are verified even though status never is (the realistic Booking.com case)', async () => {
-    // Regression test: `status` can never be scraped from Booking.com's page, so it was
-    // always in unverified_fields — a calendar-push gate requiring the *entire* list to
-    // be empty was therefore permanently unreachable for every real import, no matter how
-    // accurate the dates were. The gate now checks only check_in/check_out.
     prisma.reservation.findUnique.mockResolvedValue(null);
     prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-9', ...data }));
 
@@ -350,11 +348,11 @@ describe('ChannelImportService', () => {
     );
   });
 
-  it('does not push to the calendar when check_in or check_out is unverified, regardless of other fields', async () => {
+  it('pushes to the calendar even when check_in/check_out are unverified — an approximate date on the internal staff calendar beats no event at all', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
     prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-10', ...data }));
 
-    await service.import({
+    const { reservation } = await service.import({
       ...baseDto,
       guest_name: 'Weber Clara',
       check_in: '2026-11-06',
@@ -365,6 +363,25 @@ describe('ChannelImportService', () => {
       unverified_fields: ['check_out', 'status'],
     });
 
-    expect(googleCalendarPushService.pushReservation).not.toHaveBeenCalled();
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
+  });
+
+  it('pushes an Airbnb import to the calendar even though every scraped field is always unverified by design', async () => {
+    prisma.reservation.findUnique.mockResolvedValue(null);
+    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-3', ...data }));
+
+    const { reservation } = await service.import({
+      ...baseDto,
+      source: 'airbnb',
+      hotel_id: undefined,
+      res_id: '1000000484',
+      guest_name: 'María Laura',
+      check_in: '2026-10-27',
+      check_out: '2026-10-31',
+      guests: 3,
+      unverified_fields: ['guest_name', 'guests', 'check_in', 'check_out', 'total_price', 'currency', 'status'],
+    });
+
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
   });
 });
