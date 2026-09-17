@@ -295,6 +295,8 @@ export function ReservationFormPage() {
             ? 'Datos de la estadía y progreso del check-in online del huésped.'
             : 'Cargá los datos de una nueva reserva manual o importalos desde una captura de Booking.com.'
         }
+        backTo="/"
+        backLabel="Volver a reservas"
       />
       <Card>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

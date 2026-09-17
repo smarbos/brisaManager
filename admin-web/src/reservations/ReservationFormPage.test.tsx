@@ -32,6 +32,18 @@ describe('ReservationFormPage', () => {
     );
   });
 
+  it('shows a link back to the reservations list', () => {
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: /volver a reservas/i })).toHaveAttribute('href', '/');
+  });
+
   it('imports fields from a screenshot and pre-fills the form', async () => {
     vi.spyOn(reservationImportApi, 'parseScreenshot').mockResolvedValue({
       guestName: 'Weber Clara',

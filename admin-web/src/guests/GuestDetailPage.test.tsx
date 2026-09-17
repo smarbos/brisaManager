@@ -34,6 +34,7 @@ describe('GuestDetailPage', () => {
     expect(screen.getByText('+54911')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText(/suscripto/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /volver a huéspedes/i })).toHaveAttribute('href', '/guests');
   });
 
   it('lists the guest reservations with a link to each one', async () => {
