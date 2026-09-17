@@ -18,12 +18,18 @@ describe('ReservationFormPage', () => {
     );
 
     fireEvent.change(screen.getByLabelText(/nombre del huésped/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/email del huésped/i), { target: { value: 'jane@example.com' } });
+    fireEvent.change(screen.getByLabelText(/teléfono del huésped/i), { target: { value: '+5491100000000' } });
     fireEvent.change(screen.getByLabelText(/check-in/i), { target: { value: '2026-01-10' } });
     fireEvent.change(screen.getByLabelText(/check-out/i), { target: { value: '2026-01-15' } });
     fireEvent.change(screen.getByLabelText(/monto total/i), { target: { value: '100000' } });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ guestEmail: 'jane@example.com', guestPhone: '+5491100000000' }),
+      ),
+    );
   });
 
   it('imports fields from a screenshot and pre-fills the form', async () => {
@@ -191,6 +197,35 @@ describe('ReservationFormPage', () => {
 
     await waitFor(() => expect(resendSpy).toHaveBeenCalledWith('1'));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('pre-fills the email and phone fields when editing an existing reservation', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      guestEmail: 'jane@example.com',
+      guestPhone: '+5491100000000',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText(/email del huésped/i)).toHaveValue('jane@example.com'));
+    expect(screen.getByLabelText(/teléfono del huésped/i)).toHaveValue('+5491100000000');
   });
 
   it('shows an alert when the resent email fails to deliver', async () => {
