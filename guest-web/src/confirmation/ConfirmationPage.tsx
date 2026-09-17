@@ -274,12 +274,14 @@ export function ConfirmationPage() {
                 <p className="text-xs text-text-muted">Huéspedes</p>
                 <p className="font-semibold text-heading">{reservation.paxCount}</p>
               </div>
-              <div>
-                <p className="text-xs text-text-muted">Total de la estadía</p>
-                <p className="font-heading text-lg font-bold text-heading">
-                  {formatMoney(reservation.currency, reservation.totalAmount)}
-                </p>
-              </div>
+              {reservation.totalAmount > 0 && (
+                <div>
+                  <p className="text-xs text-text-muted">Total de la estadía</p>
+                  <p className="font-heading text-lg font-bold text-heading">
+                    {formatMoney(reservation.currency, reservation.totalAmount)}
+                  </p>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleConfirmDates} className="mt-6 flex flex-col gap-4">

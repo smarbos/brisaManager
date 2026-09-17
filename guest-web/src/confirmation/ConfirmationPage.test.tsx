@@ -77,6 +77,15 @@ describe('ConfirmationPage', () => {
     expect(screen.queryByText(/pago y garantía/i)).not.toBeInTheDocument();
   });
 
+  it('hides the total-stay amount on step 1 when no total is known yet', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation, totalAmount: 0 });
+
+    renderAt('tok-1');
+
+    await screen.findByText(/confirmá tu reserva/i);
+    expect(screen.queryByText(/total de la estadía/i)).not.toBeInTheDocument();
+  });
+
   it('submits step 1 with name, phone, and email', async () => {
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
     const confirmSpy = vi
