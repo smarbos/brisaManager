@@ -15,7 +15,23 @@
 // - Airbnb never shows the reservation year next to Check-in/Check-out on this page (only
 //   "mar, 27 oct" — weekday, day, month). The year is inferred (see inferYear() below) and
 //   check_in/check_out are always unverified as a result.
-// - No price/total amount is visible anywhere on this page.
+// - Total price is confirmed real: `data-testid="hosting-details-payment-info"` contains
+//   the amount (e.g. "$ 270.400,00") in Argentine peso formatting (dot thousands separator,
+//   comma decimal separator) — the same raw-string-passthrough convention Booking.com's
+//   total_price already uses, parsed server-side by channel-import.service.ts's
+//   parseAmount(), which already handles this exact format correctly.
+// - The guest's phone number is confirmed real too, inside a "Número de teléfono de
+//   <guest name>" row — wrapped in Unicode bidi-embedding marks (U+202A/U+202C) that force
+//   LTR rendering regardless of page direction, stripped before use (see stripBidiMarks()).
+// - Both the price and the phone number live behind collapsed disclosure rows — "Mostrar
+//   reserva" and "Administrá la reserva" respectively — that are not necessarily present/
+//   populated in the DOM until clicked. expandReservationDetails() below clicks both
+//   (matched by their visible label text, accent/case-insensitive, so it still finds them if
+//   Airbnb re-cases or re-accents the label) before extraction runs — a disclosure-row click
+//   only reveals information the host already has permission to see, it never submits or
+//   sends anything, so this is safe to do on the host's behalf. If a row can't be found (already
+//   expanded, or Airbnb changed the label), extraction just falls back to null for that field,
+//   same as always.
 // - The guest's real email is never shown here (Airbnb's messaging UI doesn't expose it) —
 //   this is *why* the extension writes a message into the chat instead of relying on the
 //   automatic confirmation email Booking.com imports get.
@@ -42,6 +58,69 @@
       if (child.nodeType === 3) text += child.textContent;
     }
     return text.trim();
+  }
+
+  // Strips accents and case so label matching survives Airbnb re-casing/re-accenting text
+  // (e.g. matching "administra la reserva" against the real "Administrá la reserva").
+  function normalizeText(s) {
+    return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+  }
+
+  // Unicode bidi-embedding marks Airbnb wraps phone numbers in to force LTR rendering
+  // regardless of page direction — not part of the actual number.
+  function stripBidiMarks(s) {
+    return s.replace(/[‎‏‪-‮⁦-⁩]/g, "").trim();
+  }
+
+  function waitForStable({ quietMs = 600, maxWaitMs = 4000 } = {}) {
+    return new Promise((resolve) => {
+      let settleTimer = null;
+      const observer = new MutationObserver(() => {
+        clearTimeout(settleTimer);
+        settleTimer = setTimeout(finish, quietMs);
+      });
+      const finish = () => {
+        observer.disconnect();
+        clearTimeout(settleTimer);
+        clearTimeout(hardStop);
+        resolve();
+      };
+      observer.observe(document.body, { childList: true, subtree: true });
+      settleTimer = setTimeout(finish, quietMs);
+      const hardStop = setTimeout(finish, maxWaitMs);
+    });
+  }
+
+  // Finds a collapsed disclosure row by its visible label text and clicks it. Returns
+  // whether a match was found/clicked — never throws, since the row may simply not exist
+  // (already expanded, or this reservation type doesn't have it).
+  function clickRowByLabel(labelSubstring) {
+    const target = normalizeText(labelSubstring);
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+    let node = walker.nextNode();
+    while (node) {
+      const text = ownText(node);
+      if (text && normalizeText(text).includes(target)) {
+        const clickable = node.closest('button, [role="button"], [tabindex]') || node;
+        clickable.click();
+        return true;
+      }
+      node = walker.nextNode();
+    }
+    return false;
+  }
+
+  // Both "Mostrar reserva" (check-in/check-out + price) and "Administrá la reserva" (phone
+  // number) are collapsed disclosure rows — see the file-header comment for why clicking
+  // them on the host's behalf is safe. Best-effort: if a row isn't found, its fields just
+  // stay null, same as today.
+  async function expandReservationDetails() {
+    if (clickRowByLabel("mostrar reserva")) {
+      await waitForStable();
+    }
+    if (clickRowByLabel("administra la reserva")) {
+      await waitForStable();
+    }
   }
 
   function shortSelector(el, depth = 4) {
@@ -135,7 +214,39 @@
     return found;
   }
 
-  function runInspection() {
+  function dumpPaymentInfo() {
+    const container = document.querySelector('[data-testid="hosting-details-payment-info"]');
+    return container ? { text: container.textContent.trim(), selector: shortSelector(container) } : null;
+  }
+
+  function dumpPhoneCandidates() {
+    const found = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+    let node = walker.nextNode();
+    while (node) {
+      const text = ownText(node);
+      if (text && normalizeText(text).startsWith("numero de telefono de")) {
+        found.push({
+          labelText: text,
+          selector: shortSelector(node),
+          nextSiblingText: node.nextElementSibling ? node.nextElementSibling.textContent.trim() : null,
+        });
+      }
+      node = walker.nextNode();
+    }
+    return found;
+  }
+
+  // Reveals both collapsed disclosure rows before scanning (unless explicitly skipped, e.g.
+  // the passive auto-scan on page load — clicking things without the operator having asked
+  // for anything yet would be surprising, unlike the explicit debug-button click or the
+  // "Generar link" flow), so the dump reflects what's actually extractable, not just
+  // whatever happened to already be open.
+  async function runInspection({ expand = true } = {}) {
+    if (expand) {
+      await expandReservationDetails();
+    }
+
     const dump = {
       url: window.location.href,
       threadId: getThreadId(),
@@ -145,6 +256,8 @@
       checkInLabelCandidates: dumpLabelCandidates(["check-in"]),
       checkOutLabelCandidates: dumpLabelCandidates(["check-out"]),
       possibleConfirmationCodes: dumpPossibleConfirmationCodes(),
+      paymentInfo: dumpPaymentInfo(),
+      phoneCandidates: dumpPhoneCandidates(),
     };
 
     window.__laBrisaAirbnbInspection = dump;
@@ -246,13 +359,43 @@
     return null;
   }
 
+  // Confirmed real via a captured DOM dump: `[data-testid="hosting-details-payment-info"]`
+  // contains a "$ 270.400,00" style amount alongside a separate "Total por N noches" line —
+  // only the amount is extracted; the nights count is already covered by check-in/check-out.
+  function extractTotalPrice() {
+    const container = document.querySelector('[data-testid="hosting-details-payment-info"]');
+    if (!container) return null;
+    const match = container.textContent.match(/\$\s*[\d.,]+/);
+    return match ? match[0].replace(/\s+/g, " ").trim() : null;
+  }
+
+  // Confirmed real via a captured DOM dump: a row titled "Número de teléfono de <guest
+  // name>" (revealed by expandReservationDetails() above) has the number in the very next
+  // sibling element, wrapped in bidi marks. Matched by prefix so it works for any guest
+  // name, not just the one captured.
+  function extractGuestPhone() {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+    let node = walker.nextNode();
+    while (node) {
+      const text = ownText(node);
+      if (text && normalizeText(text).startsWith("numero de telefono de")) {
+        const valueEl = node.nextElementSibling;
+        if (valueEl) return stripBidiMarks(valueEl.textContent) || null;
+      }
+      node = walker.nextNode();
+    }
+    return null;
+  }
+
   function extractReservationFields() {
     const guestName = extractGuestName();
     const guests = extractGuestCount();
     const checkIn = toIsoDate(findValueNearLabel("check-in"));
     const checkOut = toIsoDate(findValueNearLabel("check-out"));
+    const totalPrice = extractTotalPrice();
+    const guestPhone = extractGuestPhone();
 
-    return { guestName, guests, checkIn, checkOut };
+    return { guestName, guests, checkIn, checkOut, totalPrice, guestPhone };
   }
 
   // ---------------------------------------------------------------------
@@ -339,32 +482,45 @@
     }
   }
 
-  function sendToLaBrisa() {
+  async function sendToLaBrisa() {
     const threadId = getThreadId();
     if (!threadId) {
       showToast("No se pudo leer el id de esta conversación de la URL.", "error");
       return;
     }
 
-    const { guestName, guests, checkIn, checkOut } = extractReservationFields();
+    showToast("Buscando los datos de la reserva...", "info");
+    await expandReservationDetails();
+
+    const { guestName, guests, checkIn, checkOut, totalPrice, guestPhone } = extractReservationFields();
 
     // Every field is always unverified, found or not — see the file-header comment. This
     // isn't theoretical: the guest-name guess has already been confirmed wrong once in real
     // use (it matched a page-chrome heading instead of the conversation's), so "found
     // something" is not the same as "found correctly" until real captures confirm the
     // selectors.
-    const unverifiedFields = ["guest_name", "guests", "check_in", "check_out", "total_price", "currency", "status"];
+    const unverifiedFields = [
+      "guest_name",
+      "guest_phone",
+      "guests",
+      "check_in",
+      "check_out",
+      "total_price",
+      "currency",
+      "status",
+    ];
 
     const payload = {
       source: "airbnb",
       res_id: threadId,
       guest_name: guestName,
       guest_email: null,
+      guest_phone: guestPhone,
       check_in: checkIn,
       check_out: checkOut,
       guests,
-      total_price: null,
-      currency: null,
+      total_price: totalPrice,
+      currency: totalPrice ? "ARS" : null,
       status: null,
       unverified_fields: unverifiedFields,
     };
@@ -449,8 +605,8 @@
     debugButton.type = "button";
     debugButton.textContent = "🔍 Escanear (debug)";
     debugButton.title = "Vuelve a correr el escaneo de inspección y lo muestra en un cuadro para copiar.";
-    debugButton.addEventListener("click", () => {
-      const dump = runInspection();
+    debugButton.addEventListener("click", async () => {
+      const dump = await runInspection();
       showInspectionPanel(dump);
     });
     document.body.appendChild(debugButton);
@@ -458,7 +614,7 @@
 
   injectUI();
   runWhenStable(() => {
-    runInspection();
+    runInspection({ expand: false });
     console.log(
       '%c[La Brisa] Airbnb auto-scan complete. Click "🔍 Escanear (debug)" to re-run manually.',
       "color:#0d6efd",

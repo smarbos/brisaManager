@@ -96,12 +96,16 @@ from the DOM), and how many DOM elements were scanned in total.
 
 1. Open an Airbnb hosting message thread — a URL like:
    `https://www.airbnb.com.ar/hosting/messages/1000000484`
-2. Click the "🔍 Escanear (debug)" button (bottom right).
+2. Click the "🔍 Escanear (debug)" button (bottom right). It first clicks
+   "Mostrar reserva" and "Administrá la reserva" open on your behalf (safe —
+   these only reveal information, they never submit or send anything), then
+   scans.
 3. Same copy-the-textbox flow as Booking.com's scan above.
 
 The dump includes every `h1`/`h2`/`h3` heading on the page, every short text
 node mentioning "huésped(es)", candidate values found near "Check-in"/
 "Check-out" labels (next sibling, parent's next sibling, parent's own text),
+the payment-info block's raw text, any "Número de teléfono de ..." row found,
 and any short all-caps alphanumeric strings that might be an Airbnb
 reservation confirmation code (none has been confirmed present on this page
 yet — the thread id is used as the dedupe key instead). Pasting a couple of
@@ -133,19 +137,23 @@ Content-Type: application/json
 }
 
 // Airbnb — hotel_id is omitted (not applicable), res_id is the messages
-// thread id, guest_email is always null (never exposed on this page)
+// thread id, guest_email is always null (never exposed on this page).
+// guest_phone, total_price, and currency are all confirmed real but live
+// behind collapsed disclosure rows ("Mostrar reserva" / "Administrá la
+// reserva") that content_script_airbnb.js clicks open before extracting.
 {
   "source": "airbnb",
   "res_id": "1000000484",
   "guest_name": "María Laura",
   "guest_email": null,
+  "guest_phone": "+591 75278095",
   "check_in": "2026-10-27",
   "check_out": "2026-10-31",
   "guests": 3,
-  "total_price": null,
-  "currency": null,
+  "total_price": "$ 270.400,00",
+  "currency": "ARS",
   "status": null,
-  "unverified_fields": ["total_price", "currency", "status", "check_in", "check_out"]
+  "unverified_fields": ["guest_name", "guest_phone", "guests", "check_in", "check_out", "total_price", "currency", "status"]
 }
 ```
 
