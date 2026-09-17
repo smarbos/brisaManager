@@ -253,6 +253,7 @@ describe('SettingsPage', () => {
     });
     const disconnectSpy = vi.spyOn(googleCalendarApi, 'disconnectGoogleCalendar').mockResolvedValue({ disconnected: true });
     const syncSpy = vi.spyOn(googleCalendarApi, 'runGoogleCalendarSync').mockResolvedValue({ triggeredAt: '2026-09-13T12:05:00.000Z' });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(<SettingsPage />);
 
@@ -262,7 +263,25 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(syncSpy).toHaveBeenCalled());
 
     fireEvent.click(screen.getByRole('button', { name: /desconectar/i }));
+    expect(window.confirm).toHaveBeenCalled();
     await waitFor(() => expect(disconnectSpy).toHaveBeenCalled());
+  });
+
+  it('does not disconnect Google Calendar when the confirmation is declined', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue(baseSettings);
+    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
+      connected: true,
+      lastSyncAt: '2026-09-13T12:00:00.000Z',
+      lastSyncError: null,
+    });
+    const disconnectSpy = vi.spyOn(googleCalendarApi, 'disconnectGoogleCalendar').mockResolvedValue({ disconnected: true });
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    render(<SettingsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /desconectar/i }));
+
+    expect(disconnectSpy).not.toHaveBeenCalled();
   });
 
   it('shows a success message and cleans the URL when redirected back with ?googleCalendar=connected', async () => {

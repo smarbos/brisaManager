@@ -22,6 +22,17 @@ export function statusLabel(status: ReservationStatus): string {
   return STATUS_LABELS[status];
 }
 
+const STATUS_BADGE_TONES: Record<ReservationStatus, 'warning' | 'success' | 'danger' | 'neutral'> = {
+  PENDING: 'warning',
+  CONFIRMED: 'success',
+  CANCELLED: 'danger',
+  COMPLETED: 'neutral',
+};
+
+export function statusBadgeTone(status: ReservationStatus): 'warning' | 'success' | 'danger' | 'neutral' {
+  return STATUS_BADGE_TONES[status];
+}
+
 const EVENT_TYPE_LABELS: Record<string, string> = {
   RESERVATION_CREATED: 'Reserva creada',
   DATES_CONFIRMED: 'Fechas confirmadas',
