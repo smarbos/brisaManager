@@ -29,8 +29,19 @@ reservation type that doesn't fit (multi-room, cancelled, etc.).
 was written against one real screenshot plus a partial HTML dump — never a
 live page — so every scraped field is always listed in `unverified_fields`
 regardless of whether extraction happened to guess right, until a real
-capture confirms the selectors. It ships with its own "🔍 Escanear (debug)"
-button for exactly that purpose (see "How to run the Airbnb scan" below).
+capture confirms the selectors. That caution already paid off once: the
+first version's guest-name guess (any `h1`/`h2` with text) matched the
+"Mensajes" nav heading instead of the real conversation header, and its
+compose-box selector (`div[contenteditable="true"]`) never matched Airbnb's
+real box at all — it uses `contenteditable="plaintext-only"` — so the
+generated message silently landed in some other editable element on the
+page (the "Tus notas" panel) instead of the chat. Both are fixed now:
+`extractGuestName()` requires a comma in the heading text (every real
+conversation header is "GuestName, HostName"; page-chrome headings never
+have one), and `findComposeBox()` looks for the confirmed real
+`[data-testid="messaging-composebar"]` / `#message_input` first. It still
+ships its own "🔍 Escanear (debug)" button for whatever's confirmed wrong
+next (see "How to run the Airbnb scan" below).
 
 **Already fully built and shared by both:**
 - `manifest.json` — permissions, content script registration for both sites
