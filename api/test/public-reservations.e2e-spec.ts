@@ -56,6 +56,14 @@ describe('PublicReservationsController (e2e)', () => {
       .expect((res) => {
         if (res.body.guestName !== 'Public E2E Guest')
           throw new Error('unexpected guestName');
+        // Regression check: totalAmount comes from a real Prisma Decimal column here (unlike
+        // the unit spec's mocked Prisma, which can't reproduce this) — Decimal serializes to
+        // a JSON *string* unless explicitly cast with Number(), which silently broke guest-
+        // web's toLocaleString() money formatting (a string's toLocaleString() just falls
+        // back to toString(), no thousands separators).
+        if (typeof res.body.totalAmount !== 'number' || res.body.totalAmount !== 100000) {
+          throw new Error(`expected totalAmount to be the number 100000, got ${JSON.stringify(res.body.totalAmount)}`);
+        }
       });
 
     await request(app.getHttpServer())

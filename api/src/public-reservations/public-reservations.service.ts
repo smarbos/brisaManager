@@ -35,7 +35,12 @@ export class PublicReservationsService {
       checkIn: reservation.checkIn,
       checkOut: reservation.checkOut,
       paxCount: reservation.paxCount,
-      totalAmount: reservation.totalAmount,
+      // Cast from Prisma's Decimal: left as-is, it serializes to a JSON *string*, which
+      // silently breaks guest-web's `amount.toLocaleString('es-AR')` (a string's
+      // toLocaleString() just falls back to toString(), no thousands separators) —
+      // confirmationPaymentAmount/securityDepositAmount below never had this problem since
+      // resolveFeeAmount() already returns a real number.
+      totalAmount: Number(reservation.totalAmount),
       confirmationPaymentAmount: resolveFeeAmount(settings.confirmationPaymentValue, Number(reservation.totalAmount)),
       confirmationPaymentPercentage: parsePercentage(settings.confirmationPaymentValue),
       currency: reservation.currency,
