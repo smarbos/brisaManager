@@ -3,12 +3,14 @@ import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GoogleCalendarAuthService } from './google-calendar-auth.service';
 import { GoogleCalendarPullService } from './google-calendar-pull.service';
+import { GoogleCalendarPushService } from './google-calendar-push.service';
 
 @Controller('google-calendar')
 export class GoogleCalendarController {
   constructor(
     private readonly authService: GoogleCalendarAuthService,
     private readonly pullService: GoogleCalendarPullService,
+    private readonly pushService: GoogleCalendarPushService,
   ) {}
 
   @UseGuards(JwtAuthGuard)
@@ -48,6 +50,15 @@ export class GoogleCalendarController {
   async syncNow() {
     await this.pullService.pull();
     return { triggeredAt: new Date() };
+  }
+
+  // Force-push every reservation to the calendar, independent of whatever happened (or
+  // didn't) on its own create/update — see pushAllReservations()'s own comment for why
+  // this exists.
+  @UseGuards(JwtAuthGuard)
+  @Post('push-all')
+  async pushAll() {
+    return this.pushService.pushAllReservations();
   }
 
   @UseGuards(JwtAuthGuard)

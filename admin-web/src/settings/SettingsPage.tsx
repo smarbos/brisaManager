@@ -5,6 +5,7 @@ import {
   getGoogleCalendarConnectUrl,
   disconnectGoogleCalendar,
   runGoogleCalendarSync,
+  pushAllReservationsToGoogleCalendar,
 } from '../api/google-calendar';
 import { PageContainer, PageHeader, Alert, Button, Card, FormField, Input, Tabs, Textarea } from '../ui';
 import { formatDateTime } from '../lib/date';
@@ -58,6 +59,8 @@ export function SettingsPage() {
   const [googleLastSyncError, setGoogleLastSyncError] = useState<string | null>(null);
   const [googleActionError, setGoogleActionError] = useState<string | null>(null);
   const [googleSyncing, setGoogleSyncing] = useState(false);
+  const [googlePushing, setGooglePushing] = useState(false);
+  const [googlePushResult, setGooglePushResult] = useState<number | null>(null);
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [googleDisconnecting, setGoogleDisconnecting] = useState(false);
   const [googleCallbackStatus, setGoogleCallbackStatus] = useState<'connected' | 'error' | null>(null);
@@ -216,6 +219,24 @@ export function SettingsPage() {
       setGoogleActionError('No se pudo iniciar la sincronización. Por favor, intentá de nuevo.');
     } finally {
       setGoogleSyncing(false);
+    }
+  }
+
+  // Covers reservations whose one-time push at create/update time was silently skipped —
+  // e.g. created before Google Calendar was ever connected, or while a misconfigured OAuth
+  // client made every push fail — and never got a second attempt since nothing else
+  // re-triggers it on its own.
+  async function handleForceSyncCalendar() {
+    setGoogleActionError(null);
+    setGooglePushResult(null);
+    setGooglePushing(true);
+    try {
+      const { pushed } = await pushAllReservationsToGoogleCalendar();
+      setGooglePushResult(pushed);
+    } catch {
+      setGoogleActionError('No se pudo forzar la sincronización. Por favor, intentá de nuevo.');
+    } finally {
+      setGooglePushing(false);
     }
   }
 
@@ -464,13 +485,34 @@ export function SettingsPage() {
                 Conectado — última sincronización: {googleLastSyncAt ? formatDateTime(googleLastSyncAt) : 'nunca'}
               </p>
             )}
-            <div className="mt-3 flex gap-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3">
               <Button type="button" variant="secondary" loading={googleSyncing} onClick={handleSyncGoogleCalendarNow}>
                 Sincronizar Google Calendar ahora
               </Button>
               <Button type="button" variant="danger" loading={googleDisconnecting} onClick={handleDisconnectGoogleCalendar}>
                 Desconectar
               </Button>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              Trae a La Brisa los cambios hechos directamente en Google Calendar.
+            </p>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" variant="secondary" loading={googlePushing} onClick={handleForceSyncCalendar}>
+                  Forzar sync de reservas al calendario
+                </Button>
+                {googlePushResult !== null && (
+                  <span className="text-sm text-text-muted">
+                    {googlePushResult} reserva{googlePushResult === 1 ? '' : 's'} enviada
+                    {googlePushResult === 1 ? '' : 's'} a Google Calendar.
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-text-muted">
+                Reenvía todas las reservas a Google Calendar — usalo si una reserva no aparece (por ejemplo, si se
+                creó antes de conectar el calendario).
+              </p>
             </div>
           </>
         ) : (

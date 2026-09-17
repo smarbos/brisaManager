@@ -21,3 +21,7 @@ export function disconnectGoogleCalendar(): Promise<{ disconnected: boolean }> {
 export function runGoogleCalendarSync(): Promise<{ triggeredAt: string }> {
   return apiClient.request('/google-calendar/sync-now', { method: 'POST' });
 }
+
+export function pushAllReservationsToGoogleCalendar(): Promise<{ pushed: number }> {
+  return apiClient.request('/google-calendar/push-all', { method: 'POST' });
+}
