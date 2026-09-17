@@ -167,13 +167,18 @@
   // Real (best-effort) extraction.
   // ---------------------------------------------------------------------
   function extractGuestName() {
-    const heading = Array.from(document.querySelectorAll("h1, h2")).find((el) => el.textContent.trim());
+    // Confirmed wrong once already: `h1, h2` alone also matches page-chrome headings like
+    // "Mensajes" (the inbox nav item), which sorts before the real conversation header in
+    // DOM order. Every real conversation heading carries the host's own name after a comma
+    // (e.g. "María Laura, Ana" — confirmed against multiple threads in the same
+    // inbox, all sharing that same trailing name), and generic page-chrome headings never
+    // contain a comma, so requiring one filters those false matches out.
+    const heading = Array.from(document.querySelectorAll('h1, h2, h3, [role="heading"]')).find((el) => {
+      const text = el.textContent.trim();
+      return text && text.includes(",") && text.length <= MAX_LABEL_TEXT_LENGTH;
+    });
     if (!heading) return null;
-    // Every conversation in the inbox list carries the host's own name after a comma (e.g.
-    // "María Laura, Ana") — confirmed by comparing multiple threads in the same
-    // inbox, all sharing that same trailing name. The guest's name is the part before it.
-    const text = heading.textContent.trim();
-    return text.split(",")[0].trim() || null;
+    return heading.textContent.trim().split(",")[0].trim() || null;
   }
 
   function extractGuestCount() {
@@ -293,11 +298,20 @@
     textarea.select();
   }
 
-  // Finds Airbnb's message compose box. Best-effort only — Airbnb's editor is very likely a
-  // React-controlled contenteditable div, so this is tried as a bonus on top of the
-  // clipboard copy (which always works), never relied on alone.
+  // Finds Airbnb's message compose box. Confirmed real (from a captured DOM dump of the
+  // compose bar): `id="message_input"`, `data-testid="messaging-composebar"`,
+  // `contenteditable="plaintext-only"` — NOT `contenteditable="true"`, which a first version
+  // of this selector assumed. That mismatch meant the old selector never matched the real
+  // compose box at all and silently fell through to some *other* editable element on the
+  // page instead (e.g. the "Tus notas" panel), which is where a generated message actually
+  // ended up once. The specific selectors are tried first for exactly that reason; the
+  // generic contenteditable/textarea fallbacks only exist in case Airbnb changes these
+  // attributes later.
   function findComposeBox() {
     return (
+      document.querySelector('[data-testid="messaging-composebar"]') ||
+      document.querySelector("#message_input") ||
+      document.querySelector('div[contenteditable="plaintext-only"]') ||
       document.querySelector('div[contenteditable="true"]') ||
       document.querySelector("textarea")
     );
@@ -334,12 +348,12 @@
 
     const { guestName, guests, checkIn, checkOut } = extractReservationFields();
 
-    const unverifiedFields = ["total_price", "currency", "status"];
-    if (!guestName) unverifiedFields.push("guest_name");
-    if (!guests) unverifiedFields.push("guests");
-    // Always unverified even when found — see the file-header comment (no confirmed real
-    // capture yet, and the year is always inferred, never read).
-    unverifiedFields.push("check_in", "check_out");
+    // Every field is always unverified, found or not — see the file-header comment. This
+    // isn't theoretical: the guest-name guess has already been confirmed wrong once in real
+    // use (it matched a page-chrome heading instead of the conversation's), so "found
+    // something" is not the same as "found correctly" until real captures confirm the
+    // selectors.
+    const unverifiedFields = ["guest_name", "guests", "check_in", "check_out", "total_price", "currency", "status"];
 
     const payload = {
       source: "airbnb",
