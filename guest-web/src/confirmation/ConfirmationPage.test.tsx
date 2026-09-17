@@ -88,12 +88,12 @@ describe('ConfirmationPage', () => {
     await screen.findByText(/confirmá tu reserva/i);
 
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Jane Doe' } });
-    fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '+54 9 223 555-1234' } });
+    fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '2235550123' } });
     fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'jane@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
 
     await waitFor(() =>
-      expect(confirmSpy).toHaveBeenCalledWith('tok-1', 'Jane Doe', '+54 9 223 555-1234', 'jane@example.com'),
+      expect(confirmSpy).toHaveBeenCalledWith('tok-1', 'Jane Doe', '+5492235550123', 'jane@example.com'),
     );
   });
 
@@ -145,6 +145,9 @@ describe('ConfirmationPage', () => {
     expect(screen.getByText('ARS 150.000 · se cobra al check-in')).toBeInTheDocument();
     expect(screen.getAllByText(/pendiente/i)).toHaveLength(2);
     expect(screen.queryByText(/acepto las reglas de la casa/i)).not.toBeInTheDocument();
+    // The rules recap shouldn't be buried in the final step only — a guest deciding whether
+    // to pay should be able to re-check what they agreed to right here, on step 3.
+    expect(screen.getByRole('button', { name: /ver reglas de la casa/i })).toBeInTheDocument();
   });
 
   it('shows the confirmation payment label without a percentage when it is a fixed amount', async () => {
