@@ -8,6 +8,8 @@ import { formatDate, formatLongDate } from '../lib/date';
 
 type Step = 1 | 2 | 3 | 4;
 
+const PHONE_PREFIX = '+549';
+
 const STEP_LABELS: Record<Step, string> = { 1: 'Reserva', 2: 'Reglas', 3: 'Pago', 4: 'Confirmación' };
 
 function currentStep(reservation: GuestReservation): Step {
@@ -27,9 +29,29 @@ function formatMoney(currency: string, amount: number): string {
   return `${currency} ${amount.toLocaleString('es-AR')}`;
 }
 
-function copyToClipboard(value: string) {
-  if (!value) return;
-  navigator.clipboard?.writeText(value).catch(() => {});
+type CopyField = 'cbu' | 'alias';
+type CopyStatus = 'copied' | 'failed';
+
+function CopyButton({
+  value,
+  field,
+  status,
+  onCopy,
+}: {
+  value: string;
+  field: CopyField;
+  status: CopyStatus | null;
+  onCopy: (field: CopyField, value: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onCopy(field, value)}
+      className="min-h-11 shrink-0 rounded px-2 text-sm font-semibold text-accent underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+    >
+      {status === 'copied' ? '¡Copiado!' : status === 'failed' ? 'No se pudo copiar' : 'Copiar'}
+    </button>
+  );
 }
 
 function WaveIcon() {
@@ -49,7 +71,7 @@ function WaveIcon() {
 
 function StepIndicator({ step }: { step: Step }) {
   return (
-    <div className="mx-auto flex max-w-md gap-2 px-4">
+    <div className="mx-auto mt-6 flex max-w-md gap-2 px-4">
       {([1, 2, 3, 4] as Step[]).map((s) => (
         <div key={s} className="flex-1">
           <div className={`h-1 rounded-full ${s <= step ? 'bg-accent' : 'bg-border'}`} />
@@ -88,15 +110,19 @@ export function ConfirmationPage() {
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phoneLocal, setPhoneLocal] = useState('');
   const [email, setEmail] = useState('');
   const [rulesChecked, setRulesChecked] = useState(false);
   const [rulesRevealed, setRulesRevealed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDates, setConfirmingDates] = useState(false);
+  const [acceptingContract, setAcceptingContract] = useState(false);
+  const [refreshingPayments, setRefreshingPayments] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<Record<CopyField, CopyStatus | null>>({ cbu: null, alias: null });
 
-  function load() {
-    if (!token) return;
-    getReservationByToken(token)
+  function load(): Promise<void> {
+    if (!token) return Promise.resolve();
+    return getReservationByToken(token)
       .then((r) => {
         setReservation(r);
         setNotFound(false);
@@ -111,29 +137,55 @@ export function ConfirmationPage() {
       });
   }
 
-  useEffect(load, [token]);
+  useEffect(() => {
+    load();
+  }, [token]);
 
   async function handleConfirmDates(event: FormEvent) {
     event.preventDefault();
     if (!token) return;
     setError(null);
+    setConfirmingDates(true);
     try {
-      await confirmDates(token, fullName, phone, email);
-      load();
+      await confirmDates(token, fullName, `${PHONE_PREFIX}${phoneLocal}`, email);
+      await load();
     } catch {
       setError('No pudimos confirmar tus datos. Por favor, intentá de nuevo.');
+    } finally {
+      setConfirmingDates(false);
     }
   }
 
   async function handleAcceptContract() {
     if (!token) return;
     setError(null);
+    setAcceptingContract(true);
     try {
       await acceptContract(token);
-      load();
+      await load();
     } catch {
       setError('No pudimos registrar la aceptación del contrato. Por favor, intentá de nuevo.');
+    } finally {
+      setAcceptingContract(false);
     }
+  }
+
+  async function handleRefreshPayments() {
+    setRefreshingPayments(true);
+    try {
+      await load();
+    } finally {
+      setRefreshingPayments(false);
+    }
+  }
+
+  function handleCopy(field: CopyField, value: string) {
+    if (!value) return;
+    navigator.clipboard
+      ?.writeText(value)
+      .then(() => setCopyStatus((prev) => ({ ...prev, [field]: 'copied' })))
+      .catch(() => setCopyStatus((prev) => ({ ...prev, [field]: 'failed' })));
+    setTimeout(() => setCopyStatus((prev) => ({ ...prev, [field]: null })), 2000);
   }
 
   if (notFound) {
@@ -182,6 +234,26 @@ export function ConfirmationPage() {
       <div className="mx-auto mt-6 max-w-md rounded-xl bg-surface p-6 shadow-sm">
         {error && <Alert>{error}</Alert>}
 
+        {reservation.contractAcceptedAt && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => setRulesRevealed((v) => !v)}
+              className="min-h-11 rounded px-2 text-sm font-semibold text-accent underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            >
+              Ver reglas de la casa
+            </button>
+            {rulesRevealed && (
+              <div className="mt-2 rounded-lg bg-bg p-4">
+                <p className="whitespace-pre-wrap text-sm text-text">{reservation.contractSnapshot}</p>
+                <p className="mt-3 text-xs font-semibold uppercase text-text-muted">
+                  Aceptadas el {formatLongDate(reservation.contractAcceptedAt)}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {step === 1 && (
           <>
             <h2 className="font-heading text-xl font-bold text-heading">Confirmá tu reserva</h2>
@@ -219,27 +291,32 @@ export function ConfirmationPage() {
                   required
                 />
               </FormField>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label="Celular">
+              <FormField label="Celular">
+                <div className="flex gap-2">
+                  <span className="flex min-h-11 shrink-0 items-center justify-center rounded border border-border bg-surface px-3 text-sm font-medium text-text-muted">
+                    {PHONE_PREFIX}
+                  </span>
                   <Input
                     type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+54 9 223 ..."
+                    inputMode="numeric"
+                    value={phoneLocal}
+                    onChange={(e) => setPhoneLocal(e.target.value)}
+                    placeholder="2235550123"
                     required
+                    className="flex-1"
                   />
-                </FormField>
-                <FormField label="Email">
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="vos@mail.com"
-                    required
-                  />
-                </FormField>
-              </div>
-              <Button type="submit" className="w-full">
+                </div>
+              </FormField>
+              <FormField label="Email">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="vos@mail.com"
+                  required
+                />
+              </FormField>
+              <Button type="submit" className="w-full" loading={confirmingDates}>
                 Confirmar fechas y huéspedes
               </Button>
             </form>
@@ -263,12 +340,12 @@ export function ConfirmationPage() {
               ))}
             </div>
 
-            <label className="mt-4 flex items-start gap-2 text-sm text-text">
+            <label className="mt-4 flex items-start gap-3 text-sm text-text">
               <input
                 type="checkbox"
                 checked={rulesChecked}
                 onChange={(e) => setRulesChecked(e.target.checked)}
-                className="mt-1"
+                className="mt-0.5 h-5 w-5 shrink-0 accent-accent"
               />
               <span>
                 Leí y acepto las reglas de la casa. Entiendo que su incumplimiento puede ocasionar la pérdida
@@ -276,7 +353,13 @@ export function ConfirmationPage() {
               </span>
             </label>
 
-            <Button type="button" className="mt-4 w-full" disabled={!rulesChecked} onClick={handleAcceptContract}>
+            <Button
+              type="button"
+              className="mt-4 w-full"
+              disabled={!rulesChecked}
+              loading={acceptingContract}
+              onClick={handleAcceptContract}
+            >
               Acepto las reglas de la casa
             </Button>
           </>
@@ -328,26 +411,19 @@ export function ConfirmationPage() {
                   <dt className="text-text-muted">CBU</dt>
                   <dd className="flex flex-wrap items-center gap-2 font-medium text-heading">
                     <span className="break-all">{reservation.bankCbu}</span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(reservation.bankCbu)}
-                      className="shrink-0 text-xs font-semibold text-accent underline"
-                    >
-                      Copiar
-                    </button>
+                    <CopyButton value={reservation.bankCbu} field="cbu" status={copyStatus.cbu} onCopy={handleCopy} />
                   </dd>
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <dt className="text-text-muted">Alias</dt>
                   <dd className="flex flex-wrap items-center gap-2 font-medium text-heading">
                     <span className="break-all">{reservation.bankAlias}</span>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(reservation.bankAlias)}
-                      className="shrink-0 text-xs font-semibold text-accent underline"
-                    >
-                      Copiar
-                    </button>
+                    <CopyButton
+                      value={reservation.bankAlias}
+                      field="alias"
+                      status={copyStatus.alias}
+                      onCopy={handleCopy}
+                    />
                   </dd>
                 </div>
                 <div className="flex flex-col gap-0.5">
@@ -376,7 +452,13 @@ export function ConfirmationPage() {
               <p className="mt-3 whitespace-pre-wrap text-sm text-text-muted">{reservation.depositInstructions}</p>
             </div>
 
-            <Button type="button" variant="secondary" className="mt-4 w-full" onClick={load}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-4 w-full"
+              loading={refreshingPayments}
+              onClick={handleRefreshPayments}
+            >
               Actualizar estado de los pagos
             </Button>
           </>
@@ -387,24 +469,6 @@ export function ConfirmationPage() {
             <Badge tone="success">✓ Pago confirmado</Badge>
             <h2 className="mt-2 font-heading text-xl font-bold text-heading">Confirmación</h2>
             <p className="mt-1 text-sm text-text-muted">{reservation.confirmationStepText}</p>
-
-            <button
-              type="button"
-              onClick={() => setRulesRevealed((v) => !v)}
-              className="mt-4 text-sm font-semibold text-accent underline"
-            >
-              Ver reglas de la casa
-            </button>
-            {rulesRevealed && (
-              <div className="mt-2 rounded-lg bg-bg p-4">
-                <p className="whitespace-pre-wrap text-sm text-text">{reservation.contractSnapshot}</p>
-                {reservation.contractAcceptedAt && (
-                  <p className="mt-3 text-xs font-semibold uppercase text-text-muted">
-                    Aceptadas el {formatLongDate(reservation.contractAcceptedAt)}
-                  </p>
-                )}
-              </div>
-            )}
 
             <dl className="mt-6 flex flex-col gap-3 text-sm">
               <div className="flex items-center justify-between">

@@ -17,4 +17,24 @@ describe('Button', () => {
 
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
+
+  it('shows "Procesando..." and disables itself while loading', () => {
+    render(<Button loading>Save</Button>);
+
+    const button = screen.getByRole('button', { name: 'Procesando...' });
+    expect(button).toBeDisabled();
+  });
+
+  it('does not forward onClick while loading', () => {
+    const onClick = vi.fn();
+    render(
+      <Button loading onClick={onClick}>
+        Save
+      </Button>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Procesando...' }));
+
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });
