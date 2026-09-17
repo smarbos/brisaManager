@@ -289,6 +289,46 @@ describe('ChannelImportService', () => {
     expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
   });
 
+  it('creates an AIRBNB reservation without a hotel_id, using the thread id as the external reference', async () => {
+    prisma.reservation.findUnique.mockResolvedValue(null);
+    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-1', ...data }));
+
+    const { reservation, created } = await service.import({
+      ...baseDto,
+      source: 'airbnb',
+      hotel_id: undefined,
+      res_id: '1000000484',
+      guest_name: 'María Laura',
+      guests: 3,
+    });
+
+    expect(created).toBe(true);
+    expect(prisma.reservation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          guestName: 'María Laura',
+          source: 'AIRBNB',
+          externalReference: 'airbnb-thread-1000000484',
+          paxCount: 3,
+        }),
+      }),
+    );
+    expect(reservation.id).toBe('res-airbnb-1');
+  });
+
+  it('falls back to an Airbnb-specific placeholder guest name when none was scraped', async () => {
+    prisma.reservation.findUnique.mockResolvedValue(null);
+    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-2', ...data }));
+
+    await service.import({ ...baseDto, source: 'airbnb', hotel_id: undefined, res_id: '1000000088' });
+
+    expect(prisma.reservation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ guestName: 'Huésped de Airbnb (pendiente de completar)' }),
+      }),
+    );
+  });
+
   it('does not push to the calendar when check_in or check_out is unverified, regardless of other fields', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
     prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-10', ...data }));

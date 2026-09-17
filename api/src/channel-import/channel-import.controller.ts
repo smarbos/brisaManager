@@ -1,6 +1,8 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ApiKeyGuard } from '../auth/api-key.guard';
+import { renderTemplate } from '../common/render-template';
+import { SettingsService } from '../settings/settings.service';
 import { ChannelImportService } from './channel-import.service';
 import { ImportReservationDto } from './dto/import-reservation.dto';
 
@@ -16,11 +18,29 @@ import { ImportReservationDto } from './dto/import-reservation.dto';
 @UseGuards(ThrottlerGuard, ApiKeyGuard)
 @Controller('reservations/import')
 export class ChannelImportController {
-  constructor(private readonly channelImportService: ChannelImportService) {}
+  constructor(
+    private readonly channelImportService: ChannelImportService,
+    private readonly settingsService: SettingsService,
+  ) {}
 
   @Post()
   async import(@Body() dto: ImportReservationDto) {
     const { reservation, created } = await this.channelImportService.import(dto);
+    const confirmationUrl = `${process.env.GUEST_WEB_ORIGIN}/r/${reservation.confirmationToken}`;
+
+    // Only Airbnb needs a pre-composed message: Booking.com's flow already emails the guest
+    // directly (a real relay email is scrapeable from its extranet page), while Airbnb's
+    // messages page never exposes the guest's email, so the confirmation link travels back
+    // through the same Airbnb message thread instead — the extension pastes this into the
+    // compose box for the host to review and send.
+    const message =
+      dto.source === 'airbnb'
+        ? renderTemplate((await this.settingsService.get()).airbnbMessageTemplate, {
+            guestName: reservation.guestName,
+            confirmationUrl,
+          })
+        : null;
+
     return {
       id: reservation.id,
       created,
@@ -28,6 +48,8 @@ export class ChannelImportController {
       checkIn: reservation.checkIn,
       checkOut: reservation.checkOut,
       status: reservation.status,
+      confirmationUrl,
+      message,
     };
   }
 }

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "La Brisa - Booking.com Reservation Sync",
-  "version": "0.1.0",
-  "description": "Scrape a Booking.com extranet reservation page you're already viewing and send it to La Brisa's reservation system with one click.",
+  "name": "La Brisa - Reservation Sync",
+  "version": "0.2.0",
+  "description": "Scrape a Booking.com extranet reservation page, or generate a guest check-in link from an Airbnb hosting message thread, and send it to La Brisa's reservation system with one click.",
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
@@ -13,7 +13,7 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["storage", "activeTab", "clipboardWrite"],
   "host_permissions": [
     "https://admin.booking.com/*"
   ],
@@ -27,6 +27,15 @@
         "https://admin.booking.com/hotel/hoteladmin/extranet_ng/manage/booking.html*"
       ],
       "js": ["content_script.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.airbnb.com/hosting/messages/*",
+        "https://www.airbnb.com.ar/hosting/messages/*"
+      ],
+      "js": ["content_script_airbnb.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }

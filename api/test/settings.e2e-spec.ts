@@ -81,6 +81,7 @@ describe('SettingsController (e2e)', () => {
         reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
         depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
+        airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',
         securityDepositValue: '15%',
         bookingIcalUrl: 'https://booking.example/e2e-cal.ics',
@@ -118,6 +119,7 @@ describe('SettingsController (e2e)', () => {
         reservationReminderWhatsappTemplate: 'E2E WhatsApp reservation reminder {{guestName}}',
         depositReminderWhatsappTemplate: 'E2E WhatsApp deposit reminder {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
+        airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',
         securityDepositValue: '15%',
       })
@@ -155,6 +157,7 @@ describe('SettingsController (e2e)', () => {
         reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
         depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
+        airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',
         securityDepositValue: '150000',
       })
@@ -190,6 +193,7 @@ describe('SettingsController (e2e)', () => {
         reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
         depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
+        airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: 'not a valid value',
         securityDepositValue: '15%',
       })

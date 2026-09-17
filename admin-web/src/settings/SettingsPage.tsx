@@ -31,6 +31,7 @@ export function SettingsPage() {
   const [confirmationPaymentValue, setConfirmationPaymentValue] = useState('30%');
   const [securityDepositValue, setSecurityDepositValue] = useState('15%');
   const [confirmationStepText, setConfirmationStepText] = useState('');
+  const [airbnbMessageTemplate, setAirbnbMessageTemplate] = useState('');
   const [bookingIcalUrl, setBookingIcalUrl] = useState('');
   const [airbnbIcalUrl, setAirbnbIcalUrl] = useState('');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
@@ -74,6 +75,7 @@ export function SettingsPage() {
         setConfirmationPaymentValue(settings.confirmationPaymentValue);
         setSecurityDepositValue(settings.securityDepositValue);
         setConfirmationStepText(settings.confirmationStepText);
+        setAirbnbMessageTemplate(settings.airbnbMessageTemplate);
         setBookingIcalUrl(settings.bookingIcalUrl ?? '');
         setAirbnbIcalUrl(settings.airbnbIcalUrl ?? '');
         setLastSyncAt(settings.lastChannelSyncAt);
@@ -133,6 +135,7 @@ export function SettingsPage() {
         confirmationPaymentValue,
         securityDepositValue,
         confirmationStepText,
+        airbnbMessageTemplate,
         bookingIcalUrl,
         airbnbIcalUrl,
         lastChannelSyncAt: lastSyncAt,
@@ -301,6 +304,18 @@ export function SettingsPage() {
               <Input value={airbnbIcalUrl} onChange={(e) => setAirbnbIcalUrl(e.target.value)} />
             </FormField>
           </div>
+        </Card>
+
+        <Card>
+          <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Mensaje de Airbnb</h2>
+          <p className="mb-4 text-sm text-text-muted">
+            Cuando usás la extensión de Chrome para generar el link de check-in desde los mensajes de Airbnb, este
+            texto se copia al portapapeles listo para pegar en la conversación con el huésped.
+          </p>
+          <FormField label="Mensaje de check-in de Airbnb">
+            <Textarea value={airbnbMessageTemplate} onChange={(e) => setAirbnbMessageTemplate(e.target.value)} rows={4} />
+          </FormField>
+          <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{confirmationUrl}}'}</p>
         </Card>
 
         <Card>

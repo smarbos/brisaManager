@@ -9,6 +9,12 @@ import { ImportReservationDto } from './dto/import-reservation.dto';
 
 const SOURCE_MAP: Record<ImportReservationDto['source'], ReservationSource> = {
   'booking.com': 'BOOKING',
+  airbnb: 'AIRBNB',
+};
+
+const EXTERNAL_REFERENCE_PREFIX: Record<ImportReservationDto['source'], string> = {
+  'booking.com': 'booking-extranet',
+  airbnb: 'airbnb-thread',
 };
 
 const STATUS_MAP: Record<string, ReservationStatus> = {
@@ -37,7 +43,10 @@ function parseAmount(raw: string | null): number {
 }
 
 function buildNotes(dto: ImportReservationDto): string {
-  const base = `Creada desde la extensión de Chrome (Booking.com extranet, res_id ${dto.res_id}, hotel_id ${dto.hotel_id}).`;
+  const base =
+    dto.source === 'airbnb'
+      ? `Creada desde la extensión de Chrome (mensajes de Airbnb, thread ${dto.res_id}).`
+      : `Creada desde la extensión de Chrome (Booking.com extranet, res_id ${dto.res_id}, hotel_id ${dto.hotel_id}).`;
   if (dto.unverified_fields.length === 0) {
     return base;
   }
@@ -62,18 +71,20 @@ export class ChannelImportService {
   ) {}
 
   async import(dto: ImportReservationDto): Promise<ChannelImportResult> {
-    // We only ever operate one property. A valid API key paired with a hotel_id that isn't
-    // ours is either a misconfigured extension or a leaked key being probed against other
-    // data — reject it outright rather than importing a reservation we have no business
-    // holding, and log it so a pattern of these stands out.
-    const expectedHotelId = process.env.BOOKING_HOTEL_ID;
-    if (!expectedHotelId || dto.hotel_id !== expectedHotelId) {
-      this.logger.warn(`Rejected import for unexpected hotel_id "${dto.hotel_id}" (res_id ${dto.res_id})`);
-      throw new ForbiddenException('Unexpected hotel_id');
+    // The hotel_id pin only applies to Booking.com — we only ever operate one property
+    // there, so a valid API key paired with a hotel_id that isn't ours is either a
+    // misconfigured extension or a leaked key being probed against other data. Airbnb's
+    // messages page has no equivalent identifier to pin against in this flow.
+    if (dto.source === 'booking.com') {
+      const expectedHotelId = process.env.BOOKING_HOTEL_ID;
+      if (!expectedHotelId || dto.hotel_id !== expectedHotelId) {
+        this.logger.warn(`Rejected import for unexpected hotel_id "${dto.hotel_id}" (res_id ${dto.res_id})`);
+        throw new ForbiddenException('Unexpected hotel_id');
+      }
     }
 
     const source = SOURCE_MAP[dto.source];
-    const externalReference = `booking-extranet-${dto.res_id}`;
+    const externalReference = `${EXTERNAL_REFERENCE_PREFIX[dto.source]}-${dto.res_id}`;
 
     const existing = await this.prisma.reservation.findUnique({
       where: { source_externalReference: { source, externalReference } },
@@ -110,7 +121,11 @@ export class ChannelImportService {
 
     const reservation = await this.prisma.reservation.create({
       data: {
-        guestName: dto.guest_name?.trim() || 'Huésped de Booking.com (pendiente de completar)',
+        guestName:
+          dto.guest_name?.trim() ||
+          (dto.source === 'airbnb'
+            ? 'Huésped de Airbnb (pendiente de completar)'
+            : 'Huésped de Booking.com (pendiente de completar)'),
         guestEmail,
         checkIn,
         checkOut,
@@ -124,11 +139,7 @@ export class ChannelImportService {
       },
     });
 
-    await this.eventsService.record(
-      reservation.id,
-      'RESERVATION_CREATED',
-      `Creada desde la extensión de Chrome (res_id ${dto.res_id}, hotel_id ${dto.hotel_id}).`,
-    );
+    await this.eventsService.record(reservation.id, 'RESERVATION_CREATED', buildNotes(dto));
 
     // Link to (or create) the Guest record whenever we have an email — this is just CRM
     // bookkeeping, not guest-facing, so it's safe even if other fields are still
