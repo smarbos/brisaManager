@@ -94,6 +94,19 @@ describe('GoogleCalendarController (e2e)', () => {
     expect(response.body.triggeredAt).toBeTruthy();
   });
 
+  it('requires authentication for push-all', async () => {
+    await request(app.getHttpServer()).post('/google-calendar/push-all').expect(401);
+  });
+
+  it('force-pushes and returns a count (not connected in this test env, so each push is a no-op)', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/google-calendar/push-all')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(201);
+
+    expect(typeof response.body.pushed).toBe('number');
+  });
+
   it('requires authentication for disconnect', async () => {
     await request(app.getHttpServer()).post('/google-calendar/disconnect').expect(401);
   });

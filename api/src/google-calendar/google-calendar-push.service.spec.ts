@@ -7,7 +7,7 @@ import { Reservation } from '@prisma/client';
 describe('GoogleCalendarPushService', () => {
   let service: GoogleCalendarPushService;
   let authService: { getAuthorizedCalendarClient: jest.Mock; isInvalidGrantError: jest.Mock; disconnect: jest.Mock };
-  let prisma: { reservation: { update: jest.Mock }; settings: { update: jest.Mock } };
+  let prisma: { reservation: { update: jest.Mock; findMany: jest.Mock }; settings: { update: jest.Mock } };
   let insertMock: jest.Mock;
   let updateEventMock: jest.Mock;
   let deleteEventMock: jest.Mock;
@@ -55,7 +55,7 @@ describe('GoogleCalendarPushService', () => {
       isInvalidGrantError: jest.fn().mockReturnValue(false),
       disconnect: jest.fn().mockResolvedValue(undefined),
     };
-    prisma = { reservation: { update: jest.fn() }, settings: { update: jest.fn() } };
+    prisma = { reservation: { update: jest.fn(), findMany: jest.fn() }, settings: { update: jest.fn() } };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -74,6 +74,36 @@ describe('GoogleCalendarPushService', () => {
     await service.pushReservation(baseReservation);
 
     expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  describe('pushAllReservations', () => {
+    it('pushes every reservation and reports how many', async () => {
+      authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+      insertMock.mockResolvedValue({ data: { id: 'event-1' } });
+      prisma.reservation.findMany.mockResolvedValue([
+        baseReservation,
+        { ...baseReservation, id: 'res-2', status: 'CANCELLED', googleEventId: 'event-old' },
+      ]);
+
+      const result = await service.pushAllReservations();
+
+      expect(result).toEqual({ pushed: 2 });
+      // The active reservation gets upserted...
+      expect(insertMock).toHaveBeenCalledWith({
+        calendarId: 'cal-1',
+        requestBody: expect.objectContaining({ summary: 'Jane Doe (Directo)' }),
+      });
+      // ...and the cancelled one's lingering event gets removed, not upserted.
+      expect(deleteEventMock).toHaveBeenCalledWith({ calendarId: 'cal-1', eventId: 'event-old' });
+    });
+
+    it('reports 0 pushed when there are no reservations', async () => {
+      prisma.reservation.findMany.mockResolvedValue([]);
+
+      const result = await service.pushAllReservations();
+
+      expect(result).toEqual({ pushed: 0 });
+    });
   });
 
   it('creates a new event for a reservation with no googleEventId yet', async () => {

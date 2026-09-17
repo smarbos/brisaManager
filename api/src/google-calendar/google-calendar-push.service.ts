@@ -44,6 +44,22 @@ export class GoogleCalendarPushService {
     private readonly prisma: PrismaService,
   ) {}
 
+  // Staff-triggered bulk retry — covers reservations whose one-time push at create/update
+  // time was silently skipped (e.g. created before Google Calendar was ever connected, or
+  // while a misconfigured OAuth client made every push fail) and never got a second
+  // attempt. Includes every reservation, not just "active" ones, since a CANCELLED/
+  // COMPLETED reservation that still has a lingering calendar event (e.g. from before it
+  // was cancelled) needs pushReservation's own removal branch to run too. Sequential,
+  // not parallel — Google's Calendar API has per-user rate limits and a single property's
+  // reservation count is small enough that this finishes quickly either way.
+  async pushAllReservations(): Promise<{ pushed: number }> {
+    const reservations = await this.prisma.reservation.findMany();
+    for (const reservation of reservations) {
+      await this.pushReservation(reservation);
+    }
+    return { pushed: reservations.length };
+  }
+
   async pushReservation(reservation: Reservation): Promise<void> {
     try {
       const authorized = await this.authService.getAuthorizedCalendarClient();

@@ -284,6 +284,27 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(disconnectSpy).toHaveBeenCalled());
   });
 
+  it('force-pushes every reservation to Google Calendar and reports how many were sent', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue(baseSettings);
+    vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
+      connected: true,
+      lastSyncAt: '2026-09-13T12:00:00.000Z',
+      lastSyncError: null,
+    });
+    const pushAllSpy = vi
+      .spyOn(googleCalendarApi, 'pushAllReservationsToGoogleCalendar')
+      .mockResolvedValue({ pushed: 3 });
+
+    render(<SettingsPage />);
+
+    fireEvent.click(await screen.findByRole('tab', { name: /integraciones/i }));
+    const button = await screen.findByRole('button', { name: /forzar sync de reservas al calendario/i });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(pushAllSpy).toHaveBeenCalled());
+    expect(await screen.findByText(/3 reservas enviadas a google calendar/i)).toBeInTheDocument();
+  });
+
   it('does not disconnect Google Calendar when the confirmation is declined', async () => {
     vi.spyOn(settingsApi, 'getSettings').mockResolvedValue(baseSettings);
     vi.spyOn(googleCalendarApi, 'getGoogleCalendarStatus').mockResolvedValue({
