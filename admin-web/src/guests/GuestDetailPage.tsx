@@ -36,7 +36,12 @@ export function GuestDetailPage() {
 
   return (
     <PageContainer>
-      <PageHeader title={guest.name} subtitle={`ID de cliente: ${shortId(guest.id)}`} />
+      <PageHeader
+        title={guest.name}
+        subtitle={`ID de cliente: ${shortId(guest.id)}`}
+        backTo="/guests"
+        backLabel="Volver a huéspedes"
+      />
 
       <Card className="mb-6">
         <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
