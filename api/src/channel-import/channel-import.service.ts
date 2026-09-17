@@ -90,12 +90,24 @@ export class ChannelImportService {
       where: { source_externalReference: { source, externalReference } },
     });
 
-    if (existing) {
+    if (existing && existing.status !== 'CANCELLED') {
       // Never overwrite an already-imported reservation from here — staff may have already
       // corrected fields by hand since the first import. Re-sending the same res_id (e.g.
       // clicking the button twice, or re-testing the extension) is a safe no-op, not a
       // silent clobber of anything staff already fixed.
       return { reservation: existing, created: false };
+    }
+
+    if (existing) {
+      // A cancelled reservation shouldn't permanently claim this res_id/thread — e.g. a
+      // guest cancels and then rebooks through the very same Airbnb message thread, or a
+      // Booking.com reservation is cancelled and re-created with the same res_id. Free up
+      // the externalReference so the new reservation created below can claim it; the old
+      // cancelled row is kept as-is for history, just renamed off the live slot.
+      await this.prisma.reservation.update({
+        where: { id: existing.id },
+        data: { externalReference: `${externalReference}-superseded-${existing.id}` },
+      });
     }
 
     const now = new Date();

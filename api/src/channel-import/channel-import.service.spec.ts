@@ -10,7 +10,7 @@ import { ImportReservationDto } from './dto/import-reservation.dto';
 
 describe('ChannelImportService', () => {
   let service: ChannelImportService;
-  let prisma: { reservation: { create: jest.Mock; findUnique: jest.Mock } };
+  let prisma: { reservation: { create: jest.Mock; findUnique: jest.Mock; update: jest.Mock } };
   let eventsService: { record: jest.Mock };
   let googleCalendarPushService: { pushReservation: jest.Mock };
   let guestsService: { syncFromReservation: jest.Mock };
@@ -26,7 +26,7 @@ describe('ChannelImportService', () => {
   });
 
   beforeEach(async () => {
-    prisma = { reservation: { create: jest.fn(), findUnique: jest.fn() } };
+    prisma = { reservation: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() } };
     eventsService = { record: jest.fn() };
     googleCalendarPushService = { pushReservation: jest.fn() };
     guestsService = { syncFromReservation: jest.fn() };
@@ -162,6 +162,27 @@ describe('ChannelImportService', () => {
     expect(prisma.reservation.create).not.toHaveBeenCalled();
     expect(eventsService.record).not.toHaveBeenCalled();
     expect(googleCalendarPushService.pushReservation).not.toHaveBeenCalled();
+  });
+
+  it('creates a fresh reservation when the existing match is cancelled, freeing up the old externalReference', async () => {
+    const existing = { id: 'res-cancelled', status: 'CANCELLED', externalReference: 'booking-extranet-5000000607' };
+    prisma.reservation.findUnique.mockResolvedValue(existing);
+    prisma.reservation.update.mockResolvedValue(existing);
+    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-new', ...data }));
+
+    const { reservation, created } = await service.import(baseDto);
+
+    expect(prisma.reservation.update).toHaveBeenCalledWith({
+      where: { id: 'res-cancelled' },
+      data: { externalReference: 'booking-extranet-5000000607-superseded-res-cancelled' },
+    });
+    expect(prisma.reservation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ externalReference: 'booking-extranet-5000000607' }),
+      }),
+    );
+    expect(created).toBe(true);
+    expect(reservation.id).toBe('res-new');
   });
 
   it('rejects a hotel_id other than the configured property', async () => {
