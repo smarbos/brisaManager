@@ -48,7 +48,12 @@ describe('ChannelImportController (e2e)', () => {
   });
 
   afterAll(async () => {
-    const where = { source: 'BOOKING' as const, externalReference: { startsWith: 'booking-extranet-e2e-test' } };
+    const where = {
+      OR: [
+        { source: 'BOOKING' as const, externalReference: { startsWith: 'booking-extranet-e2e-test' } },
+        { source: 'AIRBNB' as const, externalReference: { startsWith: 'airbnb-thread-e2e-test' } },
+      ],
+    };
     const created = await prisma.reservation.findMany({ where, select: { id: true } });
     await prisma.reservationEvent.deleteMany({ where: { reservationId: { in: created.map((r) => r.id) } } });
     await prisma.reservation.deleteMany({ where });
@@ -131,6 +136,68 @@ describe('ChannelImportController (e2e)', () => {
     const stored = await prisma.reservation.findUnique({ where: { id: response.body.id } });
     expect(stored?.guestEmail).toBe('e2e-test-guest@example.com');
     expect(stored?.status).toBe('PENDING');
+  });
+
+  it('imports an Airbnb reservation without a hotel_id and returns a confirmation link + pre-filled message', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send({
+        source: 'airbnb',
+        res_id: 'e2e-test-airbnb-thread',
+        guest_name: 'María Laura',
+        guest_email: null,
+        check_in: '2026-11-06',
+        check_out: '2026-11-08',
+        guests: 3,
+        total_price: null,
+        currency: null,
+        status: null,
+        unverified_fields: ['check_in', 'check_out', 'total_price', 'currency', 'status'],
+      })
+      .expect(201);
+
+    expect(response.body.created).toBe(true);
+    expect(response.body.guestName).toBe('María Laura');
+    expect(response.body.confirmationUrl).toContain('/r/');
+    expect(response.body.message).toContain('María Laura');
+    expect(response.body.message).toContain(response.body.confirmationUrl);
+
+    const stored = await prisma.reservation.findUnique({ where: { id: response.body.id } });
+    expect(stored?.source).toBe('AIRBNB');
+    expect(stored?.externalReference).toBe('airbnb-thread-e2e-test-airbnb-thread');
+  });
+
+  it('does not create a duplicate Airbnb reservation when the same thread id is imported again', async () => {
+    const payload = {
+      source: 'airbnb',
+      res_id: 'e2e-test-airbnb-dedupe',
+      guest_name: 'Dedupe Guest',
+      guest_email: null,
+      check_in: null,
+      check_out: null,
+      guests: null,
+      total_price: null,
+      currency: null,
+      status: null,
+      unverified_fields: ['check_in', 'check_out', 'guests', 'total_price', 'currency', 'status'],
+    };
+
+    const first = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send(payload)
+      .expect(201);
+    expect(first.body.created).toBe(true);
+
+    const second = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send(payload)
+      .expect(201);
+
+    expect(second.body.created).toBe(false);
+    expect(second.body.id).toBe(first.body.id);
   });
 
   it('rejects a payload where check_out is not after check_in', async () => {

@@ -37,6 +37,9 @@ const DEFAULT_DEPOSIT_REMINDER_WHATSAPP_TEMPLATE =
 const DEFAULT_CONFIRMATION_STEP_TEXT =
   '¡Todo listo! Completaste todos los pasos necesarios para tu estadía en La Brisa de Mar del Plata.';
 
+const DEFAULT_AIRBNB_MESSAGE_TEMPLATE =
+  '¡Hola {{guestName}}! Para completar el check-in, por favor completá estos pasos rápidos: {{confirmationUrl}}';
+
 @Injectable()
 export class SettingsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -71,6 +74,7 @@ export class SettingsService {
         confirmationPaymentValue: '30%',
         securityDepositValue: '15%',
         confirmationStepText: DEFAULT_CONFIRMATION_STEP_TEXT,
+        airbnbMessageTemplate: DEFAULT_AIRBNB_MESSAGE_TEMPLATE,
       },
     });
   }

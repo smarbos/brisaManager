@@ -5,6 +5,7 @@ import { ChannelImportService } from './channel-import.service';
 import { GoogleCalendarModule } from '../google-calendar/google-calendar.module';
 import { GuestsModule } from '../guests/guests.module';
 import { ReservationsModule } from '../reservations/reservations.module';
+import { SettingsModule } from '../settings/settings.module';
 
 // ThrottlerModule is imported here (not registered globally in AppModule) so the rate limit
 // applies only to this machine-facing endpoint, not to every route in the app.
@@ -13,6 +14,7 @@ import { ReservationsModule } from '../reservations/reservations.module';
     GoogleCalendarModule,
     GuestsModule,
     ReservationsModule,
+    SettingsModule,
     ThrottlerModule.forRoot([{ name: 'channel-import', ttl: 60_000, limit: 10 }]),
   ],
   controllers: [ChannelImportController],

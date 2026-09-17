@@ -100,4 +100,8 @@ export class UpdateSettingsDto {
   @IsString()
   @MinLength(1)
   confirmationStepText: string;
+
+  @IsString()
+  @MinLength(1)
+  airbnbMessageTemplate: string;
 }

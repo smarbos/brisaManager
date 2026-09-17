@@ -85,6 +85,7 @@ describe('SettingsService', () => {
       confirmationStepText: 'new confirmation step text',
       confirmationPaymentValue: '30%',
       securityDepositValue: '15%',
+      airbnbMessageTemplate: 'new airbnb message template',
     });
 
     expect(result.houseRulesText).toBe('new rules');

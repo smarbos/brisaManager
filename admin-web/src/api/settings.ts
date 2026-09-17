@@ -22,6 +22,7 @@ export interface Settings {
   confirmationPaymentValue: string;
   securityDepositValue: string;
   confirmationStepText: string;
+  airbnbMessageTemplate: string;
   bookingIcalUrl: string | null;
   airbnbIcalUrl: string | null;
   lastChannelSyncAt: string | null;

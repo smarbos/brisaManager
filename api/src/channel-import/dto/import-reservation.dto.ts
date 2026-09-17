@@ -1,17 +1,22 @@
 import { IsArray, IsEmail, IsIn, IsInt, IsISO8601, IsOptional, IsPositive, IsString, MinLength } from 'class-validator';
 
 // Field names are snake_case to match exactly what the Chrome extension sends (see
-// chrome-extension/README.md) — the extension scrapes Booking.com's extranet UI, an external
-// contract we don't control, so this shape is kept literal rather than translated to this
-// API's usual camelCase to avoid a silent mapping bug between the two codebases.
+// chrome-extension/README.md) — the extension scrapes Booking.com's/Airbnb's own host UI, an
+// external contract we don't control, so this shape is kept literal rather than translated to
+// this API's usual camelCase to avoid a silent mapping bug between the two codebases.
 export class ImportReservationDto {
-  @IsIn(['booking.com'])
-  source: 'booking.com';
+  @IsIn(['booking.com', 'airbnb'])
+  source: 'booking.com' | 'airbnb';
 
+  // Only meaningful for source: 'booking.com' (pinned against BOOKING_HOTEL_ID in the
+  // service) — Airbnb's messages page has no equivalent concept in this flow.
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  hotel_id: string;
+  hotel_id?: string;
 
+  // Booking.com's reservation id, or Airbnb's messages-thread id — either way, the stable
+  // identifier used to dedupe repeat imports via externalReference.
   @IsString()
   @MinLength(1)
   res_id: string;
