@@ -26,3 +26,12 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
 }
+
+/* Native <button> elements don't get a pointer cursor by default the way links do — this
+   covers any raw button/role="button" outside the shared Button component (which already
+   sets cursor-pointer directly) without having to remember it on every one-off button. */
+a,
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']) {
+  cursor: pointer;
+}
