@@ -6,10 +6,21 @@ import {
   disconnectGoogleCalendar,
   runGoogleCalendarSync,
 } from '../api/google-calendar';
-import { PageContainer, PageHeader, Alert, Button, Card, FormField, Input, Textarea } from '../ui';
+import { PageContainer, PageHeader, Alert, Button, Card, FormField, Input, Tabs, Textarea } from '../ui';
 import { formatDateTime } from '../lib/date';
 
+type SettingsTab = 'reglas' | 'pagos' | 'alojamiento' | 'comunicaciones' | 'integraciones';
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'reglas', label: 'Reglas y contenido' },
+  { id: 'pagos', label: 'Pagos' },
+  { id: 'alojamiento', label: 'Alojamiento' },
+  { id: 'comunicaciones', label: 'Comunicaciones' },
+  { id: 'integraciones', label: 'Integraciones' },
+];
+
 export function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('reglas');
   const [houseRulesText, setHouseRulesText] = useState('');
   const [paymentInstructions, setPaymentInstructions] = useState('');
   const [depositInstructions, setDepositInstructions] = useState('');
@@ -90,6 +101,7 @@ export function SettingsPage() {
     const googleCalendarParam = new URLSearchParams(window.location.search).get('googleCalendar');
     if (googleCalendarParam === 'connected' || googleCalendarParam === 'error') {
       setGoogleCallbackStatus(googleCalendarParam);
+      setActiveTab('integraciones');
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
@@ -211,7 +223,9 @@ export function SettingsPage() {
     <PageContainer>
       <PageHeader title="Configuración" subtitle="Textos, pagos, datos bancarios y sincronización del alojamiento." />
       {loadError && <Alert>{loadError}</Alert>}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <Tabs tabs={TABS} activeTab={activeTab} onChange={(id) => setActiveTab(id as SettingsTab)} className="mb-6" />
+      <form id="settings-form" onSubmit={handleSubmit} className="flex flex-col gap-6">
+        {activeTab === 'reglas' && (
         <Card>
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Reglas de la casa</h2>
           <p className="mb-4 text-sm text-text-muted">Se le muestran al huésped en el paso 2 del check-in online.</p>
@@ -219,7 +233,10 @@ export function SettingsPage() {
             <Textarea value={houseRulesText} onChange={(e) => setHouseRulesText(e.target.value)} rows={8} />
           </FormField>
         </Card>
+        )}
 
+        {activeTab === 'pagos' && (
+        <>
         <Card>
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Pagos y depósito</h2>
           <p className="mb-4 text-sm text-text-muted">
@@ -282,7 +299,10 @@ export function SettingsPage() {
             </FormField>
           </div>
         </Card>
+        </>
+        )}
 
+        {activeTab === 'alojamiento' && (
         <Card>
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Alojamiento</h2>
           <p className="mb-4 text-sm text-text-muted">Dirección y enlaces compartidos con el huésped.</p>
@@ -305,7 +325,9 @@ export function SettingsPage() {
             </FormField>
           </div>
         </Card>
+        )}
 
+        {activeTab === 'reglas' && (
         <Card>
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Mensaje de Airbnb</h2>
           <p className="mb-4 text-sm text-text-muted">
@@ -317,7 +339,10 @@ export function SettingsPage() {
           </FormField>
           <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{confirmationUrl}}'}</p>
         </Card>
+        )}
 
+        {activeTab === 'comunicaciones' && (
+        <>
         <Card>
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Plantillas de email</h2>
           <p className="mb-4 text-sm text-text-muted">
@@ -394,17 +419,23 @@ export function SettingsPage() {
             </p>
           </div>
         </Card>
-
-        <Card>
-          {saveError && <Alert>{saveError}</Alert>}
-          {saved && <Alert tone="success">Guardado</Alert>}
-          <Button type="submit" loading={saving}>
-            Guardar
-          </Button>
-        </Card>
+        </>
+        )}
       </form>
 
-      <Card className="mt-6">
+      {activeTab !== 'integraciones' && (
+        <div className="sticky bottom-0 z-10 mt-6 -mx-4 border-t border-border bg-bg/95 px-4 py-4 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:bg-surface sm:px-6 sm:shadow-sm">
+          {saveError && <Alert>{saveError}</Alert>}
+          {saved && <Alert tone="success">Guardado</Alert>}
+          <Button type="submit" form="settings-form" loading={saving} className="mt-2 first:mt-0">
+            Guardar
+          </Button>
+        </div>
+      )}
+
+      {activeTab === 'integraciones' && (
+      <div className="flex flex-col gap-6">
+      <Card>
         <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Sincronización de canales</h2>
         {lastSyncError ? (
           <Alert>Falló la última sincronización: {lastSyncError}</Alert>
@@ -419,7 +450,7 @@ export function SettingsPage() {
         </Button>
       </Card>
 
-      <Card className="mt-6">
+      <Card>
         <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Google Calendar</h2>
         {googleCallbackStatus === 'connected' && <Alert tone="success">Google Calendar conectado.</Alert>}
         {googleCallbackStatus === 'error' && <Alert>No se pudo conectar Google Calendar. Por favor, intentá de nuevo.</Alert>}
@@ -451,6 +482,8 @@ export function SettingsPage() {
           </>
         )}
       </Card>
+      </div>
+      )}
     </PageContainer>
   );
 }
