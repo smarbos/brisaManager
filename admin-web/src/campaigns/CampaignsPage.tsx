@@ -7,7 +7,7 @@ import {
   Campaign,
   CampaignFilterType,
 } from '../api/campaigns';
-import { PageContainer, PageHeader, Alert, Badge, Button, FormField, Input, Select } from '../ui';
+import { PageContainer, PageHeader, Alert, Badge, Button, Card, EmptyState, FormField, Input, LoadingState, Select } from '../ui';
 import { formatDateTime } from '../lib/date';
 import { recipientStatusLabel } from '../lib/labels';
 
@@ -20,6 +20,7 @@ export function CampaignsPage() {
   const [history, setHistory] = useState<Campaign[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
     listCampaignTemplates()
@@ -31,7 +32,8 @@ export function CampaignsPage() {
   function reloadHistory() {
     listCampaignHistory()
       .then(setHistory)
-      .catch(() => setError('No se pudo cargar el historial de campañas.'));
+      .catch(() => setError('No se pudo cargar el historial de campañas.'))
+      .finally(() => setLoadingHistory(false));
   }
 
   useEffect(() => {
@@ -88,9 +90,9 @@ export function CampaignsPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Campañas" />
+      <PageHeader title="Campañas" subtitle="Enviá emails masivos a huéspedes según su historial de estadías." />
       {error && <Alert>{error}</Alert>}
-      <section className="mb-8">
+      <Card className="mb-6">
         <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Redactar</h2>
         <div className="flex flex-col gap-4">
           <FormField label="Plantilla">
@@ -119,31 +121,39 @@ export function CampaignsPage() {
           {recipientCount !== null && (
             <p className="text-sm text-text-muted">{recipientCount} destinatario(s) coinciden con este filtro.</p>
           )}
-          <Button type="button" onClick={handleSend} disabled={sending || recipientCount === null}>
-            Enviar campaña
-          </Button>
+          <div>
+            <Button type="button" loading={sending} disabled={recipientCount === null} onClick={handleSend}>
+              Enviar campaña
+            </Button>
+          </div>
         </div>
-      </section>
-      <section>
+      </Card>
+      <Card>
         <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Historial</h2>
-        <ul className="flex flex-col gap-4">
-          {history.map((c) => (
-            <li key={c.id} className="border-b border-border pb-4">
-              <p>
-                {c.template.name} — {c.recipientCount} destinatario(s) — {formatDateTime(c.sentAt)}
-              </p>
-              <ul className="mt-2 flex flex-col gap-1">
-                {c.recipients.map((r) => (
-                  <li key={r.id} className="flex items-center gap-2 text-sm">
-                    <Badge tone={r.status === 'SENT' ? 'success' : 'danger'}>{recipientStatusLabel(r.status)}</Badge>
-                    {r.error ? <span>{r.error}</span> : null}
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      </section>
+        {loadingHistory ? (
+          <LoadingState />
+        ) : history.length === 0 ? (
+          <EmptyState message="Todavía no enviaste ninguna campaña." />
+        ) : (
+          <ul className="flex flex-col divide-y divide-border">
+            {history.map((c) => (
+              <li key={c.id} className="py-4 first:pt-0 last:pb-0">
+                <p>
+                  {c.template.name} — {c.recipientCount} destinatario(s) — {formatDateTime(c.sentAt)}
+                </p>
+                <ul className="mt-2 flex flex-col gap-1">
+                  {c.recipients.map((r) => (
+                    <li key={r.id} className="flex items-center gap-2 text-sm">
+                      <Badge tone={r.status === 'SENT' ? 'success' : 'danger'}>{recipientStatusLabel(r.status)}</Badge>
+                      {r.error ? <span>{r.error}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </PageContainer>
   );
 }

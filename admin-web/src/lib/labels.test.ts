@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sourceLabel, statusLabel, eventTypeLabel, recipientStatusLabel } from './labels';
+import { sourceLabel, statusLabel, statusBadgeTone, eventTypeLabel, recipientStatusLabel } from './labels';
 
 describe('sourceLabel', () => {
   it('translates each reservation source to Spanish', () => {
@@ -16,6 +16,15 @@ describe('statusLabel', () => {
     expect(statusLabel('CONFIRMED')).toBe('Confirmada');
     expect(statusLabel('CANCELLED')).toBe('Cancelada');
     expect(statusLabel('COMPLETED')).toBe('Completada');
+  });
+});
+
+describe('statusBadgeTone', () => {
+  it('maps each reservation status to a badge tone', () => {
+    expect(statusBadgeTone('PENDING')).toBe('warning');
+    expect(statusBadgeTone('CONFIRMED')).toBe('success');
+    expect(statusBadgeTone('CANCELLED')).toBe('danger');
+    expect(statusBadgeTone('COMPLETED')).toBe('neutral');
   });
 });
 

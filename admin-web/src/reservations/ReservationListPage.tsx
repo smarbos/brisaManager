@@ -2,9 +2,24 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cancelReservation, listReservations } from '../api/reservations';
 import { Reservation, ReservationSource, ReservationStatus } from './types';
-import { PageContainer, PageHeader, Button, FormField, Select, Alert, Table, tableThClass as thClass, tableTdClass as tdClass } from '../ui';
+import {
+  PageContainer,
+  PageHeader,
+  Button,
+  Card,
+  Badge,
+  EmptyState,
+  FormField,
+  LoadingState,
+  Select,
+  Alert,
+  Table,
+  tableThClass as thClass,
+  tableTdClass as tdClass,
+} from '../ui';
 import { formatDate } from '../lib/date';
-import { sourceLabel, statusLabel } from '../lib/labels';
+import { shortId } from '../lib/id';
+import { sourceLabel, statusLabel, statusBadgeTone } from '../lib/labels';
 
 export function ReservationListPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -12,9 +27,11 @@ export function ReservationListPage() {
   const [status, setStatus] = useState<ReservationStatus | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   function load() {
     setError(null);
+    setLoading(true);
     listReservations({
       source: source || undefined,
       status: status || undefined,
@@ -23,7 +40,8 @@ export function ReservationListPage() {
       .catch((err) => {
         console.error('Failed to load reservations', err);
         setError('No se pudieron cargar las reservas.');
-      });
+      })
+      .finally(() => setLoading(false));
   }
 
   useEffect(load, [source, status]);
@@ -47,79 +65,97 @@ export function ReservationListPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Reservas" />
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap gap-4">
-          <FormField label="Canal">
-            <Select value={source} onChange={(e) => setSource(e.target.value as ReservationSource | '')}>
-              <option value="">Todos</option>
-              <option value="BOOKING">Booking.com</option>
-              <option value="AIRBNB">Airbnb</option>
-              <option value="DIRECT">Directo</option>
-              <option value="OTHER">Otro</option>
-            </Select>
-          </FormField>
-          <FormField label="Estado">
-            <Select value={status} onChange={(e) => setStatus(e.target.value as ReservationStatus | '')}>
-              <option value="">Todos</option>
-              <option value="PENDING">Pendiente</option>
-              <option value="CONFIRMED">Confirmada</option>
-              <option value="CANCELLED">Cancelada</option>
-              <option value="COMPLETED">Completada</option>
-            </Select>
-          </FormField>
+      <PageHeader title="Reservas" subtitle="Todas las reservas del alojamiento, directas y por canal." />
+      <Card>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+          <div className="flex flex-wrap gap-4">
+            <FormField label="Canal">
+              <Select value={source} onChange={(e) => setSource(e.target.value as ReservationSource | '')}>
+                <option value="">Todos</option>
+                <option value="BOOKING">Booking.com</option>
+                <option value="AIRBNB">Airbnb</option>
+                <option value="DIRECT">Directo</option>
+                <option value="OTHER">Otro</option>
+              </Select>
+            </FormField>
+            <FormField label="Estado">
+              <Select value={status} onChange={(e) => setStatus(e.target.value as ReservationStatus | '')}>
+                <option value="">Todos</option>
+                <option value="PENDING">Pendiente</option>
+                <option value="CONFIRMED">Confirmada</option>
+                <option value="CANCELLED">Cancelada</option>
+                <option value="COMPLETED">Completada</option>
+              </Select>
+            </FormField>
+          </div>
+          <Link to="/reservations/new">
+            <Button type="button">Nueva reserva</Button>
+          </Link>
         </div>
-        <Link to="/reservations/new">
-          <Button type="button">Nueva reserva</Button>
-        </Link>
-      </div>
-      {error && <Alert>{error}</Alert>}
-      <Table>
-        <thead>
-          <tr>
-            <th className={thClass}>ID</th>
-            <th className={thClass}>Huésped</th>
-            <th className={thClass}>Check-in</th>
-            <th className={thClass}>Check-out</th>
-            <th className={thClass}>Canal</th>
-            <th className={thClass}>Estado</th>
-            <th className={thClass}>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {reservations.map((r) => (
-            <tr key={r.id}>
-              <td className={tdClass}>
-                <Link to={`/reservations/${r.id}`} className="font-mono text-xs text-accent hover:underline">
-                  {r.id}
-                </Link>
-              </td>
-              <td className={tdClass}>
-                <Link to={`/reservations/${r.id}`} className="text-accent hover:underline">
-                  {r.guestName}
-                </Link>
-                {r.missingFromChannelAt && <span> ⚠ Ya no está en el calendario del canal</span>}
-              </td>
-              <td className={tdClass}>{formatDate(r.checkIn)}</td>
-              <td className={tdClass}>{formatDate(r.checkOut)}</td>
-              <td className={tdClass}>{sourceLabel(r.source)}</td>
-              <td className={tdClass}>{statusLabel(r.status)}</td>
-              <td className={tdClass}>
-                {r.status !== 'CANCELLED' && r.status !== 'COMPLETED' && (
-                  <Button
-                    type="button"
-                    variant="danger"
-                    disabled={cancellingId === r.id}
-                    onClick={() => handleCancel(r)}
-                  >
-                    Cancelar
-                  </Button>
-                )}
-              </td>
+        {error && <Alert>{error}</Alert>}
+        {loading ? (
+          <LoadingState />
+        ) : reservations.length === 0 ? (
+          <EmptyState message="No hay reservas que coincidan con estos filtros." />
+        ) : (
+        <Table>
+          <thead>
+            <tr>
+              <th className={thClass}>ID</th>
+              <th className={thClass}>Huésped</th>
+              <th className={thClass}>Check-in</th>
+              <th className={thClass}>Check-out</th>
+              <th className={thClass}>Canal</th>
+              <th className={thClass}>Estado</th>
+              <th className={thClass}>Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </Table>
+          </thead>
+          <tbody>
+            {reservations.map((r) => (
+              <tr key={r.id}>
+                <td className={tdClass}>
+                  <Link
+                    to={`/reservations/${r.id}`}
+                    title={r.id}
+                    className="font-mono text-xs text-accent hover:underline"
+                  >
+                    {shortId(r.id)}
+                  </Link>
+                </td>
+                <td className={tdClass}>
+                  <Link to={`/reservations/${r.id}`} className="font-medium text-accent hover:underline">
+                    {r.guestName}
+                  </Link>
+                  {r.missingFromChannelAt && (
+                    <Badge tone="warning" className="ml-2">
+                      ⚠ Ya no está en el calendario del canal
+                    </Badge>
+                  )}
+                </td>
+                <td className={tdClass}>{formatDate(r.checkIn)}</td>
+                <td className={tdClass}>{formatDate(r.checkOut)}</td>
+                <td className={tdClass}>{sourceLabel(r.source)}</td>
+                <td className={tdClass}>
+                  <Badge tone={statusBadgeTone(r.status)}>{statusLabel(r.status)}</Badge>
+                </td>
+                <td className={tdClass}>
+                  {r.status !== 'CANCELLED' && r.status !== 'COMPLETED' && (
+                    <Button
+                      type="button"
+                      variant="danger"
+                      loading={cancellingId === r.id}
+                      onClick={() => handleCancel(r)}
+                    >
+                      Cancelar
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+        )}
+      </Card>
     </PageContainer>
   );
 }

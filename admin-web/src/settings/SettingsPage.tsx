@@ -6,7 +6,7 @@ import {
   disconnectGoogleCalendar,
   runGoogleCalendarSync,
 } from '../api/google-calendar';
-import { PageContainer, Alert, Button, FormField, Input, Textarea } from '../ui';
+import { PageContainer, PageHeader, Alert, Button, Card, FormField, Input, Textarea } from '../ui';
 import { formatDateTime } from '../lib/date';
 
 export function SettingsPage() {
@@ -37,6 +37,7 @@ export function SettingsPage() {
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncActionError, setSyncActionError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -45,6 +46,8 @@ export function SettingsPage() {
   const [googleLastSyncError, setGoogleLastSyncError] = useState<string | null>(null);
   const [googleActionError, setGoogleActionError] = useState<string | null>(null);
   const [googleSyncing, setGoogleSyncing] = useState(false);
+  const [googleConnecting, setGoogleConnecting] = useState(false);
+  const [googleDisconnecting, setGoogleDisconnecting] = useState(false);
   const [googleCallbackStatus, setGoogleCallbackStatus] = useState<'connected' | 'error' | null>(null);
 
   useEffect(() => {
@@ -106,6 +109,7 @@ export function SettingsPage() {
     event.preventDefault();
     setSaved(false);
     setSaveError(null);
+    setSaving(true);
     try {
       await updateSettings({
         houseRulesText,
@@ -137,6 +141,8 @@ export function SettingsPage() {
       setSaved(true);
     } catch {
       setSaveError('No se pudo guardar la configuración. Por favor, intentá de nuevo.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -157,21 +163,29 @@ export function SettingsPage() {
 
   async function handleConnectGoogleCalendar() {
     setGoogleActionError(null);
+    setGoogleConnecting(true);
     try {
       const { url } = await getGoogleCalendarConnectUrl();
       window.location.href = url;
     } catch {
       setGoogleActionError('No se pudo iniciar la conexión con Google Calendar. Por favor, intentá de nuevo.');
+      setGoogleConnecting(false);
     }
   }
 
   async function handleDisconnectGoogleCalendar() {
+    if (!window.confirm('¿Desconectar Google Calendar? Vas a dejar de sincronizar reservas hasta que lo conectes de nuevo.')) {
+      return;
+    }
     setGoogleActionError(null);
+    setGoogleDisconnecting(true);
     try {
       await disconnectGoogleCalendar();
       setGoogleConnected(false);
     } catch {
       setGoogleActionError('No se pudo desconectar Google Calendar. Por favor, intentá de nuevo.');
+    } finally {
+      setGoogleDisconnecting(false);
     }
   }
 
@@ -192,162 +206,190 @@ export function SettingsPage() {
 
   return (
     <PageContainer>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <h1 className="font-heading text-2xl font-semibold text-heading">Configuración</h1>
-        {loadError && <Alert>{loadError}</Alert>}
-        {saveError && <Alert>{saveError}</Alert>}
-        <FormField label="Reglas de la casa">
-          <Textarea value={houseRulesText} onChange={(e) => setHouseRulesText(e.target.value)} rows={8} />
-        </FormField>
-        <FormField label="Instrucciones de pago">
-          <Textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={8} />
-        </FormField>
-        <FormField label="Pago de confirmación">
-          <Input
-            value={confirmationPaymentValue}
-            onChange={(e) => setConfirmationPaymentValue(e.target.value)}
-            placeholder="30% o 210000"
-          />
-        </FormField>
-        <p className="-mt-2 text-xs text-text-muted">
-          Un porcentaje del total (30%) o un monto fijo en pesos (210000, sin puntos de miles).
-        </p>
-        <FormField label="Descripción del depósito de garantía">
-          <Textarea value={depositInstructions} onChange={(e) => setDepositInstructions(e.target.value)} rows={8} />
-        </FormField>
-        <FormField label="Depósito de garantía">
-          <Input
-            value={securityDepositValue}
-            onChange={(e) => setSecurityDepositValue(e.target.value)}
-            placeholder="15% o 150000"
-          />
-        </FormField>
-        <p className="-mt-2 text-xs text-text-muted">
-          Un porcentaje del total (15%) o un monto fijo en pesos (150000, sin puntos de miles).
-        </p>
-        <FormField label="Texto del paso de confirmación final">
-          <Textarea value={confirmationStepText} onChange={(e) => setConfirmationStepText(e.target.value)} rows={4} />
-        </FormField>
-        <p className="-mt-2 text-xs text-text-muted">
-          Se muestra al huésped en el último paso, una vez que el pago de confirmación y el depósito de garantía
-          fueron marcados como recibidos.
-        </p>
+      <PageHeader title="Configuración" subtitle="Textos, pagos, datos bancarios y sincronización del alojamiento." />
+      {loadError && <Alert>{loadError}</Alert>}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <Card>
+          <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Reglas de la casa</h2>
+          <p className="mb-4 text-sm text-text-muted">Se le muestran al huésped en el paso 2 del check-in online.</p>
+          <FormField label="Reglas de la casa">
+            <Textarea value={houseRulesText} onChange={(e) => setHouseRulesText(e.target.value)} rows={8} />
+          </FormField>
+        </Card>
 
-        <div className="mt-4">
+        <Card>
+          <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Pagos y depósito</h2>
+          <p className="mb-4 text-sm text-text-muted">
+            Cada monto acepta un porcentaje del total (30%) o un monto fijo en pesos (210000, sin puntos de miles).
+          </p>
+          <div className="flex flex-col gap-4">
+            <FormField label="Instrucciones de pago">
+              <Textarea value={paymentInstructions} onChange={(e) => setPaymentInstructions(e.target.value)} rows={6} />
+            </FormField>
+            <FormField label="Pago de confirmación">
+              <Input
+                value={confirmationPaymentValue}
+                onChange={(e) => setConfirmationPaymentValue(e.target.value)}
+                placeholder="30% o 210000"
+              />
+            </FormField>
+            <FormField label="Descripción del depósito de garantía">
+              <Textarea value={depositInstructions} onChange={(e) => setDepositInstructions(e.target.value)} rows={6} />
+            </FormField>
+            <FormField label="Depósito de garantía">
+              <Input
+                value={securityDepositValue}
+                onChange={(e) => setSecurityDepositValue(e.target.value)}
+                placeholder="15% o 150000"
+              />
+            </FormField>
+            <FormField label="Texto del paso de confirmación final">
+              <Textarea value={confirmationStepText} onChange={(e) => setConfirmationStepText(e.target.value)} rows={4} />
+            </FormField>
+            <p className="-mt-2 text-xs text-text-muted">
+              Se muestra al huésped en el último paso, una vez que el pago de confirmación y el depósito de
+              garantía fueron marcados como recibidos.
+            </p>
+          </div>
+        </Card>
+
+        <Card>
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Datos bancarios</h2>
           <p className="mb-4 text-sm text-text-muted">
             Se muestran al huésped en el paso de pago, con botones para copiar el CBU y el alias.
           </p>
-        </div>
-        <FormField label="Titular">
-          <Input value={bankAccountHolder} onChange={(e) => setBankAccountHolder(e.target.value)} />
-        </FormField>
-        <FormField label="CUIL">
-          <Input value={bankCuil} onChange={(e) => setBankCuil(e.target.value)} />
-        </FormField>
-        <FormField label="Número de cuenta (caja de ahorro en pesos)">
-          <Input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} />
-        </FormField>
-        <FormField label="CBU">
-          <Input value={bankCbu} onChange={(e) => setBankCbu(e.target.value)} />
-        </FormField>
-        <FormField label="Alias">
-          <Input value={bankAlias} onChange={(e) => setBankAlias(e.target.value)} />
-        </FormField>
-        <FormField label="Banco">
-          <Input value={bankName} onChange={(e) => setBankName(e.target.value)} />
-        </FormField>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField label="Titular">
+              <Input value={bankAccountHolder} onChange={(e) => setBankAccountHolder(e.target.value)} />
+            </FormField>
+            <FormField label="CUIL">
+              <Input value={bankCuil} onChange={(e) => setBankCuil(e.target.value)} />
+            </FormField>
+            <FormField label="Número de cuenta (caja de ahorro en pesos)">
+              <Input value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} />
+            </FormField>
+            <FormField label="CBU">
+              <Input value={bankCbu} onChange={(e) => setBankCbu(e.target.value)} />
+            </FormField>
+            <FormField label="Alias">
+              <Input value={bankAlias} onChange={(e) => setBankAlias(e.target.value)} />
+            </FormField>
+            <FormField label="Banco">
+              <Input value={bankName} onChange={(e) => setBankName(e.target.value)} />
+            </FormField>
+          </div>
+        </Card>
 
-        <FormField label="Dirección del alojamiento">
-          <Input value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} />
-        </FormField>
-        <FormField label="Link de Google Maps">
-          <Input value={googleMapsUrl} onChange={(e) => setGoogleMapsUrl(e.target.value)} placeholder="https://maps.google.com/..." />
-        </FormField>
-        <FormField label="URL de iCal de Booking.com">
-          <Input value={bookingIcalUrl} onChange={(e) => setBookingIcalUrl(e.target.value)} />
-        </FormField>
-        <FormField label="URL de iCal de Airbnb">
-          <Input value={airbnbIcalUrl} onChange={(e) => setAirbnbIcalUrl(e.target.value)} />
-        </FormField>
+        <Card>
+          <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Alojamiento</h2>
+          <p className="mb-4 text-sm text-text-muted">Dirección y enlaces compartidos con el huésped.</p>
+          <div className="flex flex-col gap-4">
+            <FormField label="Dirección del alojamiento">
+              <Input value={propertyAddress} onChange={(e) => setPropertyAddress(e.target.value)} />
+            </FormField>
+            <FormField label="Link de Google Maps">
+              <Input
+                value={googleMapsUrl}
+                onChange={(e) => setGoogleMapsUrl(e.target.value)}
+                placeholder="https://maps.google.com/..."
+              />
+            </FormField>
+            <FormField label="URL de iCal de Booking.com">
+              <Input value={bookingIcalUrl} onChange={(e) => setBookingIcalUrl(e.target.value)} />
+            </FormField>
+            <FormField label="URL de iCal de Airbnb">
+              <Input value={airbnbIcalUrl} onChange={(e) => setAirbnbIcalUrl(e.target.value)} />
+            </FormField>
+          </div>
+        </Card>
 
-        <div className="mt-4">
+        <Card>
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Plantillas de email</h2>
           <p className="mb-4 text-sm text-text-muted">
-            Se envían automáticamente en cada paso del proceso de reserva. Podés usar las
-            variables entre llaves dobles indicadas debajo de cada una — se reemplazan por el
-            dato real al enviar el email.
+            Se envían automáticamente en cada paso del proceso de reserva. Podés usar las variables entre
+            llaves dobles indicadas debajo de cada una — se reemplazan por el dato real al enviar el email.
           </p>
-        </div>
-        <FormField label="Email inicial (con el link de confirmación)">
-          <Textarea value={initialEmailTemplate} onChange={(e) => setInitialEmailTemplate(e.target.value)} rows={6} />
-        </FormField>
-        <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{confirmationUrl}}'}</p>
+          <div className="flex flex-col gap-4">
+            <FormField label="Email inicial (con el link de confirmación)">
+              <Textarea value={initialEmailTemplate} onChange={(e) => setInitialEmailTemplate(e.target.value)} rows={6} />
+            </FormField>
+            <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{confirmationUrl}}'}</p>
 
-        <FormField label="Email de confirmación final">
-          <Textarea value={finalEmailTemplate} onChange={(e) => setFinalEmailTemplate(e.target.value)} rows={6} />
-        </FormField>
-        <p className="-mt-2 text-xs text-text-muted">
-          Variables: {'{{guestName}} {{propertyAddress}} {{googleMapsUrl}}'}
-        </p>
+            <FormField label="Email de confirmación final">
+              <Textarea value={finalEmailTemplate} onChange={(e) => setFinalEmailTemplate(e.target.value)} rows={6} />
+            </FormField>
+            <p className="-mt-2 text-xs text-text-muted">
+              Variables: {'{{guestName}} {{propertyAddress}} {{googleMapsUrl}}'}
+            </p>
 
-        <FormField label="Email de cancelación">
-          <Textarea
-            value={cancellationEmailTemplate}
-            onChange={(e) => setCancellationEmailTemplate(e.target.value)}
-            rows={6}
-          />
-        </FormField>
-        <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{checkOut}}'}</p>
+            <FormField label="Email de cancelación">
+              <Textarea
+                value={cancellationEmailTemplate}
+                onChange={(e) => setCancellationEmailTemplate(e.target.value)}
+                rows={6}
+              />
+            </FormField>
+            <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{checkOut}}'}</p>
+          </div>
+        </Card>
 
-        <div className="mt-4">
+        <Card>
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Recordatorios de WhatsApp</h2>
           <p className="mb-4 text-sm text-text-muted">
-            Se envían automáticamente por WhatsApp (vía Twilio) cuando el huésped tiene un
-            número de teléfono cargado. Podés usar las mismas variables entre llaves dobles
-            indicadas debajo de cada uno.
+            Se envían automáticamente por WhatsApp (vía Twilio) cuando el huésped tiene un número de teléfono
+            cargado. Podés usar las mismas variables entre llaves dobles indicadas debajo de cada uno.
           </p>
-        </div>
-        <FormField label="Días antes del check-in para el recordatorio de reserva">
-          <Input
-            type="number"
-            min={1}
-            value={reservationReminderDaysBefore === 0 ? '' : reservationReminderDaysBefore}
-            onChange={(e) =>
-              setReservationReminderDaysBefore(e.target.value === '' ? 0 : Number(e.target.value))
-            }
-          />
-        </FormField>
-        <FormField label="Mensaje de recordatorio de reserva">
-          <Textarea
-            value={reservationReminderWhatsappTemplate}
-            onChange={(e) => setReservationReminderWhatsappTemplate(e.target.value)}
-            rows={4}
-          />
-        </FormField>
-        <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{checkOut}}'}</p>
+          <div className="flex flex-col gap-4">
+            <FormField label="Días antes del check-in para el recordatorio de reserva">
+              <Input
+                type="number"
+                min={1}
+                value={reservationReminderDaysBefore === 0 ? '' : reservationReminderDaysBefore}
+                onChange={(e) =>
+                  setReservationReminderDaysBefore(e.target.value === '' ? 0 : Number(e.target.value))
+                }
+              />
+            </FormField>
+            <FormField label="Mensaje de recordatorio de reserva">
+              <Textarea
+                value={reservationReminderWhatsappTemplate}
+                onChange={(e) => setReservationReminderWhatsappTemplate(e.target.value)}
+                rows={4}
+              />
+            </FormField>
+            <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{checkOut}}'}</p>
 
-        <FormField label="Días después del email inicial para el recordatorio de depósito">
-          <Input
-            type="number"
-            min={1}
-            value={depositReminderDaysAfter === 0 ? '' : depositReminderDaysAfter}
-            onChange={(e) => setDepositReminderDaysAfter(e.target.value === '' ? 0 : Number(e.target.value))}
-          />
-        </FormField>
-        <FormField label="Mensaje de recordatorio de depósito">
-          <Textarea
-            value={depositReminderWhatsappTemplate}
-            onChange={(e) => setDepositReminderWhatsappTemplate(e.target.value)}
-            rows={4}
-          />
-        </FormField>
-        <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{paymentInstructions}}'}</p>
+            <FormField label="Días después del email inicial para el recordatorio de depósito">
+              <Input
+                type="number"
+                min={1}
+                value={depositReminderDaysAfter === 0 ? '' : depositReminderDaysAfter}
+                onChange={(e) => setDepositReminderDaysAfter(e.target.value === '' ? 0 : Number(e.target.value))}
+              />
+            </FormField>
+            <FormField label="Mensaje de recordatorio de depósito">
+              <Textarea
+                value={depositReminderWhatsappTemplate}
+                onChange={(e) => setDepositReminderWhatsappTemplate(e.target.value)}
+                rows={4}
+              />
+            </FormField>
+            <p className="-mt-2 text-xs text-text-muted">
+              Variables: {'{{guestName}} {{checkIn}} {{paymentInstructions}}'}
+            </p>
+          </div>
+        </Card>
 
-        {saved && <Alert tone="success">Guardado</Alert>}
-        <Button type="submit">Guardar</Button>
+        <Card>
+          {saveError && <Alert>{saveError}</Alert>}
+          {saved && <Alert tone="success">Guardado</Alert>}
+          <Button type="submit" loading={saving}>
+            Guardar
+          </Button>
+        </Card>
       </form>
-      <section className="mt-8">
+
+      <Card className="mt-6">
         <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Sincronización de canales</h2>
         {lastSyncError ? (
           <Alert>Falló la última sincronización: {lastSyncError}</Alert>
@@ -357,11 +399,12 @@ export function SettingsPage() {
           </p>
         )}
         {syncActionError && <Alert>{syncActionError}</Alert>}
-        <Button type="button" variant="secondary" className="mt-3" onClick={handleSyncNow} disabled={syncing}>
+        <Button type="button" variant="secondary" className="mt-3" loading={syncing} onClick={handleSyncNow}>
           Sincronizar ahora
         </Button>
-      </section>
-      <section className="mt-8">
+      </Card>
+
+      <Card className="mt-6">
         <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Google Calendar</h2>
         {googleCallbackStatus === 'connected' && <Alert tone="success">Google Calendar conectado.</Alert>}
         {googleCallbackStatus === 'error' && <Alert>No se pudo conectar Google Calendar. Por favor, intentá de nuevo.</Alert>}
@@ -376,10 +419,10 @@ export function SettingsPage() {
               </p>
             )}
             <div className="mt-3 flex gap-3">
-              <Button type="button" variant="secondary" onClick={handleSyncGoogleCalendarNow} disabled={googleSyncing}>
+              <Button type="button" variant="secondary" loading={googleSyncing} onClick={handleSyncGoogleCalendarNow}>
                 Sincronizar Google Calendar ahora
               </Button>
-              <Button type="button" variant="danger" onClick={handleDisconnectGoogleCalendar}>
+              <Button type="button" variant="danger" loading={googleDisconnecting} onClick={handleDisconnectGoogleCalendar}>
                 Desconectar
               </Button>
             </div>
@@ -387,12 +430,12 @@ export function SettingsPage() {
         ) : (
           <>
             <p className="text-sm text-text-muted">No conectado.</p>
-            <Button type="button" className="mt-3" onClick={handleConnectGoogleCalendar}>
+            <Button type="button" className="mt-3" loading={googleConnecting} onClick={handleConnectGoogleCalendar}>
               Conectar Google Calendar
             </Button>
           </>
         )}
-      </section>
+      </Card>
     </PageContainer>
   );
 }

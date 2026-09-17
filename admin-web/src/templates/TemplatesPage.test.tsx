@@ -38,11 +38,12 @@ describe('TemplatesPage', () => {
     );
   });
 
-  it('deletes a template', async () => {
+  it('asks for confirmation before deleting a template', async () => {
     vi.spyOn(templatesApi, 'listCampaignTemplates').mockResolvedValue([
       { id: '1', name: 'Welcome back', subject: 'Hi', bodyHtml: '<p>Hi</p>' },
     ]);
     const deleteSpy = vi.spyOn(templatesApi, 'deleteCampaignTemplate').mockResolvedValue(undefined);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderPage();
 
@@ -50,7 +51,24 @@ describe('TemplatesPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /eliminar/i }));
 
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Welcome back'));
     await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith('1'));
+  });
+
+  it('does not delete the template when the confirmation is declined', async () => {
+    vi.spyOn(templatesApi, 'listCampaignTemplates').mockResolvedValue([
+      { id: '1', name: 'Welcome back', subject: 'Hi', bodyHtml: '<p>Hi</p>' },
+    ]);
+    const deleteSpy = vi.spyOn(templatesApi, 'deleteCampaignTemplate').mockResolvedValue(undefined);
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /eliminar/i }));
+
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 
   it('shows an alert when a delete is refused because the template is in use', async () => {
@@ -58,6 +76,7 @@ describe('TemplatesPage', () => {
       { id: '1', name: 'Welcome back', subject: 'Hi', bodyHtml: '<p>Hi</p>' },
     ]);
     vi.spyOn(templatesApi, 'deleteCampaignTemplate').mockRejectedValue(new Error('in use'));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderPage();
 

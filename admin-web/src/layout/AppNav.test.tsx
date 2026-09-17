@@ -35,4 +35,14 @@ describe('AppNav', () => {
 
     await waitFor(() => expect(localStorage.getItem('accessToken')).toBeNull());
   });
+
+  it('toggles the mobile menu open and closed', () => {
+    renderNav();
+
+    fireEvent.click(screen.getByRole('button', { name: /abrir menú/i }));
+    expect(screen.getByRole('button', { name: /cerrar menú/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /cerrar menú/i }));
+    expect(screen.getByRole('button', { name: /abrir menú/i })).toBeInTheDocument();
+  });
 });
