@@ -121,6 +121,7 @@ export class ChannelImportService {
     }
 
     const guestEmail = dto.guest_email?.trim().toLowerCase() || null;
+    const guestPhone = dto.guest_phone?.trim() || null;
 
     // Sending the confirmation email invites the guest into the confirmation flow (accept
     // dates, accept the contract, etc.) — the reservation is, by definition, awaiting that
@@ -139,6 +140,7 @@ export class ChannelImportService {
             ? 'Huésped de Airbnb (pendiente de completar)'
             : 'Huésped de Booking.com (pendiente de completar)'),
         guestEmail,
+        guestPhone,
         checkIn,
         checkOut,
         paxCount: dto.guests ?? 1,
@@ -160,7 +162,7 @@ export class ChannelImportService {
       void this.guestsService.syncFromReservation(reservation.id, {
         email: guestEmail,
         name: reservation.guestName,
-        phone: null,
+        phone: guestPhone,
       });
     }
 

@@ -348,6 +348,50 @@ describe('ChannelImportService', () => {
     );
   });
 
+  it('stores the scraped guest_phone on the reservation, even without a guest_email', async () => {
+    prisma.reservation.findUnique.mockResolvedValue(null);
+    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-3', ...data }));
+
+    await service.import({
+      ...baseDto,
+      source: 'airbnb',
+      hotel_id: undefined,
+      res_id: '1000000484',
+      guest_name: 'María Laura',
+      guest_phone: '‪+591 75278095‬',
+    });
+
+    expect(prisma.reservation.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ guestPhone: '‪+591 75278095‬' }) }),
+    );
+    // No email was scraped, so there's nothing to key a Guest/CRM record on yet — the phone
+    // alone doesn't trigger a sync (see guestsService.syncFromReservation's email-keyed
+    // upsert). The phone is still useful on the reservation itself either way (e.g. for the
+    // existing WhatsApp reminders).
+    expect(guestsService.syncFromReservation).not.toHaveBeenCalled();
+  });
+
+  it('passes the scraped phone into the guest sync when both email and phone are present', async () => {
+    prisma.reservation.findUnique.mockResolvedValue(null);
+    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-4', ...data }));
+
+    await service.import({
+      ...baseDto,
+      source: 'airbnb',
+      hotel_id: undefined,
+      res_id: '1000000484',
+      guest_name: 'María Laura',
+      guest_email: 'gioconda@example.com',
+      guest_phone: '+591 75278095',
+    });
+
+    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-airbnb-4', {
+      email: 'gioconda@example.com',
+      name: 'María Laura',
+      phone: '+591 75278095',
+    });
+  });
+
   it('pushes to the calendar even when check_in/check_out are unverified — an approximate date on the internal staff calendar beats no event at all', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
     prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-10', ...data }));

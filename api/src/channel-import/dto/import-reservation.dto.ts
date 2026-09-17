@@ -32,6 +32,12 @@ export class ImportReservationDto {
   @IsEmail()
   guest_email: string | null;
 
+  // Airbnb-only for now (Booking.com's extranet page doesn't expose it) — used to sync the
+  // Guest record, same as guest_email.
+  @IsOptional()
+  @IsString()
+  guest_phone?: string | null;
+
   @IsOptional()
   @IsISO8601()
   check_in: string | null;
