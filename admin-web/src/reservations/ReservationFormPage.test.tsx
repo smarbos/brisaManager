@@ -199,6 +199,103 @@ describe('ReservationFormPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('resends the final confirmation email for a confirmed reservation', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      guestEmail: 'jane@example.com',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'CONFIRMED',
+      confirmationToken: 'tok-1',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    const resendSpy = vi
+      .spyOn(reservationsApi, 'resendFinalEmail')
+      .mockResolvedValue({ sent: true, reservation: {} as never });
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const button = await screen.findByRole('button', { name: /reenviar email de confirmación final/i });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(resendSpy).toHaveBeenCalledWith('1'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('resends the cancellation email for a cancelled reservation', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      guestEmail: 'jane@example.com',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'CANCELLED',
+      confirmationToken: 'tok-1',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    const resendSpy = vi
+      .spyOn(reservationsApi, 'resendCancellationEmail')
+      .mockResolvedValue({ sent: true, reservation: {} as never });
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const button = await screen.findByRole('button', { name: /reenviar email de cancelación/i });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(resendSpy).toHaveBeenCalledWith('1'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('does not show the final/cancellation resend rows for a reservation still pending', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      guestEmail: 'jane@example.com',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole('button', { name: /reenviar email de confirmación$/i });
+    expect(screen.queryByRole('button', { name: /reenviar email de confirmación final/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /reenviar email de cancelación/i })).not.toBeInTheDocument();
+  });
+
   it('pre-fills the email and phone fields when editing an existing reservation', async () => {
     vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
       id: '1',

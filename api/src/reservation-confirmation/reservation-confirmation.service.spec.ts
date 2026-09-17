@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ReservationConfirmationService } from './reservation-confirmation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
@@ -7,7 +8,7 @@ import { EmailService } from '../email/email.service';
 describe('ReservationConfirmationService', () => {
   let service: ReservationConfirmationService;
   let prisma: {
-    reservation: { findUniqueOrThrow: jest.Mock; update: jest.Mock };
+    reservation: { findUniqueOrThrow: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
   };
   let eventsService: { record: jest.Mock };
   let emailService: {
@@ -29,7 +30,7 @@ describe('ReservationConfirmationService', () => {
 
   beforeEach(async () => {
     prisma = {
-      reservation: { findUniqueOrThrow: jest.fn(), update: jest.fn() },
+      reservation: { findUniqueOrThrow: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     };
     eventsService = { record: jest.fn() };
     emailService = {
@@ -125,5 +126,55 @@ describe('ReservationConfirmationService', () => {
       'Resend down',
     );
     expect(emailService.sendAlert).toHaveBeenCalled();
+  });
+
+  describe('resendFinalEmail', () => {
+    it('resends the final email for a confirmed reservation', async () => {
+      const confirmed = { ...baseReservation, status: 'CONFIRMED' };
+      prisma.reservation.findUnique.mockResolvedValue(confirmed);
+      emailService.sendFinalConfirmationEmail.mockResolvedValue(undefined);
+
+      const { sent, reservation } = await service.resendFinalEmail('res-1');
+
+      expect(sent).toBe(true);
+      expect(reservation).toBe(confirmed);
+      expect(emailService.sendFinalConfirmationEmail).toHaveBeenCalledWith('jane@example.com', 'Jane Doe');
+      expect(prisma.reservation.update).toHaveBeenCalledWith({
+        where: { id: 'res-1' },
+        data: { finalConfirmationEmailSentAt: expect.any(Date) },
+      });
+    });
+
+    it('reports sent: false when the resend fails', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation, status: 'CONFIRMED' });
+      emailService.sendFinalConfirmationEmail.mockRejectedValue(new Error('Resend down'));
+
+      const { sent } = await service.resendFinalEmail('res-1');
+
+      expect(sent).toBe(false);
+      expect(emailService.sendAlert).toHaveBeenCalled();
+    });
+
+    it('throws when the reservation does not exist', async () => {
+      prisma.reservation.findUnique.mockResolvedValue(null);
+
+      await expect(service.resendFinalEmail('missing')).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('throws when the reservation has no guest email', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        status: 'CONFIRMED',
+        guestEmail: null,
+      });
+
+      await expect(service.resendFinalEmail('res-1')).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('throws when the reservation is not confirmed yet', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation, status: 'PENDING' });
+
+      await expect(service.resendFinalEmail('res-1')).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });
