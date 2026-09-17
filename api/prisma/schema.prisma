@@ -73,6 +73,7 @@ model Reservation {
   depositReturnedAt             DateTime?
   confirmationEmailSentAt       DateTime?
   finalConfirmationEmailSentAt  DateTime?
+  cancellationEmailSentAt       DateTime?
   reservationReminderSentAt     DateTime?
   depositReminderSentAt         DateTime?
   events                        ReservationEvent[]

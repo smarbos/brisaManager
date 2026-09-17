@@ -9,6 +9,8 @@ import {
   markDepositReceived,
   markDepositReturned,
   markPaymentReceived,
+  resendCancellationEmail,
+  resendFinalEmail,
   resendInitialEmail,
   updateReservation,
 } from '../api/reservations';
@@ -34,7 +36,14 @@ const emptyForm = {
   notes: '',
 };
 
-type ActionKey = 'resendEmail' | 'markPayment' | 'markDeposit' | 'returnDeposit' | 'cancel';
+type ActionKey =
+  | 'resendEmail'
+  | 'resendFinalEmail'
+  | 'resendCancellationEmail'
+  | 'markPayment'
+  | 'markDeposit'
+  | 'returnDeposit'
+  | 'cancel';
 
 function StepIcon({ done }: { done: boolean }) {
   return (
@@ -156,6 +165,40 @@ export function ReservationFormPage() {
       }
     } catch {
       setActionError('No se pudo reenviar el email de confirmación. Por favor, intentá de nuevo.');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleResendFinalEmail() {
+    if (!id) return;
+    setActionError(null);
+    setActionLoading('resendFinalEmail');
+    try {
+      const { sent } = await resendFinalEmail(id);
+      loadReservation();
+      if (!sent) {
+        setActionError('El email no pudo enviarse. Revisá el historial de eventos para más detalles.');
+      }
+    } catch {
+      setActionError('No se pudo reenviar el email de confirmación final. Por favor, intentá de nuevo.');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleResendCancellationEmail() {
+    if (!id) return;
+    setActionError(null);
+    setActionLoading('resendCancellationEmail');
+    try {
+      const { sent } = await resendCancellationEmail(id);
+      loadReservation();
+      if (!sent) {
+        setActionError('El email no pudo enviarse. Revisá el historial de eventos para más detalles.');
+      }
+    } catch {
+      setActionError('No se pudo reenviar el email de cancelación. Por favor, intentá de nuevo.');
     } finally {
       setActionLoading(null);
     }
@@ -491,6 +534,52 @@ export function ReservationFormPage() {
                   </Button>
                 )}
               </li>
+              {reservationRecord.status === 'CONFIRMED' && reservationRecord.guestEmail && (
+                <li className="flex items-start justify-between gap-4 py-3">
+                  <div className="flex items-start gap-3">
+                    <StepIcon done={Boolean(reservationRecord.finalConfirmationEmailSentAt)} />
+                    <div>
+                      <p className="font-medium text-text">Email de confirmación final</p>
+                      <p className="text-sm text-text-muted">
+                        {reservationRecord.finalConfirmationEmailSentAt
+                          ? `Enviado el ${formatDateTime(reservationRecord.finalConfirmationEmailSentAt)}`
+                          : 'No enviado'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={actionLoading === 'resendFinalEmail'}
+                    onClick={handleResendFinalEmail}
+                  >
+                    Reenviar email de confirmación final
+                  </Button>
+                </li>
+              )}
+              {reservationRecord.status === 'CANCELLED' && reservationRecord.guestEmail && (
+                <li className="flex items-start justify-between gap-4 py-3">
+                  <div className="flex items-start gap-3">
+                    <StepIcon done={Boolean(reservationRecord.cancellationEmailSentAt)} />
+                    <div>
+                      <p className="font-medium text-text">Email de cancelación</p>
+                      <p className="text-sm text-text-muted">
+                        {reservationRecord.cancellationEmailSentAt
+                          ? `Enviado el ${formatDateTime(reservationRecord.cancellationEmailSentAt)}`
+                          : 'No enviado'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={actionLoading === 'resendCancellationEmail'}
+                    onClick={handleResendCancellationEmail}
+                  >
+                    Reenviar email de cancelación
+                  </Button>
+                </li>
+              )}
             </ul>
             <div className="mt-4 flex flex-wrap gap-3">
               <Button type="button" variant="secondary" onClick={copyGuestLink}>

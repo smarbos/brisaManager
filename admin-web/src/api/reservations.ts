@@ -46,13 +46,21 @@ export function cancelReservation(id: string): Promise<Reservation> {
   return apiClient.request(`/reservations/${id}/cancel`, { method: 'POST' });
 }
 
-export interface ResendInitialEmailResult {
+export interface ResendEmailResult {
   sent: boolean;
   reservation: Reservation;
 }
 
-export function resendInitialEmail(id: string): Promise<ResendInitialEmailResult> {
+export function resendInitialEmail(id: string): Promise<ResendEmailResult> {
   return apiClient.request(`/reservations/${id}/resend-initial-email`, { method: 'POST' });
+}
+
+export function resendFinalEmail(id: string): Promise<ResendEmailResult> {
+  return apiClient.request(`/reservations/${id}/resend-final-email`, { method: 'POST' });
+}
+
+export function resendCancellationEmail(id: string): Promise<ResendEmailResult> {
+  return apiClient.request(`/reservations/${id}/resend-cancellation-email`, { method: 'POST' });
 }
 
 export function listReservationEvents(id: string): Promise<ReservationEvent[]> {

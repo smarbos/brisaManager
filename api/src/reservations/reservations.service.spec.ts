@@ -406,6 +406,64 @@ describe('ReservationsService', () => {
     });
   });
 
+  describe('resendCancellationEmail', () => {
+    const checkIn = new Date('2026-11-06');
+    const checkOut = new Date('2026-11-08');
+
+    it('resends the email and reports success', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: '1',
+        status: 'CANCELLED',
+        guestName: 'Jane Doe',
+        guestEmail: 'jane@example.com',
+        checkIn,
+        checkOut,
+      });
+      emailService.sendCancellationEmail.mockResolvedValue(undefined);
+
+      const result = await service.resendCancellationEmail('1');
+
+      expect(emailService.sendCancellationEmail).toHaveBeenCalledWith('jane@example.com', 'Jane Doe', checkIn, checkOut);
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'CANCELLATION_EMAIL_SENT');
+      expect(result.sent).toBe(true);
+    });
+
+    it('reports failure without throwing when the email provider rejects the send', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: '1',
+        status: 'CANCELLED',
+        guestName: 'Jane Doe',
+        guestEmail: 'jane@example.com',
+        checkIn,
+        checkOut,
+      });
+      emailService.sendCancellationEmail.mockRejectedValue(new Error('bounced'));
+
+      const result = await service.resendCancellationEmail('1');
+
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'CANCELLATION_EMAIL_FAILED', 'bounced');
+      expect(result.sent).toBe(false);
+    });
+
+    it('refuses to resend when the reservation has no guest email', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', status: 'CANCELLED', guestEmail: null });
+
+      await expect(service.resendCancellationEmail('1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(emailService.sendCancellationEmail).not.toHaveBeenCalled();
+    });
+
+    it('refuses to resend when the reservation is not cancelled', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: '1',
+        status: 'PENDING',
+        guestEmail: 'jane@example.com',
+      });
+
+      await expect(service.resendCancellationEmail('1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(emailService.sendCancellationEmail).not.toHaveBeenCalled();
+    });
+  });
+
   describe('checkOverlap', () => {
     it('queries for non-cancelled reservations overlapping the given range', async () => {
       prisma.reservation.findMany.mockResolvedValue([{ id: 'res-1' }]);

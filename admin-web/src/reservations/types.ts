@@ -23,6 +23,8 @@ export interface Reservation {
   depositReceivedAt?: string | null;
   depositReturnedAt?: string | null;
   confirmationEmailSentAt?: string | null;
+  finalConfirmationEmailSentAt?: string | null;
+  cancellationEmailSentAt?: string | null;
   missingFromChannelAt?: string | null;
 }
 

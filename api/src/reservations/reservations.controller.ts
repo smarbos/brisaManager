@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ReservationsService } from './reservations.service';
+import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { QueryReservationDto } from './dto/query-reservation.dto';
@@ -9,7 +10,10 @@ import { CheckOverlapDto } from './dto/check-overlap.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('reservations')
 export class ReservationsController {
-  constructor(private readonly reservationsService: ReservationsService) {}
+  constructor(
+    private readonly reservationsService: ReservationsService,
+    private readonly confirmationService: ReservationConfirmationService,
+  ) {}
 
   @Post()
   create(@Body() dto: CreateReservationDto) {
@@ -59,6 +63,16 @@ export class ReservationsController {
   @Post(':id/resend-initial-email')
   resendInitialEmail(@Param('id') id: string) {
     return this.reservationsService.resendInitialEmail(id);
+  }
+
+  @Post(':id/resend-final-email')
+  resendFinalEmail(@Param('id') id: string) {
+    return this.confirmationService.resendFinalEmail(id);
+  }
+
+  @Post(':id/resend-cancellation-email')
+  resendCancellationEmail(@Param('id') id: string) {
+    return this.reservationsService.resendCancellationEmail(id);
   }
 
   @Get(':id/events')

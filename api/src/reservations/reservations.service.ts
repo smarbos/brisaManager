@@ -226,7 +226,10 @@ export class ReservationsService {
     return updated;
   }
 
-  private async sendCancellationEmail(reservation: Reservation): Promise<void> {
+  // Public (not just used internally by cancel()) so resendCancellationEmail() below can
+  // retry it on demand. Returns whether it actually sent, matching sendInitialEmail()'s and
+  // ReservationConfirmationService.sendFinalEmail()'s same contract.
+  async sendCancellationEmail(reservation: Reservation): Promise<boolean> {
     try {
       await this.emailService.sendCancellationEmail(
         reservation.guestEmail as string,
@@ -234,14 +237,36 @@ export class ReservationsService {
         reservation.checkIn,
         reservation.checkOut,
       );
+      await this.prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { cancellationEmailSentAt: new Date() },
+      });
       await this.eventsService.record(reservation.id, 'CANCELLATION_EMAIL_SENT');
+      return true;
     } catch (error) {
       await this.eventsService.record(reservation.id, 'CANCELLATION_EMAIL_FAILED', (error as Error).message);
       await this.emailService.sendAlert(
         'Falló el email de cancelación',
         `Se canceló la reserva ${reservation.id} para ${reservation.guestName} pero falló el envío del email de cancelación: ${(error as Error).message}`,
       );
+      return false;
     }
+  }
+
+  // Explicit staff-triggered retry — always attempts the send regardless of whether one was
+  // already tried, same as resendInitialEmail()/resendFinalEmail(). Only allowed once the
+  // reservation is actually CANCELLED, since the email says the stay was cancelled.
+  async resendCancellationEmail(id: string): Promise<{ sent: boolean; reservation: Reservation }> {
+    const reservation = await this.findOne(id);
+    if (!reservation.guestEmail) {
+      throw new BadRequestException('This reservation has no guest email to send to');
+    }
+    if (reservation.status !== 'CANCELLED') {
+      throw new BadRequestException('This reservation is not cancelled');
+    }
+
+    const sent = await this.sendCancellationEmail(reservation);
+    return { sent, reservation: await this.findOne(id) };
   }
 
   listEvents(id: string) {
