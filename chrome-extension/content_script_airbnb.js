@@ -72,23 +72,54 @@
     return s.replace(/[‎‏‪-‮⁦-⁩]/g, "").trim();
   }
 
-  function waitForStable({ quietMs = 600, maxWaitMs = 4000 } = {}) {
-    return new Promise((resolve) => {
-      let settleTimer = null;
-      const observer = new MutationObserver(() => {
-        clearTimeout(settleTimer);
-        settleTimer = setTimeout(finish, quietMs);
-      });
-      const finish = () => {
-        observer.disconnect();
-        clearTimeout(settleTimer);
-        clearTimeout(hardStop);
-        resolve();
-      };
-      observer.observe(document.body, { childList: true, subtree: true });
-      settleTimer = setTimeout(finish, quietMs);
-      const hardStop = setTimeout(finish, maxWaitMs);
-    });
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // Condition-based waiting, not a fixed delay or a generic "DOM went quiet" heuristic —
+  // this page is busy enough (message-thread updates, read receipts, etc.) that a
+  // MutationObserver-based "wait until nothing moves for 600ms" essentially never fires
+  // before its own hard timeout, regardless of whether the specific content we're waiting
+  // for has actually rendered yet. Polling for the exact thing we need is slower to write
+  // but far more reliable — confirmed necessary: a debug scan run moments *after* a failed
+  // "Generar link" click found every field correctly, meaning the data reliably shows up
+  // eventually, just not within whatever the old fixed-style wait allowed for.
+  async function waitUntil(predicate, { intervalMs = 200, timeoutMs = 6000 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (predicate()) return true;
+      await delay(intervalMs);
+    }
+    return predicate();
+  }
+
+  function hasPaymentInfo() {
+    return Boolean(document.querySelector('[data-testid="hosting-details-payment-info"]'));
+  }
+
+  // A minimal signal that the page's own reservation panel has rendered at all — checked
+  // before touching anything disclosure-row-specific, since "dates came back wrong" has
+  // happened on the same click where price/phone also failed, suggesting the whole panel
+  // (not just the two collapsed rows) can still be mid-render right after a fresh page
+  // load/reload.
+  function hasReservationPanel() {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+    let node = walker.nextNode();
+    while (node) {
+      if (ownText(node).toLowerCase() === "check-in") return true;
+      node = walker.nextNode();
+    }
+    return false;
+  }
+
+  function hasPhoneRow() {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+    let node = walker.nextNode();
+    while (node) {
+      if (normalizeText(ownText(node)).startsWith("numero de telefono de")) return true;
+      node = walker.nextNode();
+    }
+    return false;
   }
 
   // Finds a collapsed disclosure row by its visible label text and clicks it. Returns
@@ -112,14 +143,17 @@
 
   // Both "Mostrar reserva" (check-in/check-out + price) and "Administrá la reserva" (phone
   // number) are collapsed disclosure rows — see the file-header comment for why clicking
-  // them on the host's behalf is safe. Best-effort: if a row isn't found, its fields just
-  // stay null, same as today.
+  // them on the host's behalf is safe. Skips the click entirely when the target content is
+  // already present (a second click on an already-open row would toggle it closed again),
+  // and after clicking, polls for that exact content rather than guessing how long to wait.
+  // Best-effort throughout: if a row can't be found or its content never appears within the
+  // timeout, the corresponding fields just stay null, same as before.
   async function expandReservationDetails() {
-    if (clickRowByLabel("mostrar reserva")) {
-      await waitForStable();
+    if (!hasPaymentInfo() && clickRowByLabel("mostrar reserva")) {
+      await waitUntil(hasPaymentInfo);
     }
-    if (clickRowByLabel("administra la reserva")) {
-      await waitForStable();
+    if (!hasPhoneRow() && clickRowByLabel("administra la reserva")) {
+      await waitUntil(hasPhoneRow);
     }
   }
 
@@ -244,6 +278,7 @@
   // whatever happened to already be open.
   async function runInspection({ expand = true } = {}) {
     if (expand) {
+      await waitUntil(hasReservationPanel, { timeoutMs: 8000 });
       await expandReservationDetails();
     }
 
@@ -490,6 +525,7 @@
     }
 
     showToast("Buscando los datos de la reserva...", "info");
+    await waitUntil(hasReservationPanel, { timeoutMs: 8000 });
     await expandReservationDetails();
 
     const { guestName, guests, checkIn, checkOut, totalPrice, guestPhone } = extractReservationFields();
