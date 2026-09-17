@@ -174,19 +174,18 @@ export class ChannelImportService {
       void this.reservationsService.sendInitialEmail(reservation);
     }
 
-    // The shared Google Calendar round-trips back into Booking.com's own feed (see the
-    // channel-sync design doc), so an unverified/placeholder DATE has no business
-    // appearing on it — pushing a wrong date there contaminates a calendar other systems
-    // trust. This deliberately checks only check_in/check_out, not the full
-    // unverified_fields list: `status` is never scrapeable from Booking.com's page (see
-    // the file-header comment) and so is *always* unverified, which made the old
-    // "everything verified" gate permanently unreachable — no extension-imported
-    // reservation ever reached the calendar, no matter how accurate its dates were. Status
-    // doesn't affect calendar correctness, so it has no business gating this.
-    const datesVerified = !dto.unverified_fields.includes('check_in') && !dto.unverified_fields.includes('check_out');
-    if (datesVerified) {
-      void this.googleCalendarPushService.pushReservation(reservation);
-    }
+    // Every reservation reaches the shared Google Calendar on creation, regardless of
+    // which scraped fields are still unverified — the calendar is a staff-facing
+    // visibility/double-booking-prevention tool (per the Google Calendar integration
+    // design doc), not something that round-trips back into Booking.com's or Airbnb's own
+    // availability feed, so an approximate date is far more useful there than no event at
+    // all. Gating this on `unverified_fields` used to make Airbnb-sourced reservations
+    // permanently unreachable — every field the Airbnb content script scrapes is always
+    // marked unverified by design (see content_script_airbnb.js), so a "dates verified"
+    // gate silently dropped every single Airbnb import from ever appearing on the
+    // calendar. Once staff correct any wrong dates in the admin app, the next update()
+    // call re-pushes the corrected event automatically.
+    void this.googleCalendarPushService.pushReservation(reservation);
 
     return { reservation, created: true };
   }
