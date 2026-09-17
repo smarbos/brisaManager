@@ -289,7 +289,7 @@ export function ConfirmationPage() {
                 <Input
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Como figura en tu reserva"
+                  placeholder="Como figura en tu Documento"
                   required
                 />
               </FormField>
@@ -303,7 +303,7 @@ export function ConfirmationPage() {
                     inputMode="numeric"
                     value={phoneLocal}
                     onChange={(e) => setPhoneLocal(e.target.value)}
-                    placeholder="2235550123"
+                    placeholder="2236674787"
                     required
                     className="flex-1"
                   />
