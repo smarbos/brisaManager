@@ -299,6 +299,20 @@ export function ReservationFormPage() {
           <FormField label="Nombre del huésped">
             <Input value={form.guestName} onChange={(e) => setForm({ ...form, guestName: e.target.value })} required />
           </FormField>
+          <FormField label="Email del huésped">
+            <Input
+              type="email"
+              value={form.guestEmail}
+              onChange={(e) => setForm({ ...form, guestEmail: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Teléfono del huésped">
+            <Input
+              type="tel"
+              value={form.guestPhone}
+              onChange={(e) => setForm({ ...form, guestPhone: e.target.value })}
+            />
+          </FormField>
           <FormField label="Check-in">
             <Input
               type="date"
