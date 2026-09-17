@@ -63,10 +63,11 @@ describe('GoogleCalendarAuthService', () => {
     });
   });
 
-  it('exchanges the code, creates a dedicated calendar, and persists the refresh token', async () => {
+  it('creates a dedicated calendar on first-ever connect (no existing calendarId)', async () => {
     service.getConsentUrl();
     const state = generateAuthUrlMock.mock.calls[0][0].state;
     getTokenMock.mockResolvedValue({ tokens: { refresh_token: 'refresh-abc' } });
+    settingsService.get.mockResolvedValue({ googleCalendarId: null });
     insertCalendarMock.mockResolvedValue({ data: { id: 'calendar-abc' } });
 
     await service.handleOAuthCallback('auth-code-1', state);
@@ -79,6 +80,21 @@ describe('GoogleCalendarAuthService', () => {
     expect(prisma.settings.update).toHaveBeenCalledWith({
       where: { id: 'singleton' },
       data: { googleRefreshToken: 'refresh-abc', googleCalendarId: 'calendar-abc', googleSyncToken: null },
+    });
+  });
+
+  it('reuses the existing calendar on reconnect instead of creating a new one', async () => {
+    service.getConsentUrl();
+    const state = generateAuthUrlMock.mock.calls[0][0].state;
+    getTokenMock.mockResolvedValue({ tokens: { refresh_token: 'refresh-new' } });
+    settingsService.get.mockResolvedValue({ googleCalendarId: 'calendar-existing' });
+
+    await service.handleOAuthCallback('auth-code-1', state);
+
+    expect(insertCalendarMock).not.toHaveBeenCalled();
+    expect(prisma.settings.update).toHaveBeenCalledWith({
+      where: { id: 'singleton' },
+      data: { googleRefreshToken: 'refresh-new', googleCalendarId: 'calendar-existing', googleSyncToken: null },
     });
   });
 
@@ -104,12 +120,12 @@ describe('GoogleCalendarAuthService', () => {
     expect(getTokenMock).not.toHaveBeenCalled();
   });
 
-  it('clears the stored credentials on disconnect', async () => {
+  it('clears the credentials on disconnect but keeps the calendarId so reconnecting reuses the same calendar', async () => {
     await service.disconnect();
 
     expect(prisma.settings.update).toHaveBeenCalledWith({
       where: { id: 'singleton' },
-      data: { googleRefreshToken: null, googleCalendarId: null, googleSyncToken: null },
+      data: { googleRefreshToken: null, googleSyncToken: null },
     });
   });
 

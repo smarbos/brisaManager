@@ -59,25 +59,40 @@ export class GoogleCalendarAuthService {
     }
     client.setCredentials({ refresh_token: tokens.refresh_token });
 
-    const calendarClient = calendar({ version: 'v3', auth: client });
-    const created = await calendarClient.calendars.insert({
-      requestBody: { summary: DEDICATED_CALENDAR_NAME },
-    });
+    // Reuse the existing dedicated calendar if this property already has one — reconnecting
+    // (e.g. after disconnect, or after fixing an OAuth misconfiguration) used to
+    // unconditionally create a brand-new calendar every time, silently orphaning the
+    // previous one with no cleanup. Real incident: 5 duplicate "La Brisa de Mar del Plata -
+    // Reservations" calendars accumulated in the connected Google account this way, with
+    // only the newest one ever actually receiving pushed reservations.
+    const existingCalendarId = (await this.settingsService.get()).googleCalendarId;
+    let calendarId = existingCalendarId;
+    if (!calendarId) {
+      const calendarClient = calendar({ version: 'v3', auth: client });
+      const created = await calendarClient.calendars.insert({
+        requestBody: { summary: DEDICATED_CALENDAR_NAME },
+      });
+      calendarId = created.data.id ?? null;
+    }
 
     await this.prisma.settings.update({
       where: { id: 'singleton' },
       data: {
         googleRefreshToken: tokens.refresh_token,
-        googleCalendarId: created.data.id ?? null,
+        googleCalendarId: calendarId,
         googleSyncToken: null,
       },
     });
   }
 
   async disconnect(): Promise<void> {
+    // Deliberately keeps googleCalendarId — see handleOAuthCallback's comment above:
+    // reconnecting should reuse this same calendar, not create a new one. Only the
+    // credentials (which are what "connected" actually means, per getStatus() below) and
+    // the pull cursor are cleared.
     await this.prisma.settings.update({
       where: { id: 'singleton' },
-      data: { googleRefreshToken: null, googleCalendarId: null, googleSyncToken: null },
+      data: { googleRefreshToken: null, googleSyncToken: null },
     });
   }
 
