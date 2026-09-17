@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -36,9 +37,17 @@ describe('ChannelImportController (e2e)', () => {
     // entirely, not just the outbound Resend call — the exact call to sendInitialEmail is
     // already verified with mocks in channel-import.service.spec.ts, so this file doesn't
     // need to re-observe it, only confirm nothing here reaches a real external API.
+    // This file's own request count (across every `it` below) has grown past the
+    // endpoint's real 10-req/min-per-IP throttle limit, which exists to slow down brute-
+    // force token guesses — a legitimate production concern, not something to loosen just
+    // to fit a test suite. The guard runs against this test file's own isolated app
+    // instance/in-memory throttle storage, so disabling it here has no effect on the real
+    // limit or on any other test file.
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ReservationsService)
       .useValue({ sendInitialEmail: jest.fn().mockResolvedValue(undefined) })
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
       .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -105,6 +114,35 @@ describe('ChannelImportController (e2e)', () => {
 
     expect(second.body.created).toBe(false);
     expect(second.body.id).toBe(first.body.id);
+  });
+
+  it('creates a fresh reservation when the existing one for the same res_id was cancelled', async () => {
+    const first = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send({ ...basePayload, res_id: 'e2e-test-cancelled-rebook' })
+      .expect(201);
+    expect(first.body.created).toBe(true);
+
+    await prisma.reservation.update({ where: { id: first.body.id }, data: { status: 'CANCELLED' } });
+
+    const second = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send({ ...basePayload, res_id: 'e2e-test-cancelled-rebook' })
+      .expect(201);
+
+    expect(second.body.created).toBe(true);
+    expect(second.body.id).not.toBe(first.body.id);
+
+    const oldReservation = await prisma.reservation.findUnique({ where: { id: first.body.id } });
+    expect(oldReservation?.externalReference).toBe(
+      `booking-extranet-e2e-test-cancelled-rebook-superseded-${first.body.id}`,
+    );
+    expect(oldReservation?.status).toBe('CANCELLED');
+
+    const newReservation = await prisma.reservation.findUnique({ where: { id: second.body.id } });
+    expect(newReservation?.externalReference).toBe('booking-extranet-e2e-test-cancelled-rebook');
   });
 
   it('stores the guest email and forces status to PENDING when a scraped status is present too', async () => {
