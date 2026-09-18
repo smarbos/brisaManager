@@ -147,9 +147,13 @@ model AdminUser {
 
 model Guest {
   id                 String              @id @default(uuid())
-  email              String              @unique
+  // Optional: Airbnb's hosting messages page never exposes the guest's email, only their
+  // phone — a guest reached that way is still worth a CRM record, keyed on phone instead
+  // (see GuestsService.syncFromReservation()). Postgres allows multiple NULLs in a unique
+  // column, so this doesn't collide across every email-less guest.
+  email              String?             @unique
   name               String
-  phone              String?
+  phone              String?             @unique
   totalStays         Int                 @default(0)
   lastStayAt         DateTime?
   unsubscribedAt     DateTime?

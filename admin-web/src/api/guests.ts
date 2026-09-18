@@ -3,7 +3,7 @@ import { Reservation } from '../reservations/types';
 
 export interface Guest {
   id: string;
-  email: string;
+  email: string | null;
   name: string;
   phone: string | null;
   totalStays: number;

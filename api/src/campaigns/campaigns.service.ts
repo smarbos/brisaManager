@@ -34,7 +34,8 @@ export class CampaignsService {
       const html = `${template.bodyHtml.replaceAll('{{guestName}}', guest.name)}<p><a href="${unsubscribeUrl}">Unsubscribe</a></p>`;
 
       try {
-        await this.emailService.sendMarketingEmail(guest.email, subject, html);
+        // findEligibleForCampaign() filters to guests with a non-null email.
+        await this.emailService.sendMarketingEmail(guest.email as string, subject, html);
         results.push({ guestId: guest.id, status: 'SENT', error: null });
       } catch (error) {
         results.push({ guestId: guest.id, status: 'FAILED', error: (error as Error).message });
