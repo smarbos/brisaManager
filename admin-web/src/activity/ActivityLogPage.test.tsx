@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ActivityLogPage } from './ActivityLogPage';
@@ -35,10 +35,10 @@ describe('ActivityLogPage', () => {
 
     renderPage();
 
-    await waitFor(() => expect(screen.getByText('Reserva creada')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Reserva creada').length).toBeGreaterThan(0));
     expect(screen.getByText('Created via Booking.com calendar sync')).toBeInTheDocument();
     expect(screen.getByText('Booking.com Guest')).toBeInTheDocument();
-    expect(screen.getByText('Fechas confirmadas')).toBeInTheDocument();
+    expect(screen.getAllByText('Fechas confirmadas').length).toBeGreaterThan(0);
     expect(screen.getByText('Jane Doe')).toBeInTheDocument();
   });
 
@@ -58,6 +58,93 @@ describe('ActivityLogPage', () => {
 
     const link = await screen.findByRole('link', { name: 'Booking.com Guest' });
     expect(link).toHaveAttribute('href', '/reservations/res-1');
+  });
+
+  it('filters by event type', async () => {
+    vi.spyOn(reservationEventsApi, 'listActivityLog').mockResolvedValue([
+      {
+        id: 'evt-1',
+        reservationId: 'res-1',
+        type: 'RESERVATION_CREATED',
+        detail: null,
+        createdAt: '2026-09-14T17:00:00.000Z',
+        reservation: { guestName: 'Booking.com Guest', source: 'BOOKING' },
+      },
+      {
+        id: 'evt-2',
+        reservationId: 'res-2',
+        type: 'DATES_CONFIRMED',
+        detail: null,
+        createdAt: '2026-09-13T12:00:00.000Z',
+        reservation: { guestName: 'Jane Doe', source: 'DIRECT' },
+      },
+    ]);
+
+    renderPage();
+    await screen.findByText('Jane Doe');
+
+    fireEvent.change(screen.getByLabelText(/tipo de evento/i), { target: { value: 'DATES_CONFIRMED' } });
+
+    expect(screen.queryByText('Booking.com Guest')).not.toBeInTheDocument();
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+  });
+
+  it('filters by guest name', async () => {
+    vi.spyOn(reservationEventsApi, 'listActivityLog').mockResolvedValue([
+      {
+        id: 'evt-1',
+        reservationId: 'res-1',
+        type: 'RESERVATION_CREATED',
+        detail: null,
+        createdAt: '2026-09-14T17:00:00.000Z',
+        reservation: { guestName: 'Booking.com Guest', source: 'BOOKING' },
+      },
+      {
+        id: 'evt-2',
+        reservationId: 'res-2',
+        type: 'DATES_CONFIRMED',
+        detail: null,
+        createdAt: '2026-09-13T12:00:00.000Z',
+        reservation: { guestName: 'Jane Doe', source: 'DIRECT' },
+      },
+    ]);
+
+    renderPage();
+    await screen.findByText('Jane Doe');
+
+    fireEvent.change(screen.getByLabelText(/huésped/i), { target: { value: 'jane' } });
+
+    expect(screen.queryByText('Booking.com Guest')).not.toBeInTheDocument();
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+  });
+
+  it('filters by date range', async () => {
+    vi.spyOn(reservationEventsApi, 'listActivityLog').mockResolvedValue([
+      {
+        id: 'evt-1',
+        reservationId: 'res-1',
+        type: 'RESERVATION_CREATED',
+        detail: null,
+        createdAt: '2026-09-14T17:00:00.000Z',
+        reservation: { guestName: 'Booking.com Guest', source: 'BOOKING' },
+      },
+      {
+        id: 'evt-2',
+        reservationId: 'res-2',
+        type: 'DATES_CONFIRMED',
+        detail: null,
+        createdAt: '2026-09-01T12:00:00.000Z',
+        reservation: { guestName: 'Jane Doe', source: 'DIRECT' },
+      },
+    ]);
+
+    renderPage();
+    await screen.findByText('Jane Doe');
+
+    fireEvent.change(screen.getByLabelText(/^desde$/i), { target: { value: '2026-09-10' } });
+
+    expect(screen.queryByText('Jane Doe')).not.toBeInTheDocument();
+    expect(screen.getByText('Booking.com Guest')).toBeInTheDocument();
   });
 
   it('shows an alert when the log cannot be loaded', async () => {

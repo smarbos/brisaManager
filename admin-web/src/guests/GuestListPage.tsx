@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listGuests, Guest } from '../api/guests';
 import {
@@ -10,6 +10,8 @@ import {
   LoadingState,
   Table,
   Badge,
+  FormField,
+  Input,
   tableThClass as thClass,
   tableTdClass as tdClass,
 } from '../ui';
@@ -20,6 +22,7 @@ export function GuestListPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     listGuests()
@@ -28,15 +31,37 @@ export function GuestListPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const filteredGuests = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) {
+      return guests;
+    }
+    return guests.filter((g) =>
+      [g.name, g.email, g.phone].some((field) => field?.toLowerCase().includes(term)),
+    );
+  }, [guests, search]);
+
   return (
     <PageContainer>
       <PageHeader title="Huéspedes" subtitle="Todos los huéspedes que se alojaron o reservaron en el alojamiento." />
       {error && <Alert>{error}</Alert>}
       <Card>
+        <div className="mb-4">
+          <FormField label="Buscar">
+            <Input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Nombre, email o teléfono"
+            />
+          </FormField>
+        </div>
         {loading ? (
           <LoadingState />
         ) : guests.length === 0 ? (
           <EmptyState message="Todavía no hay huéspedes registrados." />
+        ) : filteredGuests.length === 0 ? (
+          <EmptyState message="No hay huéspedes que coincidan con la búsqueda." />
         ) : (
         <Table>
           <thead>
@@ -51,7 +76,7 @@ export function GuestListPage() {
             </tr>
           </thead>
           <tbody>
-            {guests.map((g) => (
+            {filteredGuests.map((g) => (
               <tr key={g.id}>
                 <td className={tdClass}>
                   <Link
@@ -67,7 +92,7 @@ export function GuestListPage() {
                     {g.name}
                   </Link>
                 </td>
-                <td className={tdClass}>{g.email}</td>
+                <td className={tdClass}>{g.email ?? '—'}</td>
                 <td className={tdClass}>{g.phone ?? '—'}</td>
                 <td className={tdClass}>{g.totalStays}</td>
                 <td className={tdClass}>{g.lastStayAt ? formatDate(g.lastStayAt) : '—'}</td>
