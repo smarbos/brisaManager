@@ -39,7 +39,7 @@ export function PageHeader({ title, subtitle, nav, backTo, backLabel = 'Volver' 
         <h1
           ref={headingRef}
           tabIndex={-1}
-          className="font-heading text-2xl font-bold text-heading outline-none focus:rounded focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg"
+          className="font-heading text-2xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           {title}
         </h1>

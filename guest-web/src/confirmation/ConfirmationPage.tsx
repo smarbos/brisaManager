@@ -284,7 +284,7 @@ export function ConfirmationPage() {
             <h2
               ref={stepHeadingRef}
               tabIndex={-1}
-              className="font-heading text-xl font-bold text-heading outline-none focus:rounded focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+              className="font-heading text-xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
             >
               Confirmá tu reserva
             </h2>
@@ -371,7 +371,7 @@ export function ConfirmationPage() {
             <h2
               ref={stepHeadingRef}
               tabIndex={-1}
-              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus:rounded focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
             >
               Reglas de la casa
             </h2>
@@ -428,7 +428,7 @@ export function ConfirmationPage() {
             <h2
               ref={stepHeadingRef}
               tabIndex={-1}
-              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus:rounded focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
             >
               Pago y garantía
             </h2>
@@ -533,7 +533,7 @@ export function ConfirmationPage() {
             <h2
               ref={stepHeadingRef}
               tabIndex={-1}
-              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus:rounded focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
             >
               Confirmación
             </h2>
