@@ -44,16 +44,168 @@ describe('ReservationListPage', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/no se pudieron cargar las reservas/i));
   });
 
+  it('filters the visible reservations by guest name', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Jane Doe',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'AIRBNB',
+        totalAmount: 100000,
+        currency: 'ARS',
+        status: 'PENDING',
+        confirmationToken: 'tok-1',
+      },
+      {
+        id: '2',
+        guestName: 'John Smith',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'AIRBNB',
+        totalAmount: 100000,
+        currency: 'ARS',
+        status: 'PENDING',
+        confirmationToken: 'tok-2',
+      },
+    ]);
+
+    renderPage();
+    await screen.findByText('John Smith');
+
+    fireEvent.change(screen.getByLabelText(/buscar/i), { target: { value: 'jane' } });
+
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+    expect(screen.queryByText('John Smith')).not.toBeInTheDocument();
+  });
+
+  it('defaults the status filter to Pendiente', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([]);
+
+    renderPage();
+
+    expect(await screen.findByLabelText(/estado/i)).toHaveValue('PENDING');
+  });
+
+  it('shows the formatted price for a reservation with a total amount', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Jane Doe',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'AIRBNB',
+        totalAmount: 270400,
+        currency: 'ARS',
+        status: 'PENDING',
+        confirmationToken: 'tok-1',
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText('ARS 270.400')).toBeInTheDocument();
+  });
+
+  it('shows a dash for a reservation with no total amount', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Jane Doe',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'AIRBNB',
+        totalAmount: 0,
+        currency: 'ARS',
+        status: 'PENDING',
+        confirmationToken: 'tok-1',
+      },
+    ]);
+
+    renderPage();
+
+    await screen.findByText('Jane Doe');
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
+
+  it('shows an alert icon with details when the confirmation email failed to send', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Jane Doe',
+        guestEmail: 'jane@example.com',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 100000,
+        currency: 'ARS',
+        status: 'PENDING',
+        confirmationEmailSentAt: null,
+      } as never,
+    ]);
+
+    renderPage();
+
+    const icon = await screen.findByRole('img', { name: /el email de confirmación no se envió/i });
+    expect(icon).toHaveAttribute('title', 'El email de confirmación no se envió');
+  });
+
+  it('shows an alert icon when both email and phone are missing', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Jane Doe',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 100000,
+        currency: 'ARS',
+        status: 'PENDING',
+      } as never,
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByRole('img', { name: /falta el email y el teléfono/i })).toBeInTheDocument();
+  });
+
+  it('does not show an alert icon for a cancelled reservation missing everything', async () => {
+    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([
+      {
+        id: '1',
+        guestName: 'Jane Doe',
+        checkIn: '2026-01-10',
+        checkOut: '2026-01-15',
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 0,
+        currency: 'ARS',
+        status: 'CANCELLED',
+      } as never,
+    ]);
+
+    renderPage();
+
+    await screen.findByText('Jane Doe');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
   it('refetches when the source filter changes', async () => {
     const spy = vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([]);
 
     renderPage();
 
-    await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: undefined, status: undefined }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: undefined, status: 'PENDING' }));
 
     fireEvent.change(screen.getByLabelText(/canal/i), { target: { value: 'AIRBNB' } });
 
-    await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: 'AIRBNB', status: undefined }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: 'AIRBNB', status: 'PENDING' }));
   });
 
   it('shows a warning badge for a reservation missing from its channel feed', async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cancelReservation, listReservations } from '../api/reservations';
 import { Reservation, ReservationSource, ReservationStatus } from './types';
@@ -10,6 +10,7 @@ import {
   Badge,
   EmptyState,
   FormField,
+  Input,
   LoadingState,
   Select,
   Alert,
@@ -19,12 +20,13 @@ import {
 } from '../ui';
 import { formatDate } from '../lib/date';
 import { shortId } from '../lib/id';
-import { sourceLabel, statusLabel, statusBadgeTone } from '../lib/labels';
+import { sourceLabel, statusLabel, statusBadgeTone, getReservationWarnings } from '../lib/labels';
 
 export function ReservationListPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [source, setSource] = useState<ReservationSource | ''>('');
-  const [status, setStatus] = useState<ReservationStatus | ''>('');
+  const [status, setStatus] = useState<ReservationStatus | ''>('PENDING');
+  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,14 @@ export function ReservationListPage() {
   }
 
   useEffect(load, [source, status]);
+
+  const filteredReservations = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) {
+      return reservations;
+    }
+    return reservations.filter((r) => r.guestName.toLowerCase().includes(term));
+  }, [reservations, search]);
 
   async function handleCancel(reservation: Reservation) {
     if (!window.confirm(`¿Cancelar la reserva de ${reservation.guestName}?`)) {
@@ -69,6 +79,14 @@ export function ReservationListPage() {
       <Card>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap gap-4">
+            <FormField label="Buscar">
+              <Input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Nombre del huésped"
+              />
+            </FormField>
             <FormField label="Canal">
               <Select value={source} onChange={(e) => setSource(e.target.value as ReservationSource | '')}>
                 <option value="">Todos</option>
@@ -97,22 +115,42 @@ export function ReservationListPage() {
           <LoadingState />
         ) : reservations.length === 0 ? (
           <EmptyState message="No hay reservas que coincidan con estos filtros." />
+        ) : filteredReservations.length === 0 ? (
+          <EmptyState message="No hay reservas que coincidan con la búsqueda." />
         ) : (
         <Table>
           <thead>
             <tr>
+              <th className={thClass}>
+                <span className="sr-only">Alertas</span>
+              </th>
               <th className={thClass}>ID</th>
               <th className={thClass}>Huésped</th>
               <th className={thClass}>Check-in</th>
               <th className={thClass}>Check-out</th>
               <th className={thClass}>Canal</th>
+              <th className={thClass}>Precio</th>
               <th className={thClass}>Estado</th>
               <th className={thClass}>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {reservations.map((r) => (
+            {filteredReservations.map((r) => {
+              const warnings = getReservationWarnings(r);
+              return (
               <tr key={r.id}>
+                <td className={tdClass}>
+                  {warnings.length > 0 && (
+                    <span
+                      role="img"
+                      aria-label={`Requiere atención: ${warnings.join('; ')}`}
+                      title={warnings.join('\n')}
+                      className="cursor-help text-warning"
+                    >
+                      ⚠️
+                    </span>
+                  )}
+                </td>
                 <td className={tdClass}>
                   <Link
                     to={`/reservations/${r.id}`}
@@ -136,6 +174,11 @@ export function ReservationListPage() {
                 <td className={tdClass}>{formatDate(r.checkOut)}</td>
                 <td className={tdClass}>{sourceLabel(r.source)}</td>
                 <td className={tdClass}>
+                  {Number(r.totalAmount) > 0
+                    ? `${r.currency} ${Number(r.totalAmount).toLocaleString('es-AR')}`
+                    : '—'}
+                </td>
+                <td className={tdClass}>
                   <Badge tone={statusBadgeTone(r.status)}>{statusLabel(r.status)}</Badge>
                 </td>
                 <td className={tdClass}>
@@ -151,7 +194,8 @@ export function ReservationListPage() {
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </Table>
         )}
