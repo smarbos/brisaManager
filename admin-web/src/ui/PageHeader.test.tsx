@@ -36,4 +36,10 @@ describe('PageHeader', () => {
 
     expect(screen.getByRole('link', { name: /volver a huéspedes/i })).toHaveAttribute('href', '/guests');
   });
+
+  it('moves focus to the heading on mount so route changes reset keyboard/screen-reader focus', () => {
+    render(<PageHeader title="Reservas" />);
+
+    expect(screen.getByRole('heading', { name: 'Reservas' })).toHaveFocus();
+  });
 });

@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { Button } from '../ui';
+
+const MOBILE_NAV_ID = 'mobile-nav';
 
 const sections = [
   { to: '/', label: 'Reservas', end: true },
@@ -21,6 +23,27 @@ export function AppNav() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const mobileNavRef = useRef<HTMLElement>(null);
+
+  // Move focus into the opened menu (first link) so keyboard/screen-reader users land
+  // somewhere useful instead of the menu just appearing with focus still on the toggle.
+  useEffect(() => {
+    if (menuOpen) {
+      mobileNavRef.current?.querySelector<HTMLElement>('a')?.focus();
+    }
+  }, [menuOpen]);
+
+  function closeMenu() {
+    setMenuOpen(false);
+    menuToggleRef.current?.focus();
+  }
+
+  function handleMenuKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      closeMenu();
+    }
+  }
 
   function handleLogout() {
     setMenuOpen(false);
@@ -46,8 +69,10 @@ export function AppNav() {
         </nav>
         <button
           type="button"
+          ref={menuToggleRef}
           aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
           aria-expanded={menuOpen}
+          aria-controls={MOBILE_NAV_ID}
           onClick={() => setMenuOpen((v) => !v)}
           className="flex min-h-11 min-w-11 items-center justify-center rounded text-xl text-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:hidden"
         >
@@ -55,7 +80,12 @@ export function AppNav() {
         </button>
       </div>
       {menuOpen && (
-        <nav className="flex flex-col gap-1 border-t border-border px-4 py-3 text-sm sm:hidden">
+        <nav
+          id={MOBILE_NAV_ID}
+          ref={mobileNavRef}
+          onKeyDown={handleMenuKeyDown}
+          className="flex flex-col gap-1 border-t border-border px-4 py-3 text-sm sm:hidden"
+        >
           {sections.map((section) => (
             <NavLink
               key={section.to}

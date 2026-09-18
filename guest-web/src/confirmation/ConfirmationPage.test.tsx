@@ -106,6 +106,27 @@ describe('ConfirmationPage', () => {
     );
   });
 
+  it('lets a guest override the country code for a non-Argentine phone number', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+    const confirmSpy = vi
+      .spyOn(publicApi, 'confirmDates')
+      .mockResolvedValue({ datesConfirmedAt: '2026-01-01T00:00:00.000Z' });
+
+    renderAt('tok-1');
+
+    await screen.findByText(/confirmá tu reserva/i);
+
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'John Smith' } });
+    fireEvent.change(screen.getByLabelText(/código/i), { target: { value: '+1' } });
+    fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '2025551234' } });
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'john@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
+
+    await waitFor(() =>
+      expect(confirmSpy).toHaveBeenCalledWith('tok-1', 'John Smith', '+12025551234', 'john@example.com'),
+    );
+  });
+
   it('resumes at step 2 (house rules), listing each rule and requiring the checkbox before accepting', async () => {
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
