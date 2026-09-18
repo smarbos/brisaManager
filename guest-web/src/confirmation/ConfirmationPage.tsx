@@ -1,4 +1,4 @@
-import { FormEvent, ReactNode, useEffect, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { acceptContract, confirmDates, getReservationByToken } from '../api/publicReservations';
@@ -8,7 +8,11 @@ import { formatDate, formatLongDate } from '../lib/date';
 
 type Step = 1 | 2 | 3 | 4;
 
-const PHONE_PREFIX = '+549';
+// Most guests booking this property are Argentine, so the phone field defaults to this
+// prefix to save them typing it — but it's an editable Input, not a fixed label, so a
+// guest with a foreign number can overwrite it with their own country code instead of
+// having a valid-looking-but-wrong Argentine number silently substituted for it.
+const DEFAULT_PHONE_PREFIX = '+549';
 
 const STEP_LABELS: Record<Step, string> = { 1: 'Reserva', 2: 'Reglas', 3: 'Pago', 4: 'Confirmación' };
 
@@ -44,13 +48,15 @@ function CopyButton({
   onCopy: (field: CopyField, value: string) => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => onCopy(field, value)}
-      className="min-h-11 shrink-0 rounded px-2 text-sm font-semibold text-accent underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-    >
-      {status === 'copied' ? '¡Copiado!' : status === 'failed' ? 'No se pudo copiar' : 'Copiar'}
-    </button>
+    <span role="status" aria-live="polite">
+      <button
+        type="button"
+        onClick={() => onCopy(field, value)}
+        className="min-h-11 shrink-0 rounded px-2 text-sm font-semibold text-accent underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+      >
+        {status === 'copied' ? '¡Copiado!' : status === 'failed' ? 'No se pudo copiar' : 'Copiar'}
+      </button>
+    </span>
   );
 }
 
@@ -71,16 +77,19 @@ function WaveIcon() {
 
 function StepIndicator({ step }: { step: Step }) {
   return (
-    <div className="mx-auto mt-6 flex max-w-md gap-2 px-4">
+    <nav aria-label="Progreso del check-in" className="mx-auto mt-6 flex max-w-md gap-2 px-4">
       {([1, 2, 3, 4] as Step[]).map((s) => (
-        <div key={s} className="flex-1">
+        <div key={s} className="flex-1" aria-current={s === step ? 'step' : undefined}>
           <div className={`h-1 rounded-full ${s <= step ? 'bg-accent' : 'bg-border'}`} />
           <p className={`mt-1 text-xs ${s === step ? 'font-semibold text-heading' : 'text-text-muted'}`}>
             {STEP_LABELS[s]}
           </p>
         </div>
       ))}
-    </div>
+      <p role="status" aria-live="polite" className="sr-only">
+        Paso {step} de 4: {STEP_LABELS[step]}
+      </p>
+    </nav>
   );
 }
 
@@ -110,6 +119,7 @@ export function ConfirmationPage() {
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [phonePrefix, setPhonePrefix] = useState(DEFAULT_PHONE_PREFIX);
   const [phoneLocal, setPhoneLocal] = useState('');
   const [email, setEmail] = useState('');
   const [rulesChecked, setRulesChecked] = useState(false);
@@ -119,6 +129,8 @@ export function ConfirmationPage() {
   const [acceptingContract, setAcceptingContract] = useState(false);
   const [refreshingPayments, setRefreshingPayments] = useState(false);
   const [copyStatus, setCopyStatus] = useState<Record<CopyField, CopyStatus | null>>({ cbu: null, alias: null });
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousStepRef = useRef<Step | null>(null);
 
   function load(): Promise<void> {
     if (!token) return Promise.resolve();
@@ -141,13 +153,26 @@ export function ConfirmationPage() {
     load();
   }, [token]);
 
+  // Move focus to the new step's heading when the guest advances (confirm dates, accept
+  // contract) so keyboard/screen-reader users land on the new content instead of being
+  // left on the button that just submitted and disappeared. Skipped on the very first
+  // load (previousStepRef starts at null) so page load doesn't unexpectedly steal focus.
+  useEffect(() => {
+    if (!reservation) return;
+    const step = currentStep(reservation);
+    if (previousStepRef.current !== null && previousStepRef.current !== step) {
+      stepHeadingRef.current?.focus();
+    }
+    previousStepRef.current = step;
+  }, [reservation]);
+
   async function handleConfirmDates(event: FormEvent) {
     event.preventDefault();
     if (!token) return;
     setError(null);
     setConfirmingDates(true);
     try {
-      await confirmDates(token, fullName, `${PHONE_PREFIX}${phoneLocal}`, email);
+      await confirmDates(token, fullName, `${phonePrefix}${phoneLocal}`, email);
       await load();
     } catch {
       setError('No pudimos confirmar tus datos. Por favor, intentá de nuevo.');
@@ -256,7 +281,13 @@ export function ConfirmationPage() {
 
         {step === 1 && (
           <>
-            <h2 className="font-heading text-xl font-bold text-heading">Confirmá tu reserva</h2>
+            <h2
+              ref={stepHeadingRef}
+              tabIndex={-1}
+              className="font-heading text-xl font-bold text-heading outline-none focus:rounded focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+            >
+              Confirmá tu reserva
+            </h2>
             <p className="mt-1 text-sm text-text-muted">
               Revisá que los datos coincidan con tu reserva de Booking.com y completá tus datos de contacto.
             </p>
@@ -293,11 +324,18 @@ export function ConfirmationPage() {
                   required
                 />
               </FormField>
-              <FormField label="Celular">
-                <div className="flex gap-2">
-                  <span className="flex min-h-11 shrink-0 items-center justify-center rounded border border-border bg-surface px-3 text-sm font-medium text-text-muted">
-                    {PHONE_PREFIX}
-                  </span>
+              <div className="flex gap-2">
+                <FormField label="Código">
+                  <Input
+                    type="tel"
+                    value={phonePrefix}
+                    onChange={(e) => setPhonePrefix(e.target.value)}
+                    placeholder="+549"
+                    required
+                    className="w-24"
+                  />
+                </FormField>
+                <FormField label="Celular" className="flex-1">
                   <Input
                     type="tel"
                     inputMode="numeric"
@@ -305,10 +343,12 @@ export function ConfirmationPage() {
                     onChange={(e) => setPhoneLocal(e.target.value)}
                     placeholder="2236674787"
                     required
-                    className="flex-1"
                   />
-                </div>
-              </FormField>
+                </FormField>
+              </div>
+              <p className="-mt-2 text-xs text-text-muted">
+                Si tu número no es de Argentina, cambiá el código por el de tu país.
+              </p>
               <FormField label="Email">
                 <Input
                   type="email"
@@ -328,7 +368,13 @@ export function ConfirmationPage() {
         {step === 2 && (
           <>
             <Badge tone="success">✓ Reserva confirmada</Badge>
-            <h2 className="mt-2 font-heading text-xl font-bold text-heading">Reglas de la casa</h2>
+            <h2
+              ref={stepHeadingRef}
+              tabIndex={-1}
+              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus:rounded focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+            >
+              Reglas de la casa
+            </h2>
             <p className="mt-1 text-sm text-text-muted">
               Por favor, leé y aceptá las normas de convivencia del edificio antes de continuar.
             </p>
@@ -343,12 +389,21 @@ export function ConfirmationPage() {
             </div>
 
             <label className="mt-4 flex items-start gap-3 text-sm text-text">
-              <input
-                type="checkbox"
-                checked={rulesChecked}
-                onChange={(e) => setRulesChecked(e.target.checked)}
-                className="mt-0.5 h-5 w-5 shrink-0 accent-accent"
-              />
+              {/* The wrapping span gives the checkbox itself a 44px hit box (centered on
+                  its 20px visible glyph, `-m-3` cancels the added footprint so the row's
+                  layout doesn't shift) — a span, not padding on the native checkbox
+                  control, since padding-based hit-box tricks are unreliable on native
+                  form controls across browsers. The outer <label> already made the whole
+                  row clickable; this makes the checkbox's own target meet the guideline
+                  too, not just the row via its adjacent text. */}
+              <span className="-m-3 mt-[-0.375rem] flex h-11 w-11 shrink-0 items-center justify-center">
+                <input
+                  type="checkbox"
+                  checked={rulesChecked}
+                  onChange={(e) => setRulesChecked(e.target.checked)}
+                  className="h-5 w-5 accent-accent"
+                />
+              </span>
               <span>
                 Leí y acepto las reglas de la casa. Entiendo que su incumplimiento puede ocasionar la pérdida
                 parcial o total del depósito de garantía.
@@ -370,7 +425,13 @@ export function ConfirmationPage() {
         {step === 3 && (
           <>
             <Badge tone="success">✓ Reglas aceptadas</Badge>
-            <h2 className="mt-2 font-heading text-xl font-bold text-heading">Pago y garantía</h2>
+            <h2
+              ref={stepHeadingRef}
+              tabIndex={-1}
+              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus:rounded focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+            >
+              Pago y garantía
+            </h2>
             <p className="mt-1 text-sm text-text-muted">
               Transferí el importe a la cuenta indicada y compartinos el comprobante. Acá vas a ver el estado de
               cada pago.
@@ -469,7 +530,13 @@ export function ConfirmationPage() {
         {step === 4 && (
           <>
             <Badge tone="success">✓ Pago confirmado</Badge>
-            <h2 className="mt-2 font-heading text-xl font-bold text-heading">Confirmación</h2>
+            <h2
+              ref={stepHeadingRef}
+              tabIndex={-1}
+              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus:rounded focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface"
+            >
+              Confirmación
+            </h2>
             <p className="mt-1 text-sm text-text-muted">{reservation.confirmationStepText}</p>
 
             <dl className="mt-6 flex flex-col gap-3 text-sm">

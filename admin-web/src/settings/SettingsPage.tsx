@@ -244,8 +244,22 @@ export function SettingsPage() {
     <PageContainer>
       <PageHeader title="Configuración" subtitle="Textos, pagos, datos bancarios y sincronización del alojamiento." />
       {loadError && <Alert>{loadError}</Alert>}
-      <Tabs tabs={TABS} activeTab={activeTab} onChange={(id) => setActiveTab(id as SettingsTab)} className="mb-6" />
+      <Tabs
+        id="settings"
+        tabs={TABS}
+        activeTab={activeTab}
+        onChange={(id) => setActiveTab(id as SettingsTab)}
+        className="mb-6"
+      />
       <form id="settings-form" onSubmit={handleSubmit} className="flex flex-col gap-6">
+        {activeTab !== 'integraciones' && (
+        <div
+          role="tabpanel"
+          id={`settings-panel-${activeTab}`}
+          aria-labelledby={`settings-tab-${activeTab}`}
+          tabIndex={0}
+          className="flex flex-col gap-6"
+        >
         {activeTab === 'reglas' && (
         <Card>
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Reglas de la casa</h2>
@@ -442,6 +456,8 @@ export function SettingsPage() {
         </Card>
         </>
         )}
+        </div>
+        )}
       </form>
 
       {activeTab !== 'integraciones' && (
@@ -455,7 +471,13 @@ export function SettingsPage() {
       )}
 
       {activeTab === 'integraciones' && (
-      <div className="flex flex-col gap-6">
+      <div
+        role="tabpanel"
+        id="settings-panel-integraciones"
+        aria-labelledby="settings-tab-integraciones"
+        tabIndex={0}
+        className="flex flex-col gap-6"
+      >
       <Card>
         <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Sincronización de canales</h2>
         {lastSyncError ? (
