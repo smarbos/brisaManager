@@ -3,7 +3,7 @@ import { CampaignFilterType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 interface SyncInput {
-  email: string;
+  email?: string | null;
   name: string;
   phone?: string | null;
 }
@@ -16,16 +16,25 @@ export class GuestsService {
 
   async syncFromReservation(reservationId: string, input: SyncInput): Promise<void> {
     try {
-      const email = input.email.trim().toLowerCase();
-      if (!email) {
+      const email = input.email?.trim().toLowerCase() || null;
+      const phone = input.phone?.trim() || null;
+      if (!email && !phone) {
         return;
       }
 
-      const guest = await this.prisma.guest.upsert({
-        where: { email },
-        create: { email, name: input.name, phone: input.phone ?? undefined },
-        update: { name: input.name, phone: input.phone ?? undefined },
-      });
+      // Airbnb's hosting messages page never exposes the guest's email, only their phone —
+      // key the upsert on whichever identifier is actually present.
+      const guest = email
+        ? await this.prisma.guest.upsert({
+            where: { email },
+            create: { email, name: input.name, phone: phone ?? undefined },
+            update: { name: input.name, phone: phone ?? undefined },
+          })
+        : await this.prisma.guest.upsert({
+            where: { phone: phone as string },
+            create: { phone: phone as string, name: input.name },
+            update: { name: input.name },
+          });
 
       await this.prisma.reservation.update({
         where: { id: reservationId },
@@ -63,7 +72,9 @@ export class GuestsService {
   }
 
   findEligibleForCampaign(filterType: CampaignFilterType, filterMonths?: number) {
-    const where: Prisma.GuestWhereInput = { unsubscribedAt: null };
+    // Campaigns are email-only — phone-only guests (e.g. Airbnb imports with no scraped
+    // email) have nothing to send to.
+    const where: Prisma.GuestWhereInput = { unsubscribedAt: null, email: { not: null } };
 
     if (filterType === 'STAYED_WITHIN_MONTHS') {
       const cutoff = new Date();

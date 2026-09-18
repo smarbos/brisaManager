@@ -50,7 +50,7 @@ export class ReservationsService {
     // would needlessly hold the HTTP response open on every reservation create.
     void this.googleCalendarPushService.pushReservation(reservation);
 
-    if (reservation.guestEmail) {
+    if (reservation.guestEmail || reservation.guestPhone) {
       void this.guestsService.syncFromReservation(reservation.id, {
         email: reservation.guestEmail,
         name: reservation.guestName,
@@ -147,7 +147,7 @@ export class ReservationsService {
     // Fire-and-forget: see the comment in create() above.
     void this.googleCalendarPushService.pushReservation(updated);
 
-    if (updated.guestEmail) {
+    if (updated.guestEmail || updated.guestPhone) {
       void this.guestsService.syncFromReservation(updated.id, {
         email: updated.guestEmail,
         name: updated.guestName,

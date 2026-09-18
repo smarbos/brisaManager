@@ -47,7 +47,7 @@ export function GuestDetailPage() {
         <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
           <div>
             <dt className="text-xs font-semibold uppercase text-text-muted">Email</dt>
-            <dd className="text-text">{guest.email}</dd>
+            <dd className="text-text">{guest.email ?? '—'}</dd>
           </div>
           <div>
             <dt className="text-xs font-semibold uppercase text-text-muted">Teléfono</dt>

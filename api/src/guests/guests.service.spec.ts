@@ -45,16 +45,33 @@ describe('GuestsService', () => {
       });
     });
 
-    it('does nothing when the email is empty', async () => {
+    it('does nothing when neither email nor phone is present', async () => {
       await service.syncFromReservation('res-1', { email: '', name: 'Jane Doe' });
 
       expect(prisma.guest.upsert).not.toHaveBeenCalled();
     });
 
-    it('does nothing when the email is whitespace only', async () => {
-      await service.syncFromReservation('res-1', { email: '   ', name: 'Jane Doe' });
+    it('does nothing when email and phone are whitespace only', async () => {
+      await service.syncFromReservation('res-1', { email: '   ', name: 'Jane Doe', phone: '   ' });
 
       expect(prisma.guest.upsert).not.toHaveBeenCalled();
+    });
+
+    it('upserts a Guest by phone when there is no email, keyed on phone', async () => {
+      prisma.guest.upsert.mockResolvedValue({ id: 'guest-2', phone: '+591 75278095' });
+      prisma.reservation.aggregate.mockResolvedValue({ _count: { _all: 1 }, _max: { checkOut: new Date('2026-11-08') } });
+
+      await service.syncFromReservation('res-2', { email: null, name: 'María Laura', phone: '+591 75278095' });
+
+      expect(prisma.guest.upsert).toHaveBeenCalledWith({
+        where: { phone: '+591 75278095' },
+        create: { phone: '+591 75278095', name: 'María Laura' },
+        update: { name: 'María Laura' },
+      });
+      expect(prisma.reservation.update).toHaveBeenCalledWith({
+        where: { id: 'res-2' },
+        data: { guestId: 'guest-2' },
+      });
     });
 
     it('never throws when a database call fails', async () => {
@@ -93,7 +110,9 @@ describe('GuestsService', () => {
 
       await service.findEligibleForCampaign('ALL');
 
-      expect(prisma.guest.findMany).toHaveBeenCalledWith({ where: { unsubscribedAt: null } });
+      expect(prisma.guest.findMany).toHaveBeenCalledWith({
+        where: { unsubscribedAt: null, email: { not: null } },
+      });
     });
 
     it('filters to guests who stayed within N months', async () => {
@@ -102,7 +121,7 @@ describe('GuestsService', () => {
       await service.findEligibleForCampaign('STAYED_WITHIN_MONTHS', 6);
 
       expect(prisma.guest.findMany).toHaveBeenCalledWith({
-        where: { unsubscribedAt: null, lastStayAt: { gte: expect.any(Date) } },
+        where: { unsubscribedAt: null, email: { not: null }, lastStayAt: { gte: expect.any(Date) } },
       });
     });
 
@@ -114,6 +133,7 @@ describe('GuestsService', () => {
       expect(prisma.guest.findMany).toHaveBeenCalledWith({
         where: {
           unsubscribedAt: null,
+          email: { not: null },
           OR: [{ lastStayAt: { lt: expect.any(Date) } }, { lastStayAt: null }],
         },
       });

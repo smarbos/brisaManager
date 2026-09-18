@@ -155,10 +155,12 @@ export class ChannelImportService {
 
     await this.eventsService.record(reservation.id, 'RESERVATION_CREATED', buildNotes(dto));
 
-    // Link to (or create) the Guest record whenever we have an email — this is just CRM
-    // bookkeeping, not guest-facing, so it's safe even if other fields are still
+    // Link to (or create) the Guest record whenever we have an email or phone — this is
+    // just CRM bookkeeping, not guest-facing, so it's safe even if other fields are still
     // unverified: a later correction to name/dates doesn't invalidate the guest link.
-    if (guestEmail) {
+    // Airbnb's hosting messages page never exposes an email, only a phone, so this must not
+    // be gated on email alone or Airbnb-only guests never get a Guest record at all.
+    if (guestEmail || guestPhone) {
       void this.guestsService.syncFromReservation(reservation.id, {
         email: guestEmail,
         name: reservation.guestName,
