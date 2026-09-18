@@ -1,4 +1,4 @@
-import { ReservationSource, ReservationStatus } from '../reservations/types';
+import { Reservation, ReservationSource, ReservationStatus } from '../reservations/types';
 
 const SOURCE_LABELS: Record<ReservationSource, string> = {
   BOOKING: 'Booking.com',
@@ -59,4 +59,34 @@ const RECIPIENT_STATUS_LABELS: Record<string, string> = {
 
 export function recipientStatusLabel(status: string): string {
   return RECIPIENT_STATUS_LABELS[status] ?? status;
+}
+
+// A cancelled reservation needs no further action, so it's never flagged here even if it's
+// still missing data from whenever it was created.
+export function getReservationWarnings(reservation: Reservation): string[] {
+  if (reservation.status === 'CANCELLED') {
+    return [];
+  }
+
+  const warnings: string[] = [];
+
+  if (!reservation.guestEmail && !reservation.guestPhone) {
+    warnings.push('Falta el email y el teléfono del huésped');
+  }
+
+  if (reservation.guestEmail && !reservation.confirmationEmailSentAt) {
+    warnings.push('El email de confirmación no se envió');
+  }
+
+  if (Number(reservation.totalAmount) === 0) {
+    warnings.push('Falta el monto de la reserva');
+  }
+
+  // Channel imports (Booking.com/Airbnb) record unverified scraped fields as raw DTO field
+  // names inside notes — see channel-import.service.ts's buildNotes().
+  if (reservation.notes?.includes('check_in') || reservation.notes?.includes('check_out')) {
+    warnings.push('Las fechas no están verificadas');
+  }
+
+  return warnings;
 }
