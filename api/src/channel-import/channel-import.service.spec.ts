@@ -153,9 +153,19 @@ describe('ChannelImportService', () => {
     expect(prisma.reservation.create).not.toHaveBeenCalled();
   });
 
-  it('is a safe no-op when the reservation was already imported (same res_id)', async () => {
-    const existing = { id: 'res-existing', guestName: 'Ya corregido a mano' };
+  it('touches nothing when the reservation was already imported and this rescan found nothing new', async () => {
+    const existing = {
+      id: 'res-existing',
+      guestName: 'Ya corregido a mano',
+      guestPhone: null,
+      guestEmail: null,
+      checkIn: new Date('2026-01-10'),
+      checkOut: new Date('2026-01-15'),
+      currency: 'ARS',
+      status: 'PENDING',
+    };
     prisma.reservation.findUnique.mockResolvedValue(existing);
+    prisma.reservation.update.mockResolvedValue(existing);
 
     const { reservation, created } = await service.import(baseDto);
 
@@ -163,7 +173,99 @@ describe('ChannelImportService', () => {
     expect(reservation).toBe(existing);
     expect(prisma.reservation.create).not.toHaveBeenCalled();
     expect(eventsService.record).not.toHaveBeenCalled();
-    expect(googleCalendarPushService.pushReservation).not.toHaveBeenCalled();
+    // baseDto has every scraped field null, so nothing already on file gets overwritten.
+    expect(prisma.reservation.update).toHaveBeenCalledWith({ where: { id: 'res-existing' }, data: {} });
+  });
+
+  it('re-importing an already-loaded reservation only overwrites fields this rescan actually found, never a staff correction', async () => {
+    const existing = {
+      id: 'res-existing',
+      guestName: 'Ya corregido a mano',
+      guestPhone: null,
+      guestEmail: null,
+      checkIn: new Date('2026-01-10'),
+      checkOut: new Date('2026-01-15'),
+      currency: 'ARS',
+      status: 'PENDING',
+    };
+    prisma.reservation.findUnique.mockResolvedValue(existing);
+    const updated = {
+      ...existing,
+      checkIn: new Date('2026-01-12'),
+      checkOut: new Date('2026-01-17'),
+      totalAmount: 45000,
+    };
+    prisma.reservation.update.mockResolvedValue(updated);
+
+    const { reservation, created } = await service.import({
+      ...baseDto,
+      check_in: '2026-01-12',
+      check_out: '2026-01-17',
+      total_price: '$ 45.000',
+      // guest_name stays null — must not overwrite "Ya corregido a mano".
+    });
+
+    expect(created).toBe(false);
+    expect(reservation).toBe(updated);
+    expect(prisma.reservation.update).toHaveBeenCalledWith({
+      where: { id: 'res-existing' },
+      data: {
+        checkIn: new Date('2026-01-12'),
+        checkOut: new Date('2026-01-17'),
+        totalAmount: 45000,
+        currency: 'ARS',
+      },
+    });
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(updated);
+  });
+
+  it('re-syncs the guest record when a rescan brings in a phone for an already-loaded reservation', async () => {
+    const existing = {
+      id: 'res-existing',
+      guestName: 'María Laura',
+      guestPhone: null,
+      guestEmail: null,
+      checkIn: new Date('2026-11-06'),
+      checkOut: new Date('2026-11-08'),
+      currency: 'ARS',
+      status: 'PENDING',
+    };
+    prisma.reservation.findUnique.mockResolvedValue(existing);
+    const updated = { ...existing, guestPhone: '+591 75278095' };
+    prisma.reservation.update.mockResolvedValue(updated);
+
+    await service.import({
+      ...baseDto,
+      source: 'airbnb',
+      hotel_id: undefined,
+      res_id: '1000000484',
+      guest_phone: '+591 75278095',
+    });
+
+    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-existing', {
+      email: null,
+      name: 'María Laura',
+      phone: '+591 75278095',
+    });
+  });
+
+  it('rejects a rescan whose resolved dates would put check_out before check_in, without writing anything', async () => {
+    const existing = {
+      id: 'res-existing',
+      guestName: 'Jane',
+      guestPhone: null,
+      guestEmail: null,
+      checkIn: new Date('2026-01-10'),
+      checkOut: new Date('2026-01-15'),
+      currency: 'ARS',
+      status: 'PENDING',
+    };
+    prisma.reservation.findUnique.mockResolvedValue(existing);
+
+    await expect(
+      service.import({ ...baseDto, check_in: '2026-01-20', check_out: '2026-01-18' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.reservation.update).not.toHaveBeenCalled();
   });
 
   it('creates a fresh reservation when the existing match is cancelled, freeing up the old externalReference', async () => {
@@ -430,5 +532,48 @@ describe('ChannelImportService', () => {
     });
 
     expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
+  });
+
+  describe('checkStatus', () => {
+    it('reports exists: false when no matching reservation is on file', async () => {
+      prisma.reservation.findUnique.mockResolvedValue(null);
+
+      const result = await service.checkStatus('airbnb', '1000000484');
+
+      expect(prisma.reservation.findUnique).toHaveBeenCalledWith({
+        where: { source_externalReference: { source: 'AIRBNB', externalReference: 'airbnb-thread-1000000484' } },
+      });
+      expect(result).toEqual({ exists: false });
+    });
+
+    it('reports exists: false when the only match is cancelled — a fresh import should still be allowed', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: 'res-1', status: 'CANCELLED' });
+
+      const result = await service.checkStatus('airbnb', '1000000484');
+
+      expect(result).toEqual({ exists: false });
+    });
+
+    it('reports the existing reservation summary when a live match is found', async () => {
+      const checkIn = new Date('2026-11-06');
+      const checkOut = new Date('2026-11-08');
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: 'res-1',
+        guestName: 'María Laura',
+        checkIn,
+        checkOut,
+        status: 'PENDING',
+      });
+
+      const result = await service.checkStatus('airbnb', '1000000484');
+
+      expect(result).toEqual({
+        exists: true,
+        guestName: 'María Laura',
+        checkIn,
+        checkOut,
+        status: 'PENDING',
+      });
+    });
   });
 });

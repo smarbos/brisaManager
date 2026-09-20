@@ -116,6 +116,35 @@ describe('ChannelImportController (e2e)', () => {
     expect(second.body.id).toBe(first.body.id);
   });
 
+  it('refreshes fields from a fresh scrape when the same res_id is imported again', async () => {
+    const first = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send({ ...basePayload, res_id: 'e2e-test-rescan', check_in: '2026-01-10', check_out: '2026-01-15' })
+      .expect(201);
+    expect(first.body.created).toBe(true);
+
+    const second = await request(app.getHttpServer())
+      .post('/reservations/import')
+      .set('Authorization', `Bearer ${apiKey}`)
+      .send({
+        ...basePayload,
+        res_id: 'e2e-test-rescan',
+        check_in: '2026-01-12',
+        check_out: '2026-01-17',
+        total_price: '$ 50.000',
+      })
+      .expect(201);
+
+    expect(second.body.created).toBe(false);
+    expect(second.body.id).toBe(first.body.id);
+
+    const stored = await prisma.reservation.findUnique({ where: { id: first.body.id } });
+    expect(stored?.checkIn.toISOString()).toContain('2026-01-12');
+    expect(stored?.checkOut.toISOString()).toContain('2026-01-17');
+    expect(Number(stored?.totalAmount)).toBe(50000);
+  });
+
   it('creates a fresh reservation when the existing one for the same res_id was cancelled', async () => {
     const first = await request(app.getHttpServer())
       .post('/reservations/import')
@@ -250,5 +279,57 @@ describe('ChannelImportController (e2e)', () => {
         unverified_fields: [],
       })
       .expect(400);
+  });
+
+  describe('GET /reservations/import/status', () => {
+    it('requires a valid API key', async () => {
+      await request(app.getHttpServer())
+        .get('/reservations/import/status')
+        .query({ source: 'airbnb', res_id: 'e2e-test-status-unknown' })
+        .expect(401);
+    });
+
+    it('reports exists: false for a res_id that has never been imported', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/reservations/import/status')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .query({ source: 'airbnb', res_id: 'e2e-test-status-unknown' })
+        .expect(200);
+
+      expect(response.body).toEqual({ exists: false });
+    });
+
+    it('reports exists: true with the current guest/dates once a reservation is loaded', async () => {
+      const imported = await request(app.getHttpServer())
+        .post('/reservations/import')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .send({
+          source: 'airbnb',
+          res_id: 'e2e-test-status-loaded',
+          guest_name: 'Status Check Guest',
+          guest_email: null,
+          check_in: '2026-11-06',
+          check_out: '2026-11-08',
+          guests: 2,
+          total_price: null,
+          currency: null,
+          status: null,
+          unverified_fields: ['check_in', 'check_out', 'guests', 'total_price', 'currency', 'status'],
+        })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get('/reservations/import/status')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .query({ source: 'airbnb', res_id: 'e2e-test-status-loaded' })
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        exists: true,
+        guestName: 'Status Check Guest',
+        status: 'PENDING',
+      });
+      expect(imported.body.created).toBe(true);
+    });
   });
 });

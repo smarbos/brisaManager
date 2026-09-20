@@ -45,10 +45,10 @@ next (see "How to run the Airbnb scan" below).
 
 **Already fully built and shared by both:**
 - `manifest.json` — permissions, content script registration for both sites
-- `background.js` — the actual `POST /reservations/import` call (10s
-  timeout, error handling, `Authorization: Bearer <token>` header), channel
-  -agnostic — reached via `chrome.runtime.sendMessage` from either content
-  script
+- `background.js` — the actual `POST /reservations/import` and
+  `GET /reservations/import/status` calls (10s timeout, error handling,
+  `Authorization: Bearer <token>` header), channel-agnostic — reached via
+  `chrome.runtime.sendMessage` from either content script
 - `options.html` / `options.js` — stores API base URL + token in
   `chrome.storage.local`; requests the minimal runtime host permission for
   just that one domain (via `chrome.permissions.request`) before saving, so
@@ -101,6 +101,14 @@ from the DOM), and how many DOM elements were scanned in total.
    these only reveal information, they never submit or send anything), then
    scans.
 3. Same copy-the-textbox flow as Booking.com's scan above.
+
+`content_script_airbnb.js` also runs a passive, read-only check on page load
+(`GET /reservations/import/status`) — if this thread is already loaded, a
+green "✓ Ya cargada en La Brisa" badge appears top-right and the main button
+relabels to "Actualizar datos de la reserva". Clicking it either way still
+runs the same extraction + `POST /reservations/import`; the only difference
+is what the backend does with an already-existing, non-cancelled match — see
+"Re-importing an already-loaded reservation" under API contract below.
 
 The dump includes every `h1`/`h2`/`h3` heading on the page, every short text
 node mentioning "huésped(es)", candidate values found near "Check-in"/
@@ -189,6 +197,41 @@ whenever an email is present, independent of `unverified_fields` — see
 `ChannelImportService.import()`'s own comment for why (status is *always*
 unverified from Booking.com's page, which made an "only when fully
 verified" gate permanently unreachable).
+
+### Re-importing an already-loaded reservation
+
+Sending the same `source` + `res_id` again — whether the operator clicks the
+button twice by habit, or deliberately re-runs it because the guest changed
+dates/pax on Airbnb after the first import — does **not** create a
+duplicate. The existing reservation is updated instead, but only with
+whatever this scrape actually found a non-null value for: `guest_name`,
+`guest_phone`, `check_in`, `check_out`, `guests`, and `total_price`
+(+`currency`) each overwrite independently, and a field this scrape came
+back empty on (including `guest_email`, which Airbnb never provides) is left
+exactly as it was — so a staff correction never gets silently clobbered by a
+stale or partial rescan. The response's `created` field distinguishes the
+two cases (`true` for a brand-new reservation, `false` for an update to an
+existing one), and `content_script_airbnb.js` shows a different success
+toast for each.
+
+```
+GET {API_BASE_URL}/reservations/import/status?source=airbnb&res_id=1000000484
+Authorization: Bearer <token>
+```
+
+```json
+// No non-cancelled reservation on file for this source+res_id
+{ "exists": false }
+
+// A match was found
+{
+  "exists": true,
+  "guestName": "María Laura",
+  "checkIn": "2026-10-27T00:00:00.000Z",
+  "checkOut": "2026-10-31T00:00:00.000Z",
+  "status": "PENDING"
+}
+```
 
 This endpoint is implemented at `api/src/channel-import/` (distinct from the
 existing `POST /reservation-import/parse-screenshot` screenshot-OCR

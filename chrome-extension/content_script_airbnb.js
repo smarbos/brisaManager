@@ -591,12 +591,68 @@
         navigator.clipboard.writeText(message).catch(() => {});
         const inserted = tryInsertIntoComposeBox(message);
 
+        const insertedNote = inserted
+          ? "El mensaje se completó abajo — revisalo antes de enviarlo."
+          : "Mensaje copiado al portapapeles — pegalo (Ctrl+V) en el cuadro de mensaje y revisalo antes de enviar.";
+
         showToast(
-          inserted
-            ? "¡Listo! El mensaje se completó abajo — revisalo antes de enviarlo."
-            : "Mensaje copiado al portapapeles — pegalo (Ctrl+V) en el cuadro de mensaje y revisalo antes de enviar.",
+          body.created
+            ? `¡Reserva creada! ${insertedNote}`
+            : `Esta reserva ya estaba cargada — actualizamos los datos con lo que muestra Airbnb ahora. ${insertedNote}`,
           "success",
         );
+
+        showStatusBadge({ exists: true, guestName: body.guestName, status: body.status });
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // "Already loaded" indicator — checked passively on page load (read-only,
+  // no clicks on the Airbnb page), and refreshed after every "Generar link"
+  // click so it reflects whatever the operator just created/updated.
+  // ---------------------------------------------------------------------
+  function showStatusBadge(status) {
+    document.querySelectorAll(".la-brisa-status").forEach((el) => el.remove());
+
+    const sendButton = document.querySelector(".la-brisa-fab--send");
+
+    if (!status || !status.exists) {
+      if (sendButton) {
+        sendButton.textContent = "Generar link de check-in";
+        sendButton.title =
+          "Extrae los datos de esta conversación, crea (o encuentra) la reserva en La Brisa y prepara un mensaje con el link de check-in para pegar en el chat.";
+      }
+      return;
+    }
+
+    const badge = document.createElement("div");
+    badge.className = "la-brisa-status";
+    badge.textContent = `✓ Ya cargada en La Brisa${status.guestName ? ` — ${status.guestName}` : ""}`;
+    document.body.appendChild(badge);
+
+    if (sendButton) {
+      sendButton.textContent = "Actualizar datos de la reserva";
+      sendButton.title =
+        "Esta reserva ya está cargada en La Brisa. Vuelve a leer esta conversación y actualiza los datos que hayan cambiado (fechas, precio, teléfono).";
+    }
+  }
+
+  function checkExistingReservation() {
+    const threadId = getThreadId();
+    if (!threadId) return;
+
+    chrome.runtime.sendMessage(
+      { type: "labrisa:check-reservation-status", payload: { source: "airbnb", resId: threadId } },
+      (response) => {
+        if (chrome.runtime.lastError || !response || !response.ok) return;
+        let body;
+        try {
+          body = JSON.parse(response.body);
+        } catch {
+          return;
+        }
+        showStatusBadge(body);
       },
     );
   }
@@ -628,7 +684,7 @@
     if (document.querySelector(".la-brisa-fab")) return;
 
     const sendButton = document.createElement("button");
-    sendButton.className = "la-brisa-fab";
+    sendButton.className = "la-brisa-fab la-brisa-fab--send";
     sendButton.type = "button";
     sendButton.textContent = "Generar link de check-in";
     sendButton.title =
@@ -651,6 +707,7 @@
   injectUI();
   runWhenStable(() => {
     runInspection({ expand: false });
+    checkExistingReservation();
     console.log(
       '%c[La Brisa] Airbnb auto-scan complete. Click "🔍 Escanear (debug)" to re-run manually.',
       "color:#0d6efd",

@@ -16,7 +16,7 @@ async function getSettings() {
   return { apiBaseUrl: apiBaseUrl || "", apiToken: apiToken || "" };
 }
 
-async function sendReservation(payload) {
+async function laBrisaFetch(path, { method = "GET", body } = {}) {
   const { apiBaseUrl, apiToken } = await getSettings();
 
   if (!apiBaseUrl) {
@@ -28,18 +28,18 @@ async function sendReservation(payload) {
     };
   }
 
-  const url = `${apiBaseUrl.replace(/\/+$/, "")}/reservations/import`;
+  const url = `${apiBaseUrl.replace(/\/+$/, "")}${path}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
 
   try {
     const response = await fetch(url, {
-      method: "POST",
+      method,
       headers: {
-        "Content-Type": "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
         ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {}),
       },
-      body: JSON.stringify(payload),
+      ...(body ? { body: JSON.stringify(body) } : {}),
       signal: controller.signal,
     });
 
@@ -75,13 +75,33 @@ async function sendReservation(payload) {
   }
 }
 
+function sendReservation(payload) {
+  return laBrisaFetch("/reservations/import", { method: "POST", body: payload });
+}
+
+// Passive lookup the content script runs on page load, before the operator has clicked
+// anything — lets it show "already loaded" instead of only finding out after a click.
+function checkReservationStatus({ source, resId }) {
+  const query = new URLSearchParams({ source, res_id: resId }).toString();
+  return laBrisaFetch(`/reservations/import/status?${query}`);
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (!message || message.type !== "labrisa:send-reservation") {
+  if (!message || !message.type) {
     return false;
   }
 
-  sendReservation(message.payload).then(sendResponse);
-  return true; // keep the message channel open for the async sendResponse
+  if (message.type === "labrisa:send-reservation") {
+    sendReservation(message.payload).then(sendResponse);
+    return true; // keep the message channel open for the async sendResponse
+  }
+
+  if (message.type === "labrisa:check-reservation-status") {
+    checkReservationStatus(message.payload).then(sendResponse);
+    return true;
+  }
+
+  return false;
 });
 
 chrome.action.onClicked.addListener(() => {
