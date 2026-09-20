@@ -107,7 +107,10 @@ function PageShell({ children }: { children: ReactNode }) {
       </div>
       {children}
       <p className="mx-auto mt-4 max-w-md text-center text-xs text-text-muted">
-        La Brisa de Mar del Plata · www.labrisa.com.ar
+        La Brisa de Mar del Plata ·{' '}
+        <a href="https://www.labrisa.com.ar" className="hover:underline" target="_blank" rel="noreferrer">
+          www.labrisa.com.ar
+        </a>
       </p>
     </div>
   );
