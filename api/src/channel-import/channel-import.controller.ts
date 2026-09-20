@@ -1,10 +1,11 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ApiKeyGuard } from '../auth/api-key.guard';
 import { renderTemplate } from '../common/render-template';
 import { SettingsService } from '../settings/settings.service';
 import { ChannelImportService } from './channel-import.service';
 import { ImportReservationDto } from './dto/import-reservation.dto';
+import { ImportStatusQueryDto } from './dto/import-status-query.dto';
 
 // Separate controller (not a method on ReservationsController) because it's guarded
 // differently: ApiKeyGuard for machine callers (the Chrome extension) instead of JwtAuthGuard
@@ -22,6 +23,13 @@ export class ChannelImportController {
     private readonly channelImportService: ChannelImportService,
     private readonly settingsService: SettingsService,
   ) {}
+
+  // Passive check the extension runs on page load, before the operator has clicked
+  // anything — lets it show "already loaded" instead of only finding out after a click.
+  @Get('status')
+  status(@Query() query: ImportStatusQueryDto) {
+    return this.channelImportService.checkStatus(query.source, query.res_id);
+  }
 
   @Post()
   async import(@Body() dto: ImportReservationDto) {

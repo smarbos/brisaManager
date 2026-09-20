@@ -7,6 +7,14 @@ import { GuestsService } from '../guests/guests.service';
 import { ReservationsService } from '../reservations/reservations.service';
 import { ImportReservationDto } from './dto/import-reservation.dto';
 
+export interface ImportStatusResult {
+  exists: boolean;
+  guestName?: string;
+  checkIn?: Date;
+  checkOut?: Date;
+  status?: ReservationStatus;
+}
+
 const SOURCE_MAP: Record<ImportReservationDto['source'], ReservationSource> = {
   'booking.com': 'BOOKING',
   airbnb: 'AIRBNB',
@@ -91,11 +99,13 @@ export class ChannelImportService {
     });
 
     if (existing && existing.status !== 'CANCELLED') {
-      // Never overwrite an already-imported reservation from here — staff may have already
-      // corrected fields by hand since the first import. Re-sending the same res_id (e.g.
-      // clicking the button twice, or re-testing the extension) is a safe no-op, not a
-      // silent clobber of anything staff already fixed.
-      return { reservation: existing, created: false };
+      // The operator explicitly re-ran the extension against this same thread — treat that
+      // as "refresh this from what Airbnb/Booking.com shows now" (e.g. the guest changed
+      // dates after the first import), not a no-op. Only fields this scrape actually found a
+      // value for are touched (see updateFromRescan()), so a field the scrape came back empty
+      // on this time — including guest_email, which Airbnb never provides — never gets
+      // clobbered with a blank.
+      return this.updateFromRescan(existing, dto);
     }
 
     if (existing) {
@@ -192,5 +202,70 @@ export class ChannelImportService {
     void this.googleCalendarPushService.pushReservation(reservation);
 
     return { reservation, created: true };
+  }
+
+  // Re-running the extension against a thread that's already imported refreshes whatever
+  // this scrape found a value for, and leaves everything else (including anything staff
+  // corrected by hand) untouched — see the comment at the call site above.
+  private async updateFromRescan(existing: Reservation, dto: ImportReservationDto): Promise<ChannelImportResult> {
+    const guestName = dto.guest_name?.trim() || undefined;
+    const guestPhone = dto.guest_phone?.trim() || undefined;
+    const checkIn = dto.check_in ? new Date(dto.check_in) : undefined;
+    const checkOut = dto.check_out ? new Date(dto.check_out) : undefined;
+    const paxCount = dto.guests ?? undefined;
+    const totalAmount = dto.total_price ? parseAmount(dto.total_price) : undefined;
+    const currency = totalAmount !== undefined ? dto.currency?.trim() || existing.currency : undefined;
+
+    const resolvedCheckIn = checkIn ?? existing.checkIn;
+    const resolvedCheckOut = checkOut ?? existing.checkOut;
+    if (resolvedCheckOut <= resolvedCheckIn) {
+      throw new BadRequestException('check_out must be after check_in');
+    }
+
+    const updated = await this.prisma.reservation.update({
+      where: { id: existing.id },
+      data: {
+        ...(guestName ? { guestName } : {}),
+        ...(guestPhone ? { guestPhone } : {}),
+        ...(checkIn ? { checkIn } : {}),
+        ...(checkOut ? { checkOut } : {}),
+        ...(paxCount ? { paxCount } : {}),
+        ...(totalAmount !== undefined ? { totalAmount, currency } : {}),
+      },
+    });
+
+    if (updated.guestEmail || updated.guestPhone) {
+      void this.guestsService.syncFromReservation(updated.id, {
+        email: updated.guestEmail,
+        name: updated.guestName,
+        phone: updated.guestPhone,
+      });
+    }
+
+    // Fire-and-forget: see the comment in ReservationsService.update().
+    void this.googleCalendarPushService.pushReservation(updated);
+
+    return { reservation: updated, created: false };
+  }
+
+  async checkStatus(source: ImportReservationDto['source'], resId: string): Promise<ImportStatusResult> {
+    const mappedSource = SOURCE_MAP[source];
+    const externalReference = `${EXTERNAL_REFERENCE_PREFIX[source]}-${resId}`;
+
+    const existing = await this.prisma.reservation.findUnique({
+      where: { source_externalReference: { source: mappedSource, externalReference } },
+    });
+
+    if (!existing || existing.status === 'CANCELLED') {
+      return { exists: false };
+    }
+
+    return {
+      exists: true,
+      guestName: existing.guestName,
+      checkIn: existing.checkIn,
+      checkOut: existing.checkOut,
+      status: existing.status,
+    };
   }
 }
