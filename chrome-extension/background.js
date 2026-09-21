@@ -86,6 +86,16 @@ function checkReservationStatus({ source, resId }) {
   return laBrisaFetch(`/reservations/import/status?${query}`);
 }
 
+// Best-effort: a failure to log a failure shouldn't surface anything of its own, nor block or
+// retry — the operator-facing toast/badge already carries the real error, this is purely so
+// staff monitoring the admin log screen notice the extension is having trouble.
+function logExtensionError(report) {
+  laBrisaFetch("/extension-errors", {
+    method: "POST",
+    body: { ...report, extensionVersion: chrome.runtime.getManifest().version },
+  }).catch(() => {});
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || !message.type) {
     return false;
@@ -99,6 +109,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "labrisa:check-reservation-status") {
     checkReservationStatus(message.payload).then(sendResponse);
     return true;
+  }
+
+  if (message.type === "labrisa:log-error") {
+    logExtensionError(message.payload);
+    return false; // fire-and-forget, no response expected
   }
 
   return false;

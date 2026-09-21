@@ -34,8 +34,12 @@
   transform: none;
 }
 
+.la-brisa-fab--send {
+  bottom: 60px;
+}
+
 .la-brisa-fab--secondary {
-  bottom: 74px;
+  bottom: 114px;
   background: #495057;
 }
 
@@ -43,15 +47,16 @@
   background: #343a40;
 }
 
+/* Right below the blue "Generar link"/"Actualizar datos" button (.la-brisa-fab--send),
+   same right-aligned column as the floating buttons above it. */
 .la-brisa-status {
   position: fixed;
-  top: 20px;
+  bottom: 20px;
   right: 20px;
   z-index: 2147483000;
   max-width: 280px;
   padding: 8px 14px;
   border-radius: 999px;
-  background: #146c2e;
   color: #fff;
   font-family: system-ui, sans-serif;
   font-size: 13px;
@@ -59,9 +64,21 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
+.la-brisa-status--success {
+  background: #146c2e;
+}
+
+.la-brisa-status--loading {
+  background: #495057;
+}
+
+.la-brisa-status--error {
+  background: #b02a37;
+}
+
 .la-brisa-toast {
   position: fixed;
-  bottom: 128px;
+  bottom: 168px;
   right: 20px;
   z-index: 2147483000;
   max-width: 320px;

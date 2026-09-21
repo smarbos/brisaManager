@@ -16,6 +16,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { ReservationImportModule } from './reservation-import/reservation-import.module';
 import { ChannelImportModule } from './channel-import/channel-import.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { ExtensionErrorsModule } from './extension-errors/extension-errors.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     ReservationImportModule,
     ChannelImportModule,
     WhatsappModule,
+    ExtensionErrorsModule,
   ],
   controllers: [AppController],
 })

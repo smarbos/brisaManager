@@ -446,6 +446,24 @@
     setTimeout(() => toast.remove(), 6000);
   }
 
+  // Reports a failure to check or submit a reservation to the admin log screen (see
+  // ExtensionErrorsController on the API side), so staff notice the extension is having
+  // trouble even when the operator dismisses the toast without mentioning it. Fire-and-forget:
+  // background.js already swallows any failure of the report itself.
+  function reportExtensionError(operation, { resId, message, detail } = {}) {
+    chrome.runtime.sendMessage({
+      type: "labrisa:log-error",
+      payload: {
+        source: "airbnb",
+        resId: resId || null,
+        operation,
+        message,
+        detail: detail || null,
+        url: window.location.href,
+      },
+    });
+  }
+
   function showInspectionPanel(dump) {
     document.querySelectorAll(".la-brisa-panel").forEach((el) => el.remove());
 
@@ -567,15 +585,16 @@
       { type: "labrisa:send-reservation", payload },
       (response) => {
         if (chrome.runtime.lastError) {
-          showToast(`Error interno de la extensión: ${chrome.runtime.lastError.message}`, "error");
+          const message = `Error interno de la extensión: ${chrome.runtime.lastError.message}`;
+          showToast(message, "error");
+          reportExtensionError("submit_reservation", { resId: threadId, message });
           return;
         }
         if (!response || !response.ok) {
           const detail = response && (response.body || response.detail);
-          showToast(
-            `${(response && response.message) || "No se pudo generar el link."}${detail ? " — " + detail : ""}`,
-            "error",
-          );
+          const message = `${(response && response.message) || "No se pudo generar el link."}${detail ? " — " + detail : ""}`;
+          showToast(message, "error");
+          reportExtensionError("submit_reservation", { resId: threadId, message, detail });
           return;
         }
 
@@ -583,7 +602,9 @@
         try {
           body = JSON.parse(response.body);
         } catch {
-          showToast("La Brisa respondió pero no se pudo leer el link generado.", "error");
+          const message = "La Brisa respondió pero no se pudo leer el link generado.";
+          showToast(message, "error");
+          reportExtensionError("submit_reservation", { resId: threadId, message, detail: response.body });
           return;
         }
 
@@ -612,12 +633,28 @@
   // no clicks on the Airbnb page), and refreshed after every "Generar link"
   // click so it reflects whatever the operator just created/updated.
   // ---------------------------------------------------------------------
-  function showStatusBadge(status) {
+  function renderStatusBadge(text, kind) {
     document.querySelectorAll(".la-brisa-status").forEach((el) => el.remove());
+    const badge = document.createElement("div");
+    badge.className = `la-brisa-status la-brisa-status--${kind}`;
+    badge.textContent = text;
+    document.body.appendChild(badge);
+    return badge;
+  }
 
+  function showStatusLoadingBadge() {
+    renderStatusBadge("Verificando estado en La Brisa...", "loading");
+  }
+
+  function showStatusErrorBadge() {
+    renderStatusBadge("No se pudo verificar el estado en La Brisa", "error");
+  }
+
+  function showStatusBadge(status) {
     const sendButton = document.querySelector(".la-brisa-fab--send");
 
     if (!status || !status.exists) {
+      document.querySelectorAll(".la-brisa-status").forEach((el) => el.remove());
       if (sendButton) {
         sendButton.textContent = "Generar link de check-in";
         sendButton.title =
@@ -626,10 +663,7 @@
       return;
     }
 
-    const badge = document.createElement("div");
-    badge.className = "la-brisa-status";
-    badge.textContent = `✓ Ya cargada en La Brisa${status.guestName ? ` — ${status.guestName}` : ""}`;
-    document.body.appendChild(badge);
+    renderStatusBadge(`✓ Ya cargada en La Brisa${status.guestName ? ` — ${status.guestName}` : ""}`, "success");
 
     if (sendButton) {
       sendButton.textContent = "Actualizar datos de la reserva";
@@ -642,14 +676,33 @@
     const threadId = getThreadId();
     if (!threadId) return;
 
+    showStatusLoadingBadge();
+
     chrome.runtime.sendMessage(
       { type: "labrisa:check-reservation-status", payload: { source: "airbnb", resId: threadId } },
       (response) => {
-        if (chrome.runtime.lastError || !response || !response.ok) return;
+        if (chrome.runtime.lastError || !response || !response.ok) {
+          showStatusErrorBadge();
+          reportExtensionError("check_status", {
+            resId: threadId,
+            message:
+              (chrome.runtime.lastError && chrome.runtime.lastError.message) ||
+              (response && response.message) ||
+              "No se pudo verificar el estado de la reserva.",
+            detail: response && (response.body || response.detail),
+          });
+          return;
+        }
         let body;
         try {
           body = JSON.parse(response.body);
         } catch {
+          showStatusErrorBadge();
+          reportExtensionError("check_status", {
+            resId: threadId,
+            message: "La Brisa respondió pero no se pudo leer el estado de la reserva.",
+            detail: response.body,
+          });
           return;
         }
         showStatusBadge(body);

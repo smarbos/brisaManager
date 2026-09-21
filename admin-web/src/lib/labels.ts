@@ -52,6 +52,26 @@ export function eventTypeLabel(type: string): string {
   return EVENT_TYPE_LABELS[type] ?? type;
 }
 
+const EXTENSION_ERROR_OPERATION_LABELS: Record<string, string> = {
+  check_status: 'Verificar estado',
+  submit_reservation: 'Enviar reserva',
+};
+
+export function extensionErrorOperationLabel(operation: string): string {
+  return EXTENSION_ERROR_OPERATION_LABELS[operation] ?? operation;
+}
+
+// The extension reports its own literal 'booking.com' | 'airbnb' source strings (see
+// ImportReservationDto), distinct from the ReservationSource enum above.
+const EXTENSION_ERROR_SOURCE_LABELS: Record<string, string> = {
+  'booking.com': 'Booking.com',
+  airbnb: 'Airbnb',
+};
+
+export function extensionErrorSourceLabel(source: string): string {
+  return EXTENSION_ERROR_SOURCE_LABELS[source] ?? source;
+}
+
 const RECIPIENT_STATUS_LABELS: Record<string, string> = {
   SENT: 'Enviado',
   FAILED: 'Fallido',
