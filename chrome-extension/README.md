@@ -103,12 +103,21 @@ from the DOM), and how many DOM elements were scanned in total.
 3. Same copy-the-textbox flow as Booking.com's scan above.
 
 `content_script_airbnb.js` also runs a passive, read-only check on page load
-(`GET /reservations/import/status`) — if this thread is already loaded, a
-green "✓ Ya cargada en La Brisa" badge appears top-right and the main button
-relabels to "Actualizar datos de la reserva". Clicking it either way still
-runs the same extraction + `POST /reservations/import`; the only difference
-is what the backend does with an already-existing, non-cancelled match — see
-"Re-importing an already-loaded reservation" under API contract below.
+(`GET /reservations/import/status`) — a gray "Verificando estado en La
+Brisa..." badge shows right below the main button while that request is in
+flight, then either a green "✓ Ya cargada en La Brisa" badge (and the main
+button relabels to "Actualizar datos de la reserva") or, if the check itself
+failed, a red "No se pudo verificar el estado en La Brisa" badge. Clicking
+the main button either way still runs the same extraction +
+`POST /reservations/import`; the only difference is what the backend does
+with an already-existing, non-cancelled match — see "Re-importing an
+already-loaded reservation" under API contract below.
+
+Any failure to check or submit a reservation — network errors, a non-2xx
+response, or a response body that can't be parsed — is also reported to
+`POST /extension-errors`, so staff can see the extension is having trouble
+from the "Errores del plugin" tab in the admin's activity log, even if the
+operator dismisses the toast without mentioning it.
 
 The dump includes every `h1`/`h2`/`h3` heading on the page, every short text
 node mentioning "huésped(es)", candidate values found near "Check-in"/

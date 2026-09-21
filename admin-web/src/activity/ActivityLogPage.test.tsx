@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ActivityLogPage } from './ActivityLogPage';
 import * as reservationEventsApi from '../api/reservation-events';
+import * as extensionErrorsApi from '../api/extension-errors';
 
 function renderPage() {
   return render(
@@ -153,5 +154,31 @@ describe('ActivityLogPage', () => {
     renderPage();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo cargar el registro de actividad/i);
+  });
+
+  it('switches to the extension errors tab and loads it lazily', async () => {
+    vi.spyOn(reservationEventsApi, 'listActivityLog').mockResolvedValue([]);
+    const listExtensionErrors = vi.spyOn(extensionErrorsApi, 'listExtensionErrors').mockResolvedValue([
+      {
+        id: 'err-1',
+        source: 'airbnb',
+        resId: '1000000484',
+        operation: 'check_status',
+        message: 'No pudimos conectar con La Brisa.',
+        detail: null,
+        url: 'https://www.airbnb.com/hosting/messages/1000000484',
+        extensionVersion: '0.2.0',
+        createdAt: '2026-09-20T17:00:00.000Z',
+      },
+    ]);
+
+    renderPage();
+    await screen.findByText('Todavía no hay eventos registrados.');
+    expect(listExtensionErrors).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Errores del plugin' }));
+
+    expect(await screen.findByText('No pudimos conectar con La Brisa.')).toBeInTheDocument();
+    expect(listExtensionErrors).toHaveBeenCalledTimes(1);
   });
 });

@@ -195,3 +195,20 @@ model CampaignRecipient {
   error      String?
   createdAt  DateTime                @default(now())
 }
+
+// Reported by the Chrome extension (content_script_airbnb.js / background.js) whenever it
+// fails to check or submit a reservation. Not linked to Reservation: a failure can happen
+// before any reservation exists (e.g. the passive "already loaded?" check on page load, or a
+// submit that never reached the point of creating one), unlike ReservationEvent above which
+// always has one.
+model ExtensionErrorLog {
+  id              String   @id @default(uuid())
+  source          String
+  resId           String?
+  operation       String
+  message         String
+  detail          String?
+  url             String
+  extensionVersion String?
+  createdAt       DateTime @default(now())
+}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listActivityLog, ActivityLogEntry } from '../api/reservation-events';
+import { ExtensionErrorsTab } from './ExtensionErrorsTab';
 import {
   PageContainer,
   PageHeader,
@@ -12,13 +13,20 @@ import {
   LoadingState,
   Select,
   Table,
+  Tabs,
   tableThClass as thClass,
   tableTdClass as tdClass,
 } from '../ui';
 import { formatDateTime } from '../lib/date';
 import { eventTypeLabel } from '../lib/labels';
 
+const TABS = [
+  { id: 'events', label: 'Eventos de reservas' },
+  { id: 'extension-errors', label: 'Errores del plugin' },
+];
+
 export function ActivityLogPage() {
+  const [activeTab, setActiveTab] = useState('events');
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,67 +73,76 @@ export function ActivityLogPage() {
   return (
     <PageContainer>
       <PageHeader title="Registro de actividad" subtitle="Todos los eventos registrados en las reservas del alojamiento." />
-      {error && <Alert>{error}</Alert>}
-      <Card>
-        <div className="mb-4 flex flex-wrap gap-4">
-          <FormField label="Huésped">
-            <Input
-              type="search"
-              value={guestSearch}
-              onChange={(e) => setGuestSearch(e.target.value)}
-              placeholder="Nombre del huésped"
-            />
-          </FormField>
-          <FormField label="Tipo de evento">
-            <Select value={eventType} onChange={(e) => setEventType(e.target.value)}>
-              <option value="">Todos</option>
-              {eventTypeOptions.map((type) => (
-                <option key={type} value={type}>
-                  {eventTypeLabel(type)}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label="Desde">
-            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-          </FormField>
-          <FormField label="Hasta">
-            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-          </FormField>
-        </div>
-        {loading ? (
-          <LoadingState />
-        ) : entries.length === 0 ? (
-          <EmptyState message="Todavía no hay eventos registrados." />
-        ) : filteredEntries.length === 0 ? (
-          <EmptyState message="No hay eventos que coincidan con estos filtros." />
-        ) : (
-        <Table>
-          <thead>
-            <tr>
-              <th className={thClass}>Cuándo</th>
-              <th className={thClass}>Reserva</th>
-              <th className={thClass}>Evento</th>
-              <th className={thClass}>Detalle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredEntries.map((entry) => (
-              <tr key={entry.id}>
-                <td className={tdClass}>{formatDateTime(entry.createdAt)}</td>
-                <td className={tdClass}>
-                  <Link to={`/reservations/${entry.reservationId}`} className="text-accent hover:underline">
-                    {entry.reservation.guestName}
-                  </Link>
-                </td>
-                <td className={tdClass}>{eventTypeLabel(entry.type)}</td>
-                <td className={tdClass}>{entry.detail ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-        )}
-      </Card>
+      <Tabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} className="mb-4" id="activity-log" />
+      {activeTab === 'extension-errors' ? (
+        <Card>
+          <ExtensionErrorsTab />
+        </Card>
+      ) : (
+        <>
+          {error && <Alert>{error}</Alert>}
+          <Card>
+            <div className="mb-4 flex flex-wrap gap-4">
+              <FormField label="Huésped">
+                <Input
+                  type="search"
+                  value={guestSearch}
+                  onChange={(e) => setGuestSearch(e.target.value)}
+                  placeholder="Nombre del huésped"
+                />
+              </FormField>
+              <FormField label="Tipo de evento">
+                <Select value={eventType} onChange={(e) => setEventType(e.target.value)}>
+                  <option value="">Todos</option>
+                  {eventTypeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {eventTypeLabel(type)}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Desde">
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              </FormField>
+              <FormField label="Hasta">
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              </FormField>
+            </div>
+            {loading ? (
+              <LoadingState />
+            ) : entries.length === 0 ? (
+              <EmptyState message="Todavía no hay eventos registrados." />
+            ) : filteredEntries.length === 0 ? (
+              <EmptyState message="No hay eventos que coincidan con estos filtros." />
+            ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <th className={thClass}>Cuándo</th>
+                  <th className={thClass}>Reserva</th>
+                  <th className={thClass}>Evento</th>
+                  <th className={thClass}>Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEntries.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className={tdClass}>{formatDateTime(entry.createdAt)}</td>
+                    <td className={tdClass}>
+                      <Link to={`/reservations/${entry.reservationId}`} className="text-accent hover:underline">
+                        {entry.reservation.guestName}
+                      </Link>
+                    </td>
+                    <td className={tdClass}>{eventTypeLabel(entry.type)}</td>
+                    <td className={tdClass}>{entry.detail ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+            )}
+          </Card>
+        </>
+      )}
     </PageContainer>
   );
 }
