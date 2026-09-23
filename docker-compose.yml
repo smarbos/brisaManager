@@ -29,6 +29,7 @@ services:
     volumes:
       - ./api:/app
       - /app/node_modules
+      - receipts_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,3 +65,4 @@ services:
 
 volumes:
   postgres_data:
+  receipts_data:

@@ -13,10 +13,11 @@ import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
 import { GuestsModule } from './guests/guests.module';
 import { CampaignTemplatesModule } from './campaign-templates/campaign-templates.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
-import { ReservationImportModule } from './reservation-import/reservation-import.module';
 import { ChannelImportModule } from './channel-import/channel-import.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ExtensionErrorsModule } from './extension-errors/extension-errors.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ReservationImagesModule } from './reservation-images/reservation-images.module';
 
 @Module({
   imports: [
@@ -33,10 +34,11 @@ import { ExtensionErrorsModule } from './extension-errors/extension-errors.modul
     GuestsModule,
     CampaignTemplatesModule,
     CampaignsModule,
-    ReservationImportModule,
     ChannelImportModule,
     WhatsappModule,
     ExtensionErrorsModule,
+    NotificationsModule,
+    ReservationImagesModule,
   ],
   controllers: [AppController],
 })
