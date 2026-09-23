@@ -15,4 +15,7 @@ Components are versioned independently — changing `api` doesn't warrant bumpin
 or vice versa. This is what lets `/health` and the admin footer tell you, at a glance, exactly
 what's actually deployed when debugging a production issue.
 
-`guest-web` is not part of this scheme (no version is currently surfaced anywhere for it).
+`guest-web` is not part of this scheme — no manual version bump needed there. It's identified
+by git commit hash instead (shown in its fixed footer, `AppFooter`), baked in automatically at
+deploy time from `VITE_COMMIT_HASH` (see `guest-web/Dockerfile` and
+`.github/workflows/deploy.yml`), not something you set by hand.

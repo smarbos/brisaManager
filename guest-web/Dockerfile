@@ -12,6 +12,10 @@ RUN npm ci
 COPY . .
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
+# Passed in from the server's own git checkout at deploy time (see deploy.yml) — this build
+# context is scoped to ./guest-web, so .git isn't available here to compute it directly.
+ARG VITE_COMMIT_HASH
+ENV VITE_COMMIT_HASH=$VITE_COMMIT_HASH
 RUN npm run build
 
 FROM nginx:alpine AS prod

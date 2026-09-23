@@ -54,4 +54,6 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes "$SSH_USER@$SSH_HOST" \
             "ssh-keygen -F github.com -f ~/.ssh/known_hosts >/dev/null 2>&1 || ssh-keyscan -H github.com >> ~/.ssh/known_hosts; \
              git config --global --get-all safe.directory | grep -qxF '$DEPLOY_PATH' || git config --global --add safe.directory '$DEPLOY_PATH'; \
-             cd '$DEPLOY_PATH' && git pull origin main && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build && docker compose exec -T api npx prisma migrate deploy"
+             cd '$DEPLOY_PATH' && git pull origin main && \
+             export VITE_COMMIT_HASH=\$(git rev-parse --short HEAD) && \
+             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build && docker compose exec -T api npx prisma migrate deploy"

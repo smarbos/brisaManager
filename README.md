@@ -58,7 +58,8 @@
      every marketing email — left at its localhost default, every campaign email ships a broken
      unsubscribe link, silently, with the campaign still recorded as sent.
 2. Point DNS A records for `admin.labrisa.com.ar`, `reservas.labrisa.com.ar`, and `api.labrisa.com.ar` at the server's IP
-3. Start: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`
+3. Start: `VITE_COMMIT_HASH=$(git rev-parse --short HEAD) docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`
+   (the GitHub Actions deploy workflow sets `VITE_COMMIT_HASH` automatically — only needed by hand for a manual deploy. It's baked into guest-web's footer so staff can identify exactly which build a guest is looking at.)
 4. Run migrations and seed as above, using the same `docker compose -f ... exec` commands
 
 In production only Traefik publishes ports (80/443); Postgres, the API and both web apps are

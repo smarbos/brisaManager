@@ -94,8 +94,10 @@ function StepIndicator({ step }: { step: Step }) {
 }
 
 function PageShell({ children }: { children: ReactNode }) {
+  // pb-12 clears AppFooter, which is fixed to the bottom of the viewport, so it never covers
+  // the last bit of content on steps short enough not to scroll past it naturally.
   return (
-    <div className="min-h-screen bg-bg px-4 py-8">
+    <div className="min-h-screen bg-bg px-4 py-8 pb-12">
       <div className="mx-auto flex max-w-md items-start justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold text-heading">
