@@ -6,6 +6,7 @@ import { SettingsService } from '../settings/settings.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GuestsService } from '../guests/guests.service';
+import { ReservationImagesService } from '../reservation-images/reservation-images.service';
 
 describe('PublicReservationsService', () => {
   let service: PublicReservationsService;
@@ -14,6 +15,7 @@ describe('PublicReservationsService', () => {
   let eventsService: { record: jest.Mock };
   let confirmationService: { maybeAutoConfirm: jest.Mock };
   let guestsService: { syncFromReservation: jest.Mock };
+  let reservationImagesService: { upload: jest.Mock; listForReservation: jest.Mock; getOne: jest.Mock; readFile: jest.Mock };
 
   const baseReservation = {
     id: 'res-1',
@@ -43,6 +45,12 @@ describe('PublicReservationsService', () => {
     eventsService = { record: jest.fn() };
     confirmationService = { maybeAutoConfirm: jest.fn() };
     guestsService = { syncFromReservation: jest.fn() };
+    reservationImagesService = {
+      upload: jest.fn(),
+      listForReservation: jest.fn(),
+      getOne: jest.fn(),
+      readFile: jest.fn(),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -55,6 +63,7 @@ describe('PublicReservationsService', () => {
           useValue: confirmationService,
         },
         { provide: GuestsService, useValue: guestsService },
+        { provide: ReservationImagesService, useValue: reservationImagesService },
       ],
     }).compile();
 
@@ -281,5 +290,53 @@ describe('PublicReservationsService', () => {
     expect(prisma.reservation.update).not.toHaveBeenCalled();
     expect(eventsService.record).not.toHaveBeenCalled();
     expect(confirmationService.maybeAutoConfirm).not.toHaveBeenCalled();
+  });
+
+  describe('uploadImage', () => {
+    it('resolves the token to a reservation id before delegating to ReservationImagesService', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+      const file = { buffer: Buffer.from('x'), originalname: 'a.jpg', mimetype: 'image/jpeg', size: 1 } as Express.Multer.File;
+      reservationImagesService.upload.mockResolvedValue({ id: 'img-1' });
+
+      const result = await service.uploadImage('tok-1', file);
+
+      expect(reservationImagesService.upload).toHaveBeenCalledWith('res-1', file);
+      expect(result).toEqual({ id: 'img-1' });
+    });
+
+    it('throws NotFoundException for an unknown token, never reaching ReservationImagesService', async () => {
+      prisma.reservation.findUnique.mockResolvedValue(null);
+      const file = { buffer: Buffer.from('x'), originalname: 'a.jpg', mimetype: 'image/jpeg', size: 1 } as Express.Multer.File;
+
+      await expect(service.uploadImage('missing', file)).rejects.toBeInstanceOf(NotFoundException);
+      expect(reservationImagesService.upload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listImages', () => {
+    it('resolves the token to a reservation id before listing', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+      reservationImagesService.listForReservation.mockResolvedValue([{ id: 'img-1' }]);
+
+      const result = await service.listImages('tok-1');
+
+      expect(reservationImagesService.listForReservation).toHaveBeenCalledWith('res-1');
+      expect(result).toEqual([{ id: 'img-1' }]);
+    });
+  });
+
+  describe('getImageFile', () => {
+    it('resolves the token, then the image scoped to that reservation, then reads the file', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+      const image = { id: 'img-1', mimeType: 'image/jpeg', filename: 'x.jpg' };
+      reservationImagesService.getOne.mockResolvedValue(image);
+      reservationImagesService.readFile.mockResolvedValue(Buffer.from('bytes'));
+
+      const result = await service.getImageFile('tok-1', 'img-1');
+
+      expect(reservationImagesService.getOne).toHaveBeenCalledWith('res-1', 'img-1');
+      expect(reservationImagesService.readFile).toHaveBeenCalledWith(image);
+      expect(result).toEqual({ image, buffer: Buffer.from('bytes') });
+    });
   });
 });

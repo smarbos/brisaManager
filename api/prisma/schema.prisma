@@ -49,6 +49,11 @@ enum CampaignRecipientStatus {
   FAILED
 }
 
+enum NotificationType {
+  CALENDAR_MISMATCH
+  PAYMENT_RECEIPT_UPLOADED
+}
+
 model Reservation {
   id                            String             @id @default(uuid())
   guestName                     String
@@ -77,6 +82,8 @@ model Reservation {
   reservationReminderSentAt     DateTime?
   depositReminderSentAt         DateTime?
   events                        ReservationEvent[]
+  images                        ReservationImage[]
+  notifications                 Notification[]
   missingFromChannelAt          DateTime?
   googleEventId                 String?
   createdAt                     DateTime           @default(now())
@@ -194,6 +201,46 @@ model CampaignRecipient {
   status     CampaignRecipientStatus
   error      String?
   createdAt  DateTime                @default(now())
+}
+
+// A payment/deposit receipt the guest uploaded from the check-in page (Step 3). The file
+// itself lives on local disk under UPLOADS_DIR (see api/src/storage/), never in the
+// database or a publicly-servable path — these are financial documents, streamed back out
+// through an authenticated endpoint (JWT for staff, confirmationToken match for the guest
+// re-viewing their own upload) rather than a plain static URL.
+model ReservationImage {
+  id            String      @id @default(uuid())
+  reservationId String
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+  // Filename on disk — a generated uuid + original extension, never the guest's original
+  // filename (which could collide or contain unsafe characters). originalName is kept
+  // separately, display-only.
+  filename      String
+  originalName  String?
+  mimeType      String
+  sizeBytes     Int
+  createdAt     DateTime    @default(now())
+}
+
+// Not tied to a specific payment (confirmation vs. deposit) at upload time — staff review
+// the image(s) and decide which "mark as received" action(s) it corresponds to, same as
+// today's manual "guest sent the receipt over WhatsApp" flow, just with the image attached
+// to the reservation instead of living only in a chat thread.
+model Notification {
+  id            String           @id @default(uuid())
+  type          NotificationType
+  message       String
+  reservationId String?
+  reservation   Reservation?     @relation(fields: [reservationId], references: [id])
+  // Only meaningful for CALENDAR_MISMATCH: identifies "this same blocked-day gap", so a
+  // sync run every 30 minutes doesn't create a fresh notification for a gap staff already
+  // has an unread alert for. Once that alert is marked read, a still-unresolved gap is
+  // free to notify again on the next sync — read is "seen", not "permanently silenced".
+  dedupeKey     String?
+  readAt        DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@index([dedupeKey])
 }
 
 // Reported by the Chrome extension (content_script_airbnb.js / background.js) whenever it

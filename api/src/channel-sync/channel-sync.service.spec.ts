@@ -8,19 +8,17 @@ import { ChannelSyncService } from './channel-sync.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { EmailService } from '../email/email.service';
-import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
-import { ReservationEventsService } from '../reservation-events/reservation-events.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('ChannelSyncService', () => {
   let service: ChannelSyncService;
   let prisma: {
-    reservation: { findMany: jest.Mock; findUnique: jest.Mock; upsert: jest.Mock; update: jest.Mock };
+    reservation: { findFirst: jest.Mock };
     settings: { update: jest.Mock };
   };
   let settingsService: { get: jest.Mock };
   let emailService: { sendAlert: jest.Mock };
-  let googleCalendarPushService: { pushReservation: jest.Mock };
-  let eventsService: { record: jest.Mock };
+  let notificationsService: { create: jest.Mock; hasOpen: jest.Mock };
   let fromURLMock: jest.Mock;
 
   beforeEach(async () => {
@@ -28,18 +26,12 @@ describe('ChannelSyncService', () => {
     fromURLMock.mockReset();
 
     prisma = {
-      reservation: {
-        findMany: jest.fn().mockResolvedValue([]),
-        findUnique: jest.fn().mockResolvedValue(null),
-        upsert: jest.fn(),
-        update: jest.fn(),
-      },
+      reservation: { findFirst: jest.fn().mockResolvedValue(null) },
       settings: { update: jest.fn() },
     };
     settingsService = { get: jest.fn() };
     emailService = { sendAlert: jest.fn() };
-    googleCalendarPushService = { pushReservation: jest.fn() };
-    eventsService = { record: jest.fn() };
+    notificationsService = { create: jest.fn(), hasOpen: jest.fn().mockResolvedValue(false) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -47,8 +39,7 @@ describe('ChannelSyncService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: SettingsService, useValue: settingsService },
         { provide: EmailService, useValue: emailService },
-        { provide: GoogleCalendarPushService, useValue: googleCalendarPushService },
-        { provide: ReservationEventsService, useValue: eventsService },
+        { provide: NotificationsService, useValue: notificationsService },
       ],
     }).compile();
 
@@ -82,161 +73,132 @@ describe('ChannelSyncService', () => {
     );
   });
 
-  it('upserts a new reservation for a booking not seen before', async () => {
+  it('never creates or updates a reservation from the feed — only reads', async () => {
     settingsService.get.mockResolvedValue({
       bookingIcalUrl: 'https://booking.example/cal.ics',
       airbnbIcalUrl: null,
     });
     fromURLMock.mockResolvedValueOnce({
-      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
-    });
-    prisma.reservation.upsert.mockResolvedValue({ id: 'res-1' });
-
-    await service.syncAll();
-
-    expect(prisma.reservation.upsert).toHaveBeenCalledWith({
-      where: {
-        source_externalReference: { source: 'BOOKING', externalReference: 'uid-1' },
-      },
-      create: expect.objectContaining({
-        source: 'BOOKING',
-        externalReference: 'uid-1',
-        status: 'PENDING',
-        guestName: 'Huésped de Booking.com',
-      }),
-      update: { missingFromChannelAt: null },
-    });
-  });
-
-  it('records a RESERVATION_CREATED event for a booking not seen before', async () => {
-    settingsService.get.mockResolvedValue({
-      bookingIcalUrl: 'https://booking.example/cal.ics',
-      airbnbIcalUrl: null,
-    });
-    fromURLMock.mockResolvedValueOnce({
-      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
-    });
-    prisma.reservation.upsert.mockResolvedValue({ id: 'res-1' });
-
-    await service.syncAll();
-
-    expect(eventsService.record).toHaveBeenCalledWith('res-1', 'RESERVATION_CREATED', 'Creada vía sincronización de calendario de Booking.com');
-  });
-
-  it('does not record a RESERVATION_CREATED event when the reservation already existed', async () => {
-    settingsService.get.mockResolvedValue({
-      bookingIcalUrl: 'https://booking.example/cal.ics',
-      airbnbIcalUrl: null,
-    });
-    fromURLMock.mockResolvedValueOnce({
-      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
-    });
-    prisma.reservation.findUnique.mockResolvedValue({ id: 'res-1' });
-    prisma.reservation.upsert.mockResolvedValue({ id: 'res-1', missingFromChannelAt: null });
-
-    await service.syncAll();
-
-    expect(eventsService.record).not.toHaveBeenCalled();
-  });
-
-  it('pushes the upserted reservation to Google Calendar for every synced booking', async () => {
-    settingsService.get.mockResolvedValue({
-      bookingIcalUrl: 'https://booking.example/cal.ics',
-      airbnbIcalUrl: null,
-    });
-    fromURLMock.mockResolvedValueOnce({
-      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
-    });
-    const upserted = { id: 'res-1', source: 'BOOKING', externalReference: 'uid-1' };
-    prisma.reservation.upsert.mockResolvedValue(upserted);
-
-    await service.syncAll();
-
-    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(upserted);
-  });
-
-  it('does not recreate or modify an already-synced reservation still present in the feed', async () => {
-    settingsService.get.mockResolvedValue({
-      bookingIcalUrl: 'https://booking.example/cal.ics',
-      airbnbIcalUrl: null,
-    });
-    fromURLMock.mockResolvedValueOnce({
-      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
-    });
-    prisma.reservation.upsert.mockResolvedValue({ id: 'res-1', missingFromChannelAt: null });
-    prisma.reservation.findMany.mockResolvedValue([
-      { id: 'res-1', externalReference: 'uid-1', missingFromChannelAt: null },
-    ]);
-
-    await service.syncAll();
-
-    // The upsert is still called (it's the mechanism itself — atomic create-or-touch), but it
-    // must not trigger the separate "missing" flag-update path for a UID still in the feed.
-    expect(prisma.reservation.upsert).toHaveBeenCalledTimes(1);
-    expect(prisma.reservation.update).not.toHaveBeenCalled();
-  });
-
-  it('flags a previously-synced reservation as missing when its UID disappears from the feed', async () => {
-    settingsService.get.mockResolvedValue({
-      bookingIcalUrl: 'https://booking.example/cal.ics',
-      airbnbIcalUrl: null,
-    });
-    fromURLMock.mockResolvedValueOnce({});
-    prisma.reservation.findMany.mockResolvedValue([
-      { id: 'res-1', externalReference: 'uid-1', missingFromChannelAt: null },
-    ]);
-
-    await service.syncAll();
-
-    expect(prisma.reservation.update).toHaveBeenCalledWith({
-      where: { id: 'res-1' },
-      data: { missingFromChannelAt: expect.any(Date) },
-    });
-  });
-
-  it('queries only current/active reservations when checking for ones missing from the feed', async () => {
-    settingsService.get.mockResolvedValue({
-      bookingIcalUrl: 'https://booking.example/cal.ics',
-      airbnbIcalUrl: null,
-    });
-    fromURLMock.mockResolvedValueOnce({});
-
-    await service.syncAll();
-
-    expect(prisma.reservation.findMany).toHaveBeenCalledWith({
-      where: {
-        source: 'BOOKING',
-        externalReference: { not: null },
-        checkOut: { gte: expect.any(Date) },
-        status: { notIn: ['CANCELLED', 'COMPLETED'] },
+      'uid-1': {
+        type: 'VEVENT',
+        uid: 'uid-1',
+        start: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        end: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000),
       },
     });
+
+    await service.syncAll();
+
+    // No reservation.create/update/upsert mock exists on the prisma stub at all — if the
+    // service tried to call one, this test would throw "is not a function" and fail.
+    expect(prisma.reservation.findFirst).toHaveBeenCalled();
   });
 
-  it('un-flags a reservation that reappears in the feed via the upsert update branch', async () => {
+  it('does nothing for a blocked date range already covered by a non-cancelled reservation', async () => {
     settingsService.get.mockResolvedValue({
       bookingIcalUrl: 'https://booking.example/cal.ics',
       airbnbIcalUrl: null,
     });
     fromURLMock.mockResolvedValueOnce({
-      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: new Date('2026-05-01'), end: new Date('2026-05-05') },
+      'uid-1': {
+        type: 'VEVENT',
+        uid: 'uid-1',
+        start: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        end: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000),
+      },
     });
-    prisma.reservation.upsert.mockResolvedValue({
-      id: 'res-1',
-      missingFromChannelAt: null,
+    prisma.reservation.findFirst.mockResolvedValue({ id: 'res-1' });
+
+    await service.syncAll();
+
+    expect(notificationsService.create).not.toHaveBeenCalled();
+  });
+
+  it('checks for an overlapping, non-cancelled reservation of the same source', async () => {
+    const checkIn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const checkOut = new Date(Date.now() + 9 * 24 * 60 * 60 * 1000);
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({
+      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: checkIn, end: checkOut },
     });
 
     await service.syncAll();
 
-    expect(prisma.reservation.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { source_externalReference: { source: 'BOOKING', externalReference: 'uid-1' } },
-        update: { missingFromChannelAt: null },
-      }),
-    );
+    expect(prisma.reservation.findFirst).toHaveBeenCalledWith({
+      where: {
+        source: 'BOOKING',
+        status: { not: 'CANCELLED' },
+        checkIn: { lt: checkOut },
+        checkOut: { gt: checkIn },
+      },
+      select: { id: true },
+    });
   });
 
-  it('records the error and sends an alert on a fetch failure, without touching reservation data', async () => {
+  it('creates a CALENDAR_MISMATCH notification when no matching reservation is found', async () => {
+    const checkIn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const checkOut = new Date(Date.now() + 9 * 24 * 60 * 60 * 1000);
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({
+      'uid-1': { type: 'VEVENT', uid: 'uid-1', start: checkIn, end: checkOut },
+    });
+
+    await service.syncAll();
+
+    expect(notificationsService.create).toHaveBeenCalledWith({
+      type: 'CALENDAR_MISMATCH',
+      message: expect.stringContaining('Booking.com'),
+      dedupeKey: 'calendar-mismatch:BOOKING:uid-1',
+    });
+  });
+
+  it('does not create a duplicate notification when one is already open for the same event', async () => {
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({
+      'uid-1': {
+        type: 'VEVENT',
+        uid: 'uid-1',
+        start: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        end: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000),
+      },
+    });
+    notificationsService.hasOpen.mockResolvedValue(true);
+
+    await service.syncAll();
+
+    expect(notificationsService.create).not.toHaveBeenCalled();
+  });
+
+  it('ignores a blocked date range that is entirely in the past', async () => {
+    settingsService.get.mockResolvedValue({
+      bookingIcalUrl: 'https://booking.example/cal.ics',
+      airbnbIcalUrl: null,
+    });
+    fromURLMock.mockResolvedValueOnce({
+      'uid-1': {
+        type: 'VEVENT',
+        uid: 'uid-1',
+        start: new Date('2020-01-01'),
+        end: new Date('2020-01-03'),
+      },
+    });
+
+    await service.syncAll();
+
+    expect(prisma.reservation.findFirst).not.toHaveBeenCalled();
+    expect(notificationsService.create).not.toHaveBeenCalled();
+  });
+
+  it('records the error and sends an alert on a fetch failure', async () => {
     settingsService.get.mockResolvedValue({
       bookingIcalUrl: 'https://booking.example/cal.ics',
       airbnbIcalUrl: null,
@@ -245,8 +207,7 @@ describe('ChannelSyncService', () => {
 
     await service.syncAll();
 
-    expect(prisma.reservation.upsert).not.toHaveBeenCalled();
-    expect(prisma.reservation.update).not.toHaveBeenCalled();
+    expect(notificationsService.create).not.toHaveBeenCalled();
     expect(prisma.settings.update).toHaveBeenCalledWith({
       where: { id: 'singleton' },
       data: { lastChannelSyncAt: expect.any(Date), lastChannelSyncError: expect.stringContaining('ETIMEDOUT') },
@@ -255,23 +216,21 @@ describe('ChannelSyncService', () => {
   });
 
   it('syncs both platforms independently — one failing does not stop the other', async () => {
+    const checkIn = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const checkOut = new Date(Date.now() + 9 * 24 * 60 * 60 * 1000);
     settingsService.get.mockResolvedValue({
       bookingIcalUrl: 'https://booking.example/cal.ics',
       airbnbIcalUrl: 'https://airbnb.example/cal.ics',
     });
     fromURLMock.mockRejectedValueOnce(new Error('booking down'));
     fromURLMock.mockResolvedValueOnce({
-      'uid-2': { type: 'VEVENT', uid: 'uid-2', start: new Date('2026-06-01'), end: new Date('2026-06-03') },
+      'uid-2': { type: 'VEVENT', uid: 'uid-2', start: checkIn, end: checkOut },
     });
-    prisma.reservation.upsert.mockResolvedValue({ id: 'res-2' });
 
     await service.syncAll();
 
-    expect(prisma.reservation.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { source_externalReference: { source: 'AIRBNB', externalReference: 'uid-2' } },
-        create: expect.objectContaining({ source: 'AIRBNB', externalReference: 'uid-2' }),
-      }),
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ dedupeKey: 'calendar-mismatch:AIRBNB:uid-2' }),
     );
     expect(prisma.settings.update).toHaveBeenCalledWith({
       where: { id: 'singleton' },

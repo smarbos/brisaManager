@@ -24,6 +24,12 @@ describe('PublicReservationsController (e2e)', () => {
     await prisma.reservationEvent.deleteMany({
       where: { reservation: { guestName: 'Public E2E Guest' } },
     });
+    await prisma.notification.deleteMany({
+      where: { reservation: { guestName: 'Public E2E Guest' } },
+    });
+    await prisma.reservationImage.deleteMany({
+      where: { reservation: { guestName: 'Public E2E Guest' } },
+    });
     await prisma.reservation.deleteMany({
       where: { guestName: 'Public E2E Guest' },
     });
@@ -129,5 +135,100 @@ describe('PublicReservationsController (e2e)', () => {
       )
       .send({ fullName: 'Jane Doe', phone: 'not a phone number', email: 'a@example.com' })
       .expect(400);
+  });
+
+  describe('receipt images', () => {
+    it('uploads an image, lists it, streams it back, and raises a notification', async () => {
+      const reservation = await prisma.reservation.create({
+        data: {
+          guestName: 'Public E2E Guest',
+          checkIn: new Date('2026-03-01'),
+          checkOut: new Date('2026-03-05'),
+          paxCount: 2,
+          source: 'DIRECT',
+          totalAmount: 100000,
+          currency: 'ARS',
+        },
+      });
+
+      const uploadResponse = await request(app.getHttpServer())
+        .post(`/public/reservations/${reservation.confirmationToken}/images`)
+        .attach('file', Buffer.from('fake png bytes'), { filename: 'comprobante.png', contentType: 'image/png' })
+        .expect(200);
+
+      expect(uploadResponse.body.id).toBeTruthy();
+      expect(uploadResponse.body.reservationId).toBe(reservation.id);
+
+      const listResponse = await request(app.getHttpServer())
+        .get(`/public/reservations/${reservation.confirmationToken}/images`)
+        .expect(200);
+      expect(listResponse.body).toHaveLength(1);
+      expect(listResponse.body[0].id).toBe(uploadResponse.body.id);
+
+      const fileResponse = await request(app.getHttpServer())
+        .get(`/public/reservations/${reservation.confirmationToken}/images/${uploadResponse.body.id}/file`)
+        .expect(200);
+      expect(fileResponse.headers['content-type']).toContain('image/png');
+      expect(fileResponse.body.toString()).toBe('fake png bytes');
+
+      const notification = await prisma.notification.findFirst({
+        where: { reservationId: reservation.id, type: 'PAYMENT_RECEIPT_UPLOADED' },
+      });
+      expect(notification).not.toBeNull();
+      expect(notification?.message).toContain('Public E2E Guest');
+    });
+
+    it('rejects a non-image file', async () => {
+      const reservation = await prisma.reservation.create({
+        data: {
+          guestName: 'Public E2E Guest',
+          checkIn: new Date('2026-03-01'),
+          checkOut: new Date('2026-03-05'),
+          paxCount: 2,
+          source: 'DIRECT',
+          totalAmount: 100000,
+          currency: 'ARS',
+        },
+      });
+
+      await request(app.getHttpServer())
+        .post(`/public/reservations/${reservation.confirmationToken}/images`)
+        .attach('file', Buffer.from('not an image'), { filename: 'file.txt', contentType: 'text/plain' })
+        .expect(400);
+    });
+
+    it('returns 404 for an image requested through the wrong reservation token', async () => {
+      const reservationA = await prisma.reservation.create({
+        data: {
+          guestName: 'Public E2E Guest',
+          checkIn: new Date('2026-03-01'),
+          checkOut: new Date('2026-03-05'),
+          paxCount: 2,
+          source: 'DIRECT',
+          totalAmount: 100000,
+          currency: 'ARS',
+        },
+      });
+      const reservationB = await prisma.reservation.create({
+        data: {
+          guestName: 'Public E2E Guest',
+          checkIn: new Date('2026-04-01'),
+          checkOut: new Date('2026-04-05'),
+          paxCount: 2,
+          source: 'DIRECT',
+          totalAmount: 100000,
+          currency: 'ARS',
+        },
+      });
+
+      const uploadResponse = await request(app.getHttpServer())
+        .post(`/public/reservations/${reservationA.confirmationToken}/images`)
+        .attach('file', Buffer.from('fake png bytes'), { filename: 'a.png', contentType: 'image/png' })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get(`/public/reservations/${reservationB.confirmationToken}/images/${uploadResponse.body.id}/file`)
+        .expect(404);
+    });
   });
 });

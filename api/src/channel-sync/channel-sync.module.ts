@@ -3,10 +3,10 @@ import { ChannelSyncController } from './channel-sync.controller';
 import { ChannelSyncService } from './channel-sync.service';
 import { ChannelSyncSchedulerService } from './channel-sync-scheduler.service';
 import { SettingsModule } from '../settings/settings.module';
-import { GoogleCalendarModule } from '../google-calendar/google-calendar.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [SettingsModule, GoogleCalendarModule],
+  imports: [SettingsModule, NotificationsModule],
   controllers: [ChannelSyncController],
   providers: [ChannelSyncService, ChannelSyncSchedulerService],
   exports: [ChannelSyncService],

@@ -4,6 +4,7 @@ import { SettingsService } from '../settings/settings.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GuestsService } from '../guests/guests.service';
+import { ReservationImagesService } from '../reservation-images/reservation-images.service';
 import { parsePercentage, resolveFeeAmount } from '../settings/fee-value';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class PublicReservationsService {
     private readonly eventsService: ReservationEventsService,
     private readonly confirmationService: ReservationConfirmationService,
     private readonly guestsService: GuestsService,
+    private readonly reservationImagesService: ReservationImagesService,
   ) {}
 
   private async findByToken(token: string) {
@@ -120,5 +122,22 @@ export class PublicReservationsService {
     await this.confirmationService.maybeAutoConfirm(reservation.id);
 
     return { contractAcceptedAt: updated.contractAcceptedAt };
+  }
+
+  async uploadImage(token: string, file: Express.Multer.File) {
+    const reservation = await this.findByToken(token);
+    return this.reservationImagesService.upload(reservation.id, file);
+  }
+
+  async listImages(token: string) {
+    const reservation = await this.findByToken(token);
+    return this.reservationImagesService.listForReservation(reservation.id);
+  }
+
+  async getImageFile(token: string, imageId: string) {
+    const reservation = await this.findByToken(token);
+    const image = await this.reservationImagesService.getOne(reservation.id, imageId);
+    const buffer = await this.reservationImagesService.readFile(image);
+    return { image, buffer };
   }
 }
