@@ -102,11 +102,11 @@ describe('ConfirmationPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
 
     await waitFor(() =>
-      expect(confirmSpy).toHaveBeenCalledWith('tok-1', 'Jane Doe', '+5492235550123', 'jane@example.com'),
+      expect(confirmSpy).toHaveBeenCalledWith('tok-1', 'Jane Doe', '+542235550123', 'jane@example.com'),
     );
   });
 
-  it('lets a guest override the country code for a non-Argentine phone number', async () => {
+  it('accepts a foreign phone number typed with its own country code', async () => {
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
     const confirmSpy = vi
       .spyOn(publicApi, 'confirmDates')
@@ -117,14 +117,30 @@ describe('ConfirmationPage', () => {
     await screen.findByText(/confirmá tu reserva/i);
 
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'John Smith' } });
-    fireEvent.change(screen.getByLabelText(/código/i), { target: { value: '+1' } });
-    fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '2025551234' } });
+    fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '+1 202 555 0123' } });
     fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'john@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
 
     await waitFor(() =>
-      expect(confirmSpy).toHaveBeenCalledWith('tok-1', 'John Smith', '+12025551234', 'john@example.com'),
+      expect(confirmSpy).toHaveBeenCalledWith('tok-1', 'John Smith', '+12025550123', 'john@example.com'),
     );
+  });
+
+  it('blocks submission and shows an inline error for an invalid phone number', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+    const confirmSpy = vi.spyOn(publicApi, 'confirmDates');
+
+    renderAt('tok-1');
+
+    await screen.findByText(/confirmá tu reserva/i);
+
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '123' } });
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'jane@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/número de teléfono válido/i);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
   it('resumes at step 2 (house rules), listing each rule and requiring the checkbox before accepting', async () => {

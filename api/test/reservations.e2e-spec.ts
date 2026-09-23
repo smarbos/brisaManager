@@ -76,6 +76,40 @@ describe('ReservationsController (e2e)', () => {
     await request(app.getHttpServer()).get('/reservations').expect(401);
   });
 
+  it('creates a reservation with a valid guest phone', async () => {
+    await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        guestName: 'E2E Guest',
+        guestPhone: '+54 9 223 555-9999',
+        checkIn: '2026-02-01',
+        checkOut: '2026-02-05',
+        paxCount: 3,
+        source: 'AIRBNB',
+        totalAmount: 50000,
+        currency: 'ARS',
+      })
+      .expect(201);
+  });
+
+  it('rejects creating a reservation with an invalid guest phone', async () => {
+    await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        guestName: 'E2E Guest',
+        guestPhone: 'not a phone number',
+        checkIn: '2026-02-01',
+        checkOut: '2026-02-05',
+        paxCount: 3,
+        source: 'AIRBNB',
+        totalAmount: 50000,
+        currency: 'ARS',
+      })
+      .expect(400);
+  });
+
   it('finds overlapping reservations and respects excludeId', async () => {
     const first = await request(app.getHttpServer())
       .post('/reservations')

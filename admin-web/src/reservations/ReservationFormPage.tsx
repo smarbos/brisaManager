@@ -1,5 +1,6 @@
 import { ChangeEvent, ClipboardEvent, FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
 import {
   cancelReservation,
   checkOverlap,
@@ -63,6 +64,7 @@ export function ReservationFormPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<ActionKey | null>(null);
@@ -270,13 +272,23 @@ export function ReservationFormPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    // Only manual entry via this form is held to this: staff sometimes need to enter a
+    // reservation with no phone at all (optional field), but a non-empty value must be a
+    // real number — unlike the Chrome extension's import path, which best-effort normalizes
+    // a scraped phone and never rejects the import over it (see ChannelImportService).
+    if (form.guestPhone && !isValidPhoneNumber(form.guestPhone, 'AR')) {
+      setPhoneError('Ingresá un número de teléfono válido.');
+      return;
+    }
+    setPhoneError(null);
     setError(null);
     setSubmitting(true);
+    const guestPhone = form.guestPhone ? parsePhoneNumberFromString(form.guestPhone, 'AR')!.number : form.guestPhone;
     try {
       if (isEditing && id) {
-        await updateReservation(id, form);
+        await updateReservation(id, { ...form, guestPhone });
       } else {
-        await createReservation(form);
+        await createReservation({ ...form, guestPhone });
       }
       navigate('/');
     } catch {
@@ -351,11 +363,14 @@ export function ReservationFormPage() {
               onChange={(e) => setForm({ ...form, guestEmail: e.target.value })}
             />
           </FormField>
-          <FormField label="Teléfono del huésped">
+          <FormField label="Teléfono del huésped" error={phoneError}>
             <Input
               type="tel"
               value={form.guestPhone}
-              onChange={(e) => setForm({ ...form, guestPhone: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, guestPhone: e.target.value });
+                setPhoneError(null);
+              }}
             />
           </FormField>
           <FormField label="Check-in">

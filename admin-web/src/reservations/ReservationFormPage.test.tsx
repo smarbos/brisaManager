@@ -32,6 +32,48 @@ describe('ReservationFormPage', () => {
     );
   });
 
+  it('blocks saving and shows an inline error for an invalid guest phone', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText(/nombre del huésped/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/teléfono del huésped/i), { target: { value: '123' } });
+    fireEvent.change(screen.getByLabelText(/check-in/i), { target: { value: '2026-01-10' } });
+    fireEvent.change(screen.getByLabelText(/check-out/i), { target: { value: '2026-01-15' } });
+    fireEvent.change(screen.getByLabelText(/monto total/i), { target: { value: '100000' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/número de teléfono válido/i);
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('allows saving with no guest phone at all, since the field is optional', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText(/nombre del huésped/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/check-in/i), { target: { value: '2026-01-10' } });
+    fireEvent.change(screen.getByLabelText(/check-out/i), { target: { value: '2026-01-15' } });
+    fireEvent.change(screen.getByLabelText(/monto total/i), { target: { value: '100000' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() => expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ guestPhone: '' })));
+  });
+
   it('shows a link back to the reservations list', () => {
     render(
       <MemoryRouter initialEntries={['/reservations/new']}>
