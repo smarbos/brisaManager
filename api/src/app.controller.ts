@@ -23,6 +23,6 @@ export class AppController {
 
   @Get('config')
   config() {
-    return { emailDebugMode: process.env.EMAIL_DEBUG_MODE === 'true' };
+    return { emailDebugMode: process.env.EMAIL_DEBUG_MODE === 'true', version };
   }
 }
