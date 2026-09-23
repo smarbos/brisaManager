@@ -1,8 +1,14 @@
-import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, ClipboardEvent, FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
 import { ApiError } from '../api/client';
 import { acceptContract, confirmDates, getReservationByToken } from '../api/publicReservations';
+import {
+  listReceiptImages,
+  receiptImageUrl,
+  uploadReceiptImage,
+  ReservationImage,
+} from '../api/reservationImages';
 import { GuestReservation } from './types';
 import { Alert, Badge, Button, FormField, Input } from '../ui';
 import { formatDate, formatLongDate } from '../lib/date';
@@ -134,6 +140,9 @@ export function ConfirmationPage() {
   const [acceptingContract, setAcceptingContract] = useState(false);
   const [refreshingPayments, setRefreshingPayments] = useState(false);
   const [copyStatus, setCopyStatus] = useState<Record<CopyField, CopyStatus | null>>({ cbu: null, alias: null });
+  const [images, setImages] = useState<ReservationImage[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousStepRef = useRef<Step | null>(null);
 
@@ -154,8 +163,45 @@ export function ConfirmationPage() {
       });
   }
 
+  function loadImages() {
+    if (!token) return;
+    listReceiptImages(token)
+      .then(setImages)
+      .catch(() => {});
+  }
+
+  async function uploadImage(file: File) {
+    if (!token || uploadingImage) return;
+    setUploadError(null);
+    setUploadingImage(true);
+    try {
+      const image = await uploadReceiptImage(token, file);
+      setImages((prev) => [image, ...prev]);
+    } catch {
+      setUploadError('No pudimos subir el comprobante. Por favor, intentá de nuevo.');
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  function handleImageFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) {
+      void uploadImage(file);
+    }
+  }
+
+  function handleImagePaste(event: ClipboardEvent<HTMLDivElement>) {
+    const file = Array.from(event.clipboardData.files).find((f) => f.type.startsWith('image/'));
+    if (file) {
+      void uploadImage(file);
+    }
+  }
+
   useEffect(() => {
     load();
+    loadImages();
   }, [token]);
 
   // Move focus to the new step's heading when the guest advances (confirm dates, accept
@@ -496,8 +542,8 @@ export function ConfirmationPage() {
                 </div>
               </dl>
               <p className="mt-4 rounded bg-surface p-3 text-xs text-text-muted">
-                Una vez transferido, enviá el comprobante por WhatsApp o email para que actualicemos el estado del
-                pago.
+                Una vez transferido, subí el comprobante acá abajo (o mandalo por WhatsApp o email) para que
+                actualicemos el estado del pago.
               </p>
             </div>
 
@@ -514,6 +560,49 @@ export function ConfirmationPage() {
                 </Badge>
               </div>
               <p className="mt-3 whitespace-pre-wrap text-sm text-text-muted">{reservation.depositInstructions}</p>
+            </div>
+
+            <div
+              tabIndex={0}
+              onPaste={handleImagePaste}
+              className="mt-4 flex flex-col gap-2 rounded-lg border border-dashed border-border bg-bg p-4"
+            >
+              <FormField label="Subir comprobante de pago">
+                {/* Raw input, not the shared Input primitive — file pickers render as a
+                    native browser button and don't benefit from the same text-input styling. */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  disabled={uploadingImage}
+                  className="text-sm text-text"
+                />
+              </FormField>
+              <p className="text-xs text-text-muted">
+                También podés pegar una captura copiada (Ctrl+V) haciendo clic acá primero. Vale para la seña o
+                para el depósito — subí las que tengas.
+              </p>
+              {uploadingImage && <p className="text-sm text-text-muted">Subiendo...</p>}
+              {uploadError && <Alert>{uploadError}</Alert>}
+              {images.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {images.map((image) => (
+                    <a
+                      key={image.id}
+                      href={receiptImageUrl(token!, image.id)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={image.originalName ?? 'Comprobante'}
+                    >
+                      <img
+                        src={receiptImageUrl(token!, image.id)}
+                        alt={image.originalName ?? 'Comprobante de pago'}
+                        className="h-20 w-20 rounded border border-border object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Button

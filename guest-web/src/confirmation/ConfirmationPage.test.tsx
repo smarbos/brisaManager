@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmationPage } from './ConfirmationPage';
 import * as publicApi from '../api/publicReservations';
+import * as reservationImagesApi from '../api/reservationImages';
 import { ApiError } from '../api/client';
 
 const baseReservation = {
@@ -194,6 +195,75 @@ describe('ConfirmationPage', () => {
     // The rules recap shouldn't be buried in the final step only — a guest deciding whether
     // to pay should be able to re-check what they agreed to right here, on step 3.
     expect(screen.getByRole('button', { name: /ver reglas de la casa/i })).toBeInTheDocument();
+  });
+
+  it('uploads a payment receipt from step 3 and shows it in the gallery', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+    });
+    vi.spyOn(reservationImagesApi, 'listReceiptImages').mockResolvedValue([]);
+    const uploadSpy = vi.spyOn(reservationImagesApi, 'uploadReceiptImage').mockResolvedValue({
+      id: 'img-1',
+      reservationId: 'res-1',
+      originalName: 'comprobante.png',
+      mimeType: 'image/png',
+      sizeBytes: 123,
+      createdAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    renderAt('tok-1');
+
+    const input = await screen.findByLabelText(/subir comprobante de pago/i);
+    const file = new File(['fake-image-bytes'], 'comprobante.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(uploadSpy).toHaveBeenCalledWith('tok-1', file));
+    expect(await screen.findByAltText('comprobante.png')).toBeInTheDocument();
+  });
+
+  it('shows receipts already uploaded on a previous visit', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+    });
+    vi.spyOn(reservationImagesApi, 'listReceiptImages').mockResolvedValue([
+      {
+        id: 'img-1',
+        reservationId: 'res-1',
+        originalName: 'comprobante.png',
+        mimeType: 'image/png',
+        sizeBytes: 123,
+        createdAt: '2026-01-02T00:00:00.000Z',
+      },
+    ]);
+
+    renderAt('tok-1');
+
+    expect(await screen.findByAltText('comprobante.png')).toBeInTheDocument();
+  });
+
+  it('shows an error notice when the upload fails', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+    });
+    vi.spyOn(reservationImagesApi, 'listReceiptImages').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'uploadReceiptImage').mockRejectedValue(new Error('network error'));
+
+    renderAt('tok-1');
+
+    const input = await screen.findByLabelText(/subir comprobante de pago/i);
+    const file = new File(['fake-image-bytes'], 'comprobante.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no pudimos subir el comprobante/i);
   });
 
   it('shows the confirmation payment label without a percentage when it is a fixed amount', async () => {
