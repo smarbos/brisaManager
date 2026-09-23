@@ -1,8 +1,9 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AppNav } from './AppNav';
 import { AuthProvider } from '../auth/AuthContext';
+import * as notificationsApi from '../api/notifications';
 
 function renderNav() {
   return render(
@@ -16,6 +17,8 @@ function renderNav() {
 
 describe('AppNav', () => {
   it('renders a link to every section', () => {
+    vi.spyOn(notificationsApi, 'getUnreadNotificationCount').mockResolvedValue({ count: 0 });
+
     renderNav();
 
     expect(screen.getByRole('link', { name: 'Reservas' })).toHaveAttribute('href', '/');
@@ -23,7 +26,25 @@ describe('AppNav', () => {
     expect(screen.getByRole('link', { name: 'Plantillas' })).toHaveAttribute('href', '/templates');
     expect(screen.getByRole('link', { name: 'Campañas' })).toHaveAttribute('href', '/campaigns');
     expect(screen.getByRole('link', { name: 'Registro de actividad' })).toHaveAttribute('href', '/activity');
+    expect(screen.getByRole('link', { name: 'Notificaciones' })).toHaveAttribute('href', '/notifications');
     expect(screen.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/settings');
+  });
+
+  it('shows an unread-count badge on the Notificaciones link when there are unread notifications', async () => {
+    vi.spyOn(notificationsApi, 'getUnreadNotificationCount').mockResolvedValue({ count: 3 });
+
+    renderNav();
+
+    expect(await screen.findByLabelText('3 sin leer')).toBeInTheDocument();
+  });
+
+  it('shows no badge when there are no unread notifications', async () => {
+    vi.spyOn(notificationsApi, 'getUnreadNotificationCount').mockResolvedValue({ count: 0 });
+
+    renderNav();
+
+    await screen.findByRole('link', { name: 'Notificaciones' });
+    expect(screen.queryByLabelText(/sin leer/)).not.toBeInTheDocument();
   });
 
   it('clears the stored token when logging out', async () => {

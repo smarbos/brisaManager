@@ -1,9 +1,14 @@
 import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { getUnreadNotificationCount } from '../api/notifications';
 import { Button } from '../ui';
 
 const MOBILE_NAV_ID = 'mobile-nav';
+
+// Polled rather than pushed — the app has no websocket/SSE channel, and a once-a-minute
+// staleness window is fine for a low-traffic single-property admin tool.
+const UNREAD_POLL_MS = 60_000;
 
 const sections = [
   { to: '/', label: 'Reservas', end: true },
@@ -11,6 +16,7 @@ const sections = [
   { to: '/templates', label: 'Plantillas' },
   { to: '/campaigns', label: 'Campañas' },
   { to: '/activity', label: 'Registro de actividad' },
+  { to: '/notifications', label: 'Notificaciones' },
   { to: '/settings', label: 'Configuración' },
 ];
 
@@ -23,8 +29,20 @@ export function AppNav() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
   const mobileNavRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    function refreshUnreadCount() {
+      getUnreadNotificationCount()
+        .then(({ count }) => setUnreadCount(count))
+        .catch(() => {});
+    }
+    refreshUnreadCount();
+    const interval = setInterval(refreshUnreadCount, UNREAD_POLL_MS);
+    return () => clearInterval(interval);
+  }, []);
 
   // Move focus into the opened menu (first link) so keyboard/screen-reader users land
   // somewhere useful instead of the menu just appearing with focus still on the toggle.
@@ -61,6 +79,14 @@ export function AppNav() {
           {sections.map((section) => (
             <NavLink key={section.to} to={section.to} end={section.end} className={linkClass}>
               {section.label}
+              {section.to === '/notifications' && unreadCount > 0 && (
+                <span
+                  className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white"
+                  aria-label={`${unreadCount} sin leer`}
+                >
+                  {unreadCount}
+                </span>
+              )}
             </NavLink>
           ))}
           <Button type="button" variant="secondary" className="ml-2" onClick={handleLogout}>
@@ -95,6 +121,14 @@ export function AppNav() {
               className={linkClass}
             >
               {section.label}
+              {section.to === '/notifications' && unreadCount > 0 && (
+                <span
+                  className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white"
+                  aria-label={`${unreadCount} sin leer`}
+                >
+                  {unreadCount}
+                </span>
+              )}
             </NavLink>
           ))}
           <Button type="button" variant="secondary" className="mt-2" onClick={handleLogout}>

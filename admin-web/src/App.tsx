@@ -10,6 +10,7 @@ import { GuestDetailPage } from './guests/GuestDetailPage';
 import { TemplatesPage } from './templates/TemplatesPage';
 import { CampaignsPage } from './campaigns/CampaignsPage';
 import { ActivityLogPage } from './activity/ActivityLogPage';
+import { NotificationsPage } from './notifications/NotificationsPage';
 import { AppFooter } from './layout/AppFooter';
 
 export function App() {
@@ -28,6 +29,7 @@ export function App() {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/activity" element={<ActivityLogPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
           </Route>
         </Routes>
         <AppFooter />
