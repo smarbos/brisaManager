@@ -18,3 +18,18 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
 
   return response.json() as Promise<T>;
 }
+
+// No auth header here — unlike admin-web, guest-web has no login; the confirmationToken
+// already embedded in the path is what scopes this request to one reservation.
+export async function upload<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await response.text());
+  }
+
+  return response.json() as Promise<T>;
+}
