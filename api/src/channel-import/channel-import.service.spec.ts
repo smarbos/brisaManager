@@ -10,7 +10,13 @@ import { ImportReservationDto } from './dto/import-reservation.dto';
 
 describe('ChannelImportService', () => {
   let service: ChannelImportService;
-  let prisma: { reservation: { create: jest.Mock; findUnique: jest.Mock; update: jest.Mock } };
+  let prisma: {
+    reservation: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+  };
   let eventsService: { record: jest.Mock };
   let googleCalendarPushService: { pushReservation: jest.Mock };
   let guestsService: { syncFromReservation: jest.Mock };
@@ -26,7 +32,13 @@ describe('ChannelImportService', () => {
   });
 
   beforeEach(async () => {
-    prisma = { reservation: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() } };
+    prisma = {
+      reservation: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+    };
     eventsService = { record: jest.fn() };
     googleCalendarPushService = { pushReservation: jest.fn() };
     guestsService = { syncFromReservation: jest.fn() };
@@ -37,7 +49,10 @@ describe('ChannelImportService', () => {
         ChannelImportService,
         { provide: PrismaService, useValue: prisma },
         { provide: ReservationEventsService, useValue: eventsService },
-        { provide: GoogleCalendarPushService, useValue: googleCalendarPushService },
+        {
+          provide: GoogleCalendarPushService,
+          useValue: googleCalendarPushService,
+        },
         { provide: GuestsService, useValue: guestsService },
         { provide: ReservationsService, useValue: reservationsService },
       ],
@@ -58,12 +73,22 @@ describe('ChannelImportService', () => {
     total_price: null,
     currency: null,
     status: null,
-    unverified_fields: ['guest_name', 'check_in', 'check_out', 'guests', 'total_price', 'currency', 'status'],
+    unverified_fields: [
+      'guest_name',
+      'check_in',
+      'check_out',
+      'guests',
+      'total_price',
+      'currency',
+      'status',
+    ],
   };
 
   it('creates a reservation with placeholder values when every field is unverified/null', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-1', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-1', ...data }),
+    );
 
     const { reservation, created } = await service.import(baseDto);
 
@@ -90,12 +115,16 @@ describe('ChannelImportService', () => {
     // Even a placeholder reservation reaches the shared staff calendar — see the
     // "pushes to the calendar even when..." test below for why this isn't gated on
     // verification.
-    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(
+      reservation,
+    );
   });
 
   it('uses the real scraped values when present', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-2', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-2', ...data }),
+    );
 
     const dto: ImportReservationDto = {
       ...baseDto,
@@ -125,7 +154,9 @@ describe('ChannelImportService', () => {
       }),
     );
     // Fully verified, so it's safe to push to the shared calendar.
-    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(
+      reservation,
+    );
   });
 
   it.each([
@@ -135,12 +166,16 @@ describe('ChannelImportService', () => {
     ['some unknown status', 'PENDING'],
   ])('maps status "%s" to %s', async (rawStatus, expectedStatus) => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-3', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-3', ...data }),
+    );
 
     await service.import({ ...baseDto, status: rawStatus });
 
     expect(prisma.reservation.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: expectedStatus }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ status: expectedStatus }),
+      }),
     );
   });
 
@@ -148,7 +183,11 @@ describe('ChannelImportService', () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.import({ ...baseDto, check_in: '2026-11-08', check_out: '2026-11-06' }),
+      service.import({
+        ...baseDto,
+        check_in: '2026-11-08',
+        check_out: '2026-11-06',
+      }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.reservation.create).not.toHaveBeenCalled();
   });
@@ -174,7 +213,10 @@ describe('ChannelImportService', () => {
     expect(prisma.reservation.create).not.toHaveBeenCalled();
     expect(eventsService.record).not.toHaveBeenCalled();
     // baseDto has every scraped field null, so nothing already on file gets overwritten.
-    expect(prisma.reservation.update).toHaveBeenCalledWith({ where: { id: 'res-existing' }, data: {} });
+    expect(prisma.reservation.update).toHaveBeenCalledWith({
+      where: { id: 'res-existing' },
+      data: {},
+    });
   });
 
   it('re-importing an already-loaded reservation only overwrites fields this rescan actually found, never a staff correction', async () => {
@@ -216,7 +258,9 @@ describe('ChannelImportService', () => {
         currency: 'ARS',
       },
     });
-    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(updated);
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(
+      updated,
+    );
   });
 
   it('re-syncs the guest record when a rescan brings in a phone for an already-loaded reservation', async () => {
@@ -242,11 +286,14 @@ describe('ChannelImportService', () => {
       guest_phone: '+591 75278095',
     });
 
-    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-existing', {
-      email: null,
-      name: 'María Laura',
-      phone: '+591 75278095',
-    });
+    expect(guestsService.syncFromReservation).toHaveBeenCalledWith(
+      'res-existing',
+      {
+        email: null,
+        name: 'María Laura',
+        phone: '+591 75278095',
+      },
+    );
   });
 
   it('rejects a rescan whose resolved dates would put check_out before check_in, without writing anything', async () => {
@@ -263,26 +310,41 @@ describe('ChannelImportService', () => {
     prisma.reservation.findUnique.mockResolvedValue(existing);
 
     await expect(
-      service.import({ ...baseDto, check_in: '2026-01-20', check_out: '2026-01-18' }),
+      service.import({
+        ...baseDto,
+        check_in: '2026-01-20',
+        check_out: '2026-01-18',
+      }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.reservation.update).not.toHaveBeenCalled();
   });
 
   it('creates a fresh reservation when the existing match is cancelled, freeing up the old externalReference', async () => {
-    const existing = { id: 'res-cancelled', status: 'CANCELLED', externalReference: 'booking-extranet-5000000607' };
+    const existing = {
+      id: 'res-cancelled',
+      status: 'CANCELLED',
+      externalReference: 'booking-extranet-5000000607',
+    };
     prisma.reservation.findUnique.mockResolvedValue(existing);
     prisma.reservation.update.mockResolvedValue(existing);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-new', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-new', ...data }),
+    );
 
     const { reservation, created } = await service.import(baseDto);
 
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-cancelled' },
-      data: { externalReference: 'booking-extranet-5000000607-superseded-res-cancelled' },
+      data: {
+        externalReference:
+          'booking-extranet-5000000607-superseded-res-cancelled',
+      },
     });
     expect(prisma.reservation.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ externalReference: 'booking-extranet-5000000607' }),
+        data: expect.objectContaining({
+          externalReference: 'booking-extranet-5000000607',
+        }),
       }),
     );
     expect(created).toBe(true);
@@ -290,16 +352,18 @@ describe('ChannelImportService', () => {
   });
 
   it('rejects a hotel_id other than the configured property', async () => {
-    await expect(service.import({ ...baseDto, hotel_id: 'some-other-hotel' })).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      service.import({ ...baseDto, hotel_id: 'some-other-hotel' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.reservation.findUnique).not.toHaveBeenCalled();
     expect(prisma.reservation.create).not.toHaveBeenCalled();
   });
 
   it('syncs the guest record and sends the confirmation email when an email is present, even with other fields unverified', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-4', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-4', ...data }),
+    );
 
     const { reservation } = await service.import({
       ...baseDto,
@@ -308,7 +372,11 @@ describe('ChannelImportService', () => {
     });
 
     expect(prisma.reservation.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ guestEmail: 'znoemi@guest.booking.com' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          guestEmail: 'znoemi@guest.booking.com',
+        }),
+      }),
     );
     expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-4', {
       email: 'znoemi@guest.booking.com',
@@ -318,13 +386,19 @@ describe('ChannelImportService', () => {
     // The confirmation email invites the guest into the same flow a manual reservation
     // uses, where whatever's still missing gets sorted out — it doesn't wait for the
     // scrape to be fully verified first, same as the calendar push below.
-    expect(reservationsService.sendInitialEmail).toHaveBeenCalledWith(reservation);
-    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
+    expect(reservationsService.sendInitialEmail).toHaveBeenCalledWith(
+      reservation,
+    );
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(
+      reservation,
+    );
   });
 
   it('does not sync a guest or send an email when no email was captured', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-5', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-5', ...data }),
+    );
 
     await service.import(baseDto);
 
@@ -334,7 +408,9 @@ describe('ChannelImportService', () => {
 
   it('sends the initial confirmation email once every core field is verified and an email exists', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-6', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-6', ...data }),
+    );
 
     const dto: ImportReservationDto = {
       ...baseDto,
@@ -351,13 +427,19 @@ describe('ChannelImportService', () => {
 
     const { reservation } = await service.import(dto);
 
-    expect(reservationsService.sendInitialEmail).toHaveBeenCalledWith(reservation);
-    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
+    expect(reservationsService.sendInitialEmail).toHaveBeenCalledWith(
+      reservation,
+    );
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(
+      reservation,
+    );
   });
 
   it('forces status to PENDING when sending the confirmation email, even if a different status was scraped', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-7', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-7', ...data }),
+    );
 
     await service.import({
       ...baseDto,
@@ -366,13 +448,17 @@ describe('ChannelImportService', () => {
     });
 
     expect(prisma.reservation.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'PENDING' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'PENDING' }),
+      }),
     );
   });
 
   it('does not send the confirmation email when every field is verified but there is no email', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-8', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-8', ...data }),
+    );
 
     await service.import({
       ...baseDto,
@@ -394,7 +480,9 @@ describe('ChannelImportService', () => {
 
   it('pushes to the calendar when dates are verified even though status never is (the realistic Booking.com case)', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-9', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-9', ...data }),
+    );
 
     const { reservation } = await service.import({
       ...baseDto,
@@ -407,12 +495,16 @@ describe('ChannelImportService', () => {
       unverified_fields: ['status'],
     });
 
-    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(
+      reservation,
+    );
   });
 
   it('creates an AIRBNB reservation without a hotel_id, using the thread id as the external reference', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-1', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-airbnb-1', ...data }),
+    );
 
     const { reservation, created } = await service.import({
       ...baseDto,
@@ -439,21 +531,35 @@ describe('ChannelImportService', () => {
 
   it('falls back to an Airbnb-specific placeholder guest name when none was scraped', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-2', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-airbnb-2', ...data }),
+    );
 
-    await service.import({ ...baseDto, source: 'airbnb', hotel_id: undefined, res_id: '1000000088' });
+    await service.import({
+      ...baseDto,
+      source: 'airbnb',
+      hotel_id: undefined,
+      res_id: '1000000088',
+    });
 
     expect(prisma.reservation.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ guestName: 'Huésped de Airbnb (pendiente de completar)' }),
+        data: expect.objectContaining({
+          guestName: 'Huésped de Airbnb (pendiente de completar)',
+        }),
       }),
     );
   });
 
-  it('syncs a phone-only guest record, even without a guest_email', async () => {
+  it('syncs a phone-only guest record with the phone normalized to E.164, even without a guest_email', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-3', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-airbnb-3', ...data }),
+    );
 
+    // The bidi control characters (U+202A/U+202C) are a real artifact of copying a phone
+    // number from an RTL-locale page — libphonenumber-js still parses the digits out from
+    // around them, which doubles as this test's regression coverage for that case.
     await service.import({
       ...baseDto,
       source: 'airbnb',
@@ -464,21 +570,50 @@ describe('ChannelImportService', () => {
     });
 
     expect(prisma.reservation.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ guestPhone: '‪+591 75278095‬' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ guestPhone: '+59175278095' }),
+      }),
     );
     // Airbnb's hosting messages page never exposes an email, only a phone — the sync must
     // still fire so these guests get a CRM record, keyed on phone (see
     // GuestsService.syncFromReservation()).
-    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-airbnb-3', {
-      email: null,
-      name: 'María Laura',
-      phone: '‪+591 75278095‬',
-    });
+    expect(guestsService.syncFromReservation).toHaveBeenCalledWith(
+      'res-airbnb-3',
+      {
+        email: null,
+        name: 'María Laura',
+        phone: '+59175278095',
+      },
+    );
   });
 
-  it('passes the scraped phone into the guest sync when both email and phone are present', async () => {
+  it('stores an unparseable scraped phone exactly as scraped, rather than rejecting the import', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-4', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-airbnb-5', ...data }),
+    );
+
+    await service.import({
+      ...baseDto,
+      source: 'airbnb',
+      hotel_id: undefined,
+      res_id: '1000000485',
+      guest_name: 'María Laura',
+      guest_phone: 'ask on WhatsApp',
+    });
+
+    expect(prisma.reservation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ guestPhone: 'ask on WhatsApp' }),
+      }),
+    );
+  });
+
+  it('passes the normalized phone into the guest sync when both email and phone are present', async () => {
+    prisma.reservation.findUnique.mockResolvedValue(null);
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-airbnb-4', ...data }),
+    );
 
     await service.import({
       ...baseDto,
@@ -490,16 +625,21 @@ describe('ChannelImportService', () => {
       guest_phone: '+591 75278095',
     });
 
-    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-airbnb-4', {
-      email: 'gioconda@example.com',
-      name: 'María Laura',
-      phone: '+591 75278095',
-    });
+    expect(guestsService.syncFromReservation).toHaveBeenCalledWith(
+      'res-airbnb-4',
+      {
+        email: 'gioconda@example.com',
+        name: 'María Laura',
+        phone: '+59175278095',
+      },
+    );
   });
 
   it('pushes to the calendar even when check_in/check_out are unverified — an approximate date on the internal staff calendar beats no event at all', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-10', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-10', ...data }),
+    );
 
     const { reservation } = await service.import({
       ...baseDto,
@@ -512,12 +652,16 @@ describe('ChannelImportService', () => {
       unverified_fields: ['check_out', 'status'],
     });
 
-    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(
+      reservation,
+    );
   });
 
   it('pushes an Airbnb import to the calendar even though every scraped field is always unverified by design', async () => {
     prisma.reservation.findUnique.mockResolvedValue(null);
-    prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-airbnb-3', ...data }));
+    prisma.reservation.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'res-airbnb-3', ...data }),
+    );
 
     const { reservation } = await service.import({
       ...baseDto,
@@ -528,10 +672,20 @@ describe('ChannelImportService', () => {
       check_in: '2026-10-27',
       check_out: '2026-10-31',
       guests: 3,
-      unverified_fields: ['guest_name', 'guests', 'check_in', 'check_out', 'total_price', 'currency', 'status'],
+      unverified_fields: [
+        'guest_name',
+        'guests',
+        'check_in',
+        'check_out',
+        'total_price',
+        'currency',
+        'status',
+      ],
     });
 
-    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(reservation);
+    expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(
+      reservation,
+    );
   });
 
   describe('checkStatus', () => {
@@ -541,13 +695,21 @@ describe('ChannelImportService', () => {
       const result = await service.checkStatus('airbnb', '1000000484');
 
       expect(prisma.reservation.findUnique).toHaveBeenCalledWith({
-        where: { source_externalReference: { source: 'AIRBNB', externalReference: 'airbnb-thread-1000000484' } },
+        where: {
+          source_externalReference: {
+            source: 'AIRBNB',
+            externalReference: 'airbnb-thread-1000000484',
+          },
+        },
       });
       expect(result).toEqual({ exists: false });
     });
 
     it('reports exists: false when the only match is cancelled — a fresh import should still be allowed', async () => {
-      prisma.reservation.findUnique.mockResolvedValue({ id: 'res-1', status: 'CANCELLED' });
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: 'res-1',
+        status: 'CANCELLED',
+      });
 
       const result = await service.checkStatus('airbnb', '1000000484');
 

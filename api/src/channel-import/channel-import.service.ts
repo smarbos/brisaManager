@@ -1,5 +1,15 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
-import { Reservation, ReservationSource, ReservationStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
+import {
+  Reservation,
+  ReservationSource,
+  ReservationStatus,
+} from '@prisma/client';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
@@ -20,10 +30,22 @@ const SOURCE_MAP: Record<ImportReservationDto['source'], ReservationSource> = {
   airbnb: 'AIRBNB',
 };
 
-const EXTERNAL_REFERENCE_PREFIX: Record<ImportReservationDto['source'], string> = {
+const EXTERNAL_REFERENCE_PREFIX: Record<
+  ImportReservationDto['source'],
+  string
+> = {
   'booking.com': 'booking-extranet',
   airbnb: 'airbnb-thread',
 };
+
+// Best-effort only: a badly-scraped phone string from Booking.com's/Airbnb's page must never
+// block an import the way an invalid number blocks admin-web's manual form or guest-web's
+// check-in wizard (both hard-reject via IsValidPhoneNumber). If it doesn't parse as a real
+// number, it's stored exactly as scraped instead, for a human to clean up later.
+function normalizePhoneBestEffort(raw: string): string {
+  const parsed = parsePhoneNumberFromString(raw, 'AR');
+  return parsed?.isValid() ? parsed.number : raw;
+}
 
 const STATUS_MAP: Record<string, ReservationStatus> = {
   confirmed: 'CONFIRMED',
@@ -45,7 +67,9 @@ function mapStatus(raw: string | null): ReservationStatus {
 function parseAmount(raw: string | null): number {
   if (!raw) return 0;
   const withoutThousandsDot = raw.replace(/\.(?=\d{3}(?:\D|$))/g, '');
-  const normalized = withoutThousandsDot.replace(/[^\d,.-]/g, '').replace(',', '.');
+  const normalized = withoutThousandsDot
+    .replace(/[^\d,.-]/g, '')
+    .replace(',', '.');
   const value = Number(normalized);
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
@@ -86,7 +110,9 @@ export class ChannelImportService {
     if (dto.source === 'booking.com') {
       const expectedHotelId = process.env.BOOKING_HOTEL_ID;
       if (!expectedHotelId || dto.hotel_id !== expectedHotelId) {
-        this.logger.warn(`Rejected import for unexpected hotel_id "${dto.hotel_id}" (res_id ${dto.res_id})`);
+        this.logger.warn(
+          `Rejected import for unexpected hotel_id "${dto.hotel_id}" (res_id ${dto.res_id})`,
+        );
         throw new ForbiddenException('Unexpected hotel_id');
       }
     }
@@ -116,7 +142,9 @@ export class ChannelImportService {
       // cancelled row is kept as-is for history, just renamed off the live slot.
       await this.prisma.reservation.update({
         where: { id: existing.id },
-        data: { externalReference: `${externalReference}-superseded-${existing.id}` },
+        data: {
+          externalReference: `${externalReference}-superseded-${existing.id}`,
+        },
       });
     }
 
@@ -131,7 +159,10 @@ export class ChannelImportService {
     }
 
     const guestEmail = dto.guest_email?.trim().toLowerCase() || null;
-    const guestPhone = dto.guest_phone?.trim() || null;
+    const trimmedPhone = dto.guest_phone?.trim() || null;
+    const guestPhone = trimmedPhone
+      ? normalizePhoneBestEffort(trimmedPhone)
+      : null;
 
     // Sending the confirmation email invites the guest into the confirmation flow (accept
     // dates, accept the contract, etc.) — the reservation is, by definition, awaiting that
@@ -163,7 +194,11 @@ export class ChannelImportService {
       },
     });
 
-    await this.eventsService.record(reservation.id, 'RESERVATION_CREATED', buildNotes(dto));
+    await this.eventsService.record(
+      reservation.id,
+      'RESERVATION_CREATED',
+      buildNotes(dto),
+    );
 
     // Link to (or create) the Guest record whenever we have an email or phone — this is
     // just CRM bookkeeping, not guest-facing, so it's safe even if other fields are still
@@ -207,14 +242,25 @@ export class ChannelImportService {
   // Re-running the extension against a thread that's already imported refreshes whatever
   // this scrape found a value for, and leaves everything else (including anything staff
   // corrected by hand) untouched — see the comment at the call site above.
-  private async updateFromRescan(existing: Reservation, dto: ImportReservationDto): Promise<ChannelImportResult> {
+  private async updateFromRescan(
+    existing: Reservation,
+    dto: ImportReservationDto,
+  ): Promise<ChannelImportResult> {
     const guestName = dto.guest_name?.trim() || undefined;
-    const guestPhone = dto.guest_phone?.trim() || undefined;
+    const trimmedPhone = dto.guest_phone?.trim() || undefined;
+    const guestPhone = trimmedPhone
+      ? normalizePhoneBestEffort(trimmedPhone)
+      : undefined;
     const checkIn = dto.check_in ? new Date(dto.check_in) : undefined;
     const checkOut = dto.check_out ? new Date(dto.check_out) : undefined;
     const paxCount = dto.guests ?? undefined;
-    const totalAmount = dto.total_price ? parseAmount(dto.total_price) : undefined;
-    const currency = totalAmount !== undefined ? dto.currency?.trim() || existing.currency : undefined;
+    const totalAmount = dto.total_price
+      ? parseAmount(dto.total_price)
+      : undefined;
+    const currency =
+      totalAmount !== undefined
+        ? dto.currency?.trim() || existing.currency
+        : undefined;
 
     const resolvedCheckIn = checkIn ?? existing.checkIn;
     const resolvedCheckOut = checkOut ?? existing.checkOut;
@@ -248,12 +294,17 @@ export class ChannelImportService {
     return { reservation: updated, created: false };
   }
 
-  async checkStatus(source: ImportReservationDto['source'], resId: string): Promise<ImportStatusResult> {
+  async checkStatus(
+    source: ImportReservationDto['source'],
+    resId: string,
+  ): Promise<ImportStatusResult> {
     const mappedSource = SOURCE_MAP[source];
     const externalReference = `${EXTERNAL_REFERENCE_PREFIX[source]}-${resId}`;
 
     const existing = await this.prisma.reservation.findUnique({
-      where: { source_externalReference: { source: mappedSource, externalReference } },
+      where: {
+        source_externalReference: { source: mappedSource, externalReference },
+      },
     });
 
     if (!existing || existing.status === 'CANCELLED') {

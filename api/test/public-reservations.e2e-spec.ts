@@ -109,4 +109,25 @@ describe('PublicReservationsController (e2e)', () => {
       .send({ fullName: '', phone: '+54911', email: 'a@example.com' })
       .expect(400);
   });
+
+  it('rejects date confirmation with an invalid phone number', async () => {
+    const reservation = await prisma.reservation.create({
+      data: {
+        guestName: 'Public E2E Guest',
+        checkIn: new Date('2026-03-01'),
+        checkOut: new Date('2026-03-05'),
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 100000,
+        currency: 'ARS',
+      },
+    });
+
+    await request(app.getHttpServer())
+      .post(
+        `/public/reservations/${reservation.confirmationToken}/confirm-dates`,
+      )
+      .send({ fullName: 'Jane Doe', phone: 'not a phone number', email: 'a@example.com' })
+      .expect(400);
+  });
 });

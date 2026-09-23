@@ -1,5 +1,6 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
 import { ApiError } from '../api/client';
 import { acceptContract, confirmDates, getReservationByToken } from '../api/publicReservations';
 import { GuestReservation } from './types';
@@ -8,11 +9,10 @@ import { formatDate, formatLongDate } from '../lib/date';
 
 type Step = 1 | 2 | 3 | 4;
 
-// Most guests booking this property are Argentine, so the phone field defaults to this
-// prefix to save them typing it — but it's an editable Input, not a fixed label, so a
-// guest with a foreign number can overwrite it with their own country code instead of
-// having a valid-looking-but-wrong Argentine number silently substituted for it.
-const DEFAULT_PHONE_PREFIX = '+549';
+// Most guests booking this property are Argentine, so a bare local number (no country code)
+// is assumed to be Argentine — but a guest can still type "+" followed by any other
+// country's code and it's validated/normalized against that country instead.
+const DEFAULT_PHONE_COUNTRY = 'AR';
 
 const STEP_LABELS: Record<Step, string> = { 1: 'Reserva', 2: 'Reglas', 3: 'Pago', 4: 'Confirmación' };
 
@@ -124,8 +124,8 @@ export function ConfirmationPage() {
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [fullName, setFullName] = useState('');
-  const [phonePrefix, setPhonePrefix] = useState(DEFAULT_PHONE_PREFIX);
-  const [phoneLocal, setPhoneLocal] = useState('');
+  const [phone, setPhone] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [rulesChecked, setRulesChecked] = useState(false);
   const [rulesRevealed, setRulesRevealed] = useState(false);
@@ -174,10 +174,16 @@ export function ConfirmationPage() {
   async function handleConfirmDates(event: FormEvent) {
     event.preventDefault();
     if (!token) return;
+    if (!isValidPhoneNumber(phone, DEFAULT_PHONE_COUNTRY)) {
+      setPhoneError('Ingresá un número de teléfono válido.');
+      return;
+    }
+    setPhoneError(null);
     setError(null);
     setConfirmingDates(true);
     try {
-      await confirmDates(token, fullName, `${phonePrefix}${phoneLocal}`, email);
+      const normalizedPhone = parsePhoneNumberFromString(phone, DEFAULT_PHONE_COUNTRY)!.number;
+      await confirmDates(token, fullName, normalizedPhone, email);
       await load();
     } catch {
       setError('No pudimos confirmar tus datos. Por favor, intentá de nuevo.');
@@ -329,30 +335,20 @@ export function ConfirmationPage() {
                   required
                 />
               </FormField>
-              <div className="flex gap-2">
-                <FormField label="Código">
-                  <Input
-                    type="tel"
-                    value={phonePrefix}
-                    onChange={(e) => setPhonePrefix(e.target.value)}
-                    placeholder="+549"
-                    required
-                    className="w-24"
-                  />
-                </FormField>
-                <FormField label="Celular" className="flex-1">
-                  <Input
-                    type="tel"
-                    inputMode="numeric"
-                    value={phoneLocal}
-                    onChange={(e) => setPhoneLocal(e.target.value)}
-                    placeholder="2236674787"
-                    required
-                  />
-                </FormField>
-              </div>
+              <FormField label="Celular" error={phoneError}>
+                <Input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setPhoneError(null);
+                  }}
+                  placeholder="223 456 7890"
+                  required
+                />
+              </FormField>
               <p className="-mt-2 text-xs text-text-muted">
-                Si tu número no es de Argentina, cambiá el código por el de tu país.
+                Si tu número no es de Argentina, escribilo con el código de tu país (ej. +1 202 555 0123).
               </p>
               <FormField label="Email">
                 <Input

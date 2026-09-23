@@ -1,12 +1,12 @@
 import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsValidPhoneNumber } from '../../common/is-valid-phone-number';
 
 export class ConfirmDatesDto {
   @IsString()
   @MinLength(1)
   fullName: string;
 
-  @IsString()
-  @MinLength(1)
+  @IsValidPhoneNumber('AR')
   phone: string;
 
   @IsEmail()
