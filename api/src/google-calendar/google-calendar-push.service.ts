@@ -20,12 +20,28 @@ const STATUS_LABELS: Record<Reservation['status'], string> = {
 
 // Google Calendar's colorId is a string '1'-'11' picked from a fixed, unchangeable
 // palette (no custom hex) — see https://developers.google.com/calendar/api/v3/reference/colors.
-// Only PENDING and CONFIRMED need an entry: CANCELLED/COMPLETED reservations are removed
-// from the calendar entirely (see the isActive check below), never upserted with a color.
-const STATUS_COLOR_IDS: Partial<Record<Reservation['status'], string>> = {
+const STATUS_COLOR_IDS: Record<Reservation['status'], string> = {
   PENDING: '5', // Banana (yellow) — still awaiting guest/staff confirmation
   CONFIRMED: '10', // Basil (green) — confirmed, nothing pending
+  CANCELLED: '11', // Tomato (red)
+  COMPLETED: '8', // Graphite (gray) — stay in the past, out of the way visually
 };
+
+// A short bracketed tag prepended to the event title (e.g. "[Esperando pago] Jane Doe
+// (Booking.com)") so staff can tell a reservation's state at a glance without opening it.
+// CANCELLED/COMPLETED map directly from status; everything else is PENDING, where the plain
+// status alone can't distinguish "hasn't started the guest wizard" from "just needs to pay" —
+// that instead comes from which guest-confirmation step has actually completed. A reservation
+// can be CONFIRMED without ever going through the wizard at all (e.g. a DIRECT booking staff
+// mark confirmed by hand), so that check short-circuits ahead of the granular ones.
+function statusTag(reservation: Reservation): string {
+  if (reservation.status === 'CANCELLED') return 'Cancelada';
+  if (reservation.status === 'COMPLETED') return 'Completada';
+  if (reservation.status === 'CONFIRMED') return 'Confirmada';
+  if (reservation.confirmationPaymentReceivedAt) return 'Confirmada';
+  if (reservation.contractAcceptedAt) return 'Esperando pago';
+  return 'Esperando confirmación';
+}
 
 function toDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -47,11 +63,8 @@ export class GoogleCalendarPushService {
   // Staff-triggered bulk retry — covers reservations whose one-time push at create/update
   // time was silently skipped (e.g. created before Google Calendar was ever connected, or
   // while a misconfigured OAuth client made every push fail) and never got a second
-  // attempt. Includes every reservation, not just "active" ones, since a CANCELLED/
-  // COMPLETED reservation that still has a lingering calendar event (e.g. from before it
-  // was cancelled) needs pushReservation's own removal branch to run too. Sequential,
-  // not parallel — Google's Calendar API has per-user rate limits and a single property's
-  // reservation count is small enough that this finishes quickly either way.
+  // attempt. Sequential, not parallel — Google's Calendar API has per-user rate limits and a
+  // single property's reservation count is small enough that this finishes quickly either way.
   async pushAllReservations(): Promise<{ pushed: number }> {
     const reservations = await this.prisma.reservation.findMany();
     for (const reservation of reservations) {
@@ -67,12 +80,6 @@ export class GoogleCalendarPushService {
         return;
       }
       const { client, calendarId } = authorized;
-      const isActive = reservation.status !== 'CANCELLED' && reservation.status !== 'COMPLETED';
-
-      if (!isActive) {
-        await this.removeEvent(client, calendarId, reservation);
-        return;
-      }
 
       await this.upsertEvent(client, calendarId, reservation);
       await this.prisma.settings.update({ where: { id: 'singleton' }, data: { lastCalendarSyncError: null } });
@@ -95,27 +102,9 @@ export class GoogleCalendarPushService {
     }
   }
 
-  private async removeEvent(
-    client: calendar_v3.Calendar,
-    calendarId: string,
-    reservation: Reservation,
-  ): Promise<void> {
-    if (!reservation.googleEventId) {
-      return;
-    }
-    try {
-      await client.events.delete({ calendarId, eventId: reservation.googleEventId });
-    } catch (error) {
-      if (!isNotFoundError(error)) {
-        throw error;
-      }
-    }
-    await this.prisma.reservation.update({ where: { id: reservation.id }, data: { googleEventId: null } });
-  }
-
   private async upsertEvent(client: calendar_v3.Calendar, calendarId: string, reservation: Reservation): Promise<void> {
     const requestBody: calendar_v3.Schema$Event = {
-      summary: `${reservation.guestName} (${SOURCE_LABELS[reservation.source]})`,
+      summary: `[${statusTag(reservation)}] ${reservation.guestName} (${SOURCE_LABELS[reservation.source]})`,
       description: `Huéspedes: ${reservation.paxCount}\nTotal: ${Number(reservation.totalAmount)} ${reservation.currency}\nEstado: ${STATUS_LABELS[reservation.status]}`,
       start: { date: toDateOnly(reservation.checkIn) },
       end: { date: toDateOnly(reservation.checkOut) },

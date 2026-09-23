@@ -214,9 +214,9 @@ export class ReservationsService {
     });
     await this.eventsService.record(id, 'RESERVATION_CANCELLED');
 
-    // Removes the reservation from the shared Google Calendar: pushReservation already
-    // treats CANCELLED (and COMPLETED) as inactive and deletes the event instead of
-    // upserting it — same as any other status update, see update() above.
+    // Re-pushes to the shared Google Calendar so the event's title/color reflect the
+    // cancellation (pushReservation tags it "[Cancelada]" rather than removing it) — same as
+    // any other status update, see update() above.
     void this.googleCalendarPushService.pushReservation(updated);
 
     if (updated.guestEmail) {
