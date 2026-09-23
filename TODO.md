@@ -3,50 +3,58 @@
 High-level backlog of everything requested so far. Each section will be broken down into its own spec + implementation plan (via superpowers brainstorming/writing-plans) before coding starts.
 
 ## 1. Core reservation management
-- [ ] List all reservations
-- [ ] Track which source each reservation came from (Booking.com, Airbnb, direct/WhatsApp, etc.)
-- [ ] Keep historical record of past reservations (for marketing use, see section 5)
+- [x] List all reservations
+- [x] Track which source each reservation came from (Booking.com, Airbnb, direct/WhatsApp, etc.)
+- [x] Keep historical record of past reservations (for marketing use, see section 5)
 
 ## 2. Guest onboarding workflow (per new reservation)
-- [ ] New reservation is created (manually or via channel sync)
-- [ ] Automated message sent to guest asking to confirm dates and number of pax
-- [ ] Request 30% of total amount as booking confirmation payment
-- [ ] Guest must accept a "digital contract" (house rules: no parties, noise, etc.)
-- [ ] Request a refundable security deposit (returned after checkout)
-- [ ] Once terms accepted + dates/pax confirmed + 30% payment confirmed → mark reservation as confirmed
-- [ ] Send confirmation email to guest once fully confirmed
+- [x] New reservation is created (manually or via channel sync)
+- [x] Automated message sent to guest asking to confirm dates and number of pax
+- [x] Request 30% of total amount as booking confirmation payment
+- [x] Guest must accept a "digital contract" (house rules: no parties, noise, etc.)
+- [x] Request a refundable security deposit (returned after checkout)
+- [x] Once terms accepted + dates/pax confirmed + 30% payment confirmed → mark reservation as confirmed
+- [x] Send confirmation email to guest once fully confirmed
 
 ## 3. Channel integrations
-- [ ] Integrate with Booking.com (credentials or API) to fetch/sync reservations
-- [ ] Integrate with Airbnb (credentials or API) to fetch/sync reservations
-- [ ] App acts as central hub aggregating reservations from all sources
-- [ ] **Future idea (not yet designed/approved):** iCal sync only gives blocked date ranges, not guest name/contact/pax/price. Considered alternative: use a headless browser (e.g. Playwright/Puppeteer) logged in with the owner's own Booking.com extranet credentials to scrape the actual reservation details page instead of relying on iCal. Real tradeoffs to weigh before building this: (1) likely violates Booking.com's/Airbnb's Terms of Service — scraping a logged-in account is different from using a public export feed; (2) fragile — breaks silently whenever the extranet's HTML/login flow changes, no warning like an API would give; (3) requires storing the owner's real login credentials (and handling 2FA) in the app, a meaningfully bigger security surface than an iCal URL or an API key. Worth a fresh brainstorming pass on its own before committing to it, weighed against just having staff manually copy guest details from the Booking.com/Airbnb inbox (which the current iCal-based plan already assumes).
-- [ ] **Future idea (not yet designed/approved), safer alternative to the scraping idea above:** let staff take a screenshot of a Booking.com/Airbnb reservation page and upload the image to the admin app; extract guest name, dates, pax, price etc. from the image (via an LLM vision model or OCR) to pre-fill the reservation form instead of typing it all manually. No login automation, no stored credentials, no ToS risk since it's just an image the staff member captured themselves — meaningfully lower-risk than the scraping idea. Worth its own brainstorming pass (accuracy/failure handling when extraction gets a field wrong, which vision/OCR service to use, image upload storage).
+- [x] Integrate with Booking.com to fetch/sync reservations — iCal feed (date-blocking only) **plus** a Chrome extension that scrapes the real extranet reservation page (guest name/contact/pax/price) and sends it to `POST /reservations/import`
+- [x] Integrate with Airbnb to fetch/sync reservations — same iCal + Chrome extension pattern, scraping the hosting-messages thread page instead (Airbnb never exposes guest email here, only phone)
+- [x] App acts as central hub aggregating reservations from all sources
+- [x] Re-running the Chrome extension against an already-imported reservation now **updates** it from the fresh scrape (only the fields that scrape actually found) instead of no-op'ing, with a passive "already loaded" indicator shown before the operator even clicks anything
+- [ ] ~~Headless-browser credential scraping~~ — considered and **rejected** (ToS risk, stored credentials, fragility); the Chrome-extension approach above was built instead, since it scrapes only what the logged-in staff member's own browser session can already see, no stored credentials needed
+- [ ] ~~Screenshot/OCR import~~ — built (`api/src/reservation-import/`, Tesseract OCR), then **removed**: once the Chrome extension covered both channels directly, the OCR path was redundant, so it and its "Importar desde captura" control were deleted outright rather than left as unused surface area
+- [x] **iCal feeds repurposed as a mismatch detector, not a data source** — since the Chrome extension is now how reservation data actually gets in, `ChannelSyncService` no longer creates/upserts Reservation rows from Booking.com/Airbnb's iCal feed at all. Every 30 minutes it checks each blocked date range in the feed against real reservations on file (by date overlap); an unmatched blocked range raises a `CALENDAR_MISMATCH` Notification (deduped per feed event so it doesn't repeat every sync while still unread) — a sign staff haven't loaded that reservation yet.
 
 ## 4. Google Calendar integration
-- [ ] Sync reservations to a shared Google Calendar
-- [ ] Staff/employees can view all reservations on the calendar
+- [x] Sync reservations to a shared Google Calendar — two-way: reservations push to the calendar, and changes made directly in Google Calendar pull back in on a schedule (plus manual "sync now" / "force sync" buttons in Settings)
+- [x] Staff/employees can view all reservations on the calendar
+
+## 3b. Notifications system
+- [x] In-app notification center: `Notification` model, staff-only list/unread-count/mark-read endpoints, a bell-style "Notificaciones" nav link with an unread badge (polled every 60s), and a `/notifications` page. Currently raised by two sources: `CALENDAR_MISMATCH` (section 3 above) and `PAYMENT_RECEIPT_UPLOADED` (section 8 below).
+
+## 8. Payment receipt uploads (guest-facing)
+- [x] Guests can upload a payment/deposit receipt image from the check-in page (Step 3: Pago y garantía) — file picker or paste, same UX pattern the removed screenshot-OCR control used. Files are stored on local disk (a Docker volume, `receipts_data:/app/uploads`), served back only through an authenticated endpoint (JWT for staff, confirmationToken match for the guest re-viewing their own upload) since receipts are financial documents, never a public URL.
+- [x] Every upload raises a `PAYMENT_RECEIPT_UPLOADED` notification linking to the reservation.
+- [x] Admin's reservation detail page shows a thumbnail gallery of uploaded receipts with "Marcar pago del 30% como recibido" / "Marcar depósito como recibido" buttons right next to them (the same underlying actions already on the page, just surfaced next to the evidence) — staff decide from the image itself which payment(s) it covers, since receipts aren't tagged to a specific payment at upload time.
 
 ## 5. Marketing / CRM
-- [ ] Maintain guest history across all past reservations
-- [ ] Ability to send marketing campaigns to past guests
-- [ ] **Future idea (not yet designed/approved):** at the guest check-in link (the existing guest onboarding portal), have the guest validate/confirm their phone number and email as part of the flow. If what they enter differs from what's on file, update our stored record to match what the guest confirmed — treat the guest's own confirmation as more trustworthy than whatever staff originally typed in (same reasoning already applied to `Guest.name` syncing from contract acceptance in sub-project 5). Needs its own brainstorming pass: what exactly "validate" means (a plain confirm-or-edit field vs. an actual verification step like an OTP/confirmation link), and whether changing the on-file contact info for an in-progress reservation should require any staff review before taking effect.
-- [ ] **Future idea (not yet designed/approved):** give `Guest` a history-of-changes record — e.g. if a guest updates their phone number (per the idea above, or any other future edit path), keep a trail of what changed, from what value to what value, and when. Needs its own brainstorming pass: whether this is a generic audit log (reusable pattern, similar to `ReservationEvent` from sub-project 2) or a narrower phone/email-only change log, and how much history is actually useful to show staff versus just useful for debugging a "wait, why did this change" question.
+- [x] Maintain guest history across all past reservations — including phone-only guests (Airbnb), who couldn't get a `Guest` record at all until that was fixed
+- [x] Ability to send marketing campaigns to past guests — filtered by "stayed within N months" / "not stayed within N months" / all, with an unsubscribe link
+- [x] **Guest confirms/validates their own contact info** (the first future idea) — effectively done as a side effect of the existing flow: the guest-web wizard's Step 1 always writes the guest-entered name/phone/email onto the reservation and syncs it to the `Guest` record, so the guest's own input already wins over whatever staff first typed in. Not framed as an explicit "differs from what's on file, confirm the change" step, and no staff-review gate before it takes effect — worth a proper brainstorming pass only if that gap actually causes a problem in practice.
+- [ ] **Guest change-history / audit log** — still not done. No model tracks what a `Guest`'s phone/email/name changed from/to or when; `ReservationEvent` only covers reservation-level events, not guest-field edits. Needs its own brainstorming pass if this becomes something staff actually need (e.g. for a "wait, why did this change" question).
 
 ## 6. Infrastructure & deployment
-- [ ] Dockerized infrastructure (local dev environment)
-- [ ] Easy deployment to production server
-- [ ] Two separate web apps/sites:
-  - [ ] Admin "intranet" app (internal reservation management)
-  - [ ] Public-facing app (guest forms: confirmation, contract acceptance, payment info) — kept separate so guests never access the admin/intranet site
-- [ ] Use labrisa.com.ar domain with subdomains for each app (e.g. admin subdomain + public/guest-facing subdomain)
-- [ ] Guest-facing app's look and feel should match labrisa.com.ar's existing design (colors, typography, general style) so guests feel it's an integrated part of the same site, not a disconnected tool. Admin/intranet app has no such constraint — internal-only, functional design is fine.
-- [ ] **Future idea (not yet designed/approved):** implement a proper UI component library for both `admin-web` and `guest-web` (currently plain unstyled HTML elements). Both apps should be designed mobile-first, but also work well on desktop — admin staff may check reservations from a phone, and guests will almost always be on mobile when opening a confirmation link from email/WhatsApp. Needs its own brainstorming pass: which library/approach (a component kit vs. a utility-first CSS framework vs. custom), whether the two apps share one design system or use separate ones given their different audiences/constraints (guest-web must match labrisa.com.ar's branding, admin-web doesn't), and how much of the existing plain-HTML UI needs to be retrofitted vs. only applied going forward.
+- [x] Dockerized infrastructure (local dev environment)
+- [x] Easy deployment to production server — `deploy.sh`, live on a DigitalOcean droplet
+- [x] Two separate web apps/sites:
+  - [x] Admin "intranet" app (internal reservation management)
+  - [x] Public-facing app (guest forms: confirmation, contract acceptance, payment info) — kept separate so guests never access the admin/intranet site
+- [x] Use labrisa.com.ar domain with subdomains for each app (`admin.`, `checkin.`, `api.labrisa.com.ar`)
+- [x] Guest-facing app's look and feel matches labrisa.com.ar's branding (favicon pulled from the real site, footer links back to it, redesigned theme)
+- [x] **UI component library** — done: both `admin-web/src/ui/` and `guest-web/src/ui/` have a shared set of components (Button, Card, FormField, Input, Select, Table, Badge, PageHeader, Alert, etc.), applied across every page, mobile-first with working desktop layouts
 
 ## 7. Staff notifications via WhatsApp (Twilio)
-- [ ] Send notifications to a staff WhatsApp group chat via the Twilio WhatsApp API (distinct from the existing email-based failure alerts from sub-project 2 — this is for day-to-day operational visibility, not just error alerting)
-- [ ] Example notifications: "New reservation confirmed and paid for [dates]", "Reminder: current guest checks out tomorrow at 3PM", likely also new-reservation-created, deposit-received, deposit-return-due
-- [ ] Needs its own brainstorming pass: which events trigger a message (avoid notification fatigue from over-notifying), Twilio WhatsApp Business setup/approval process, message template requirements (WhatsApp Business API requires pre-approved templates for business-initiated messages), where the group/recipient config lives
+- [ ] **Still entirely pending.** What exists today is guest-facing only: automatic WhatsApp reminders *to guests* (reservation reminder + deposit reminder, both on a daily schedule, templates configurable in Settings). There is no staff-group notification channel yet — nothing pings the team on Twilio WhatsApp for "reservation confirmed and paid", "guest checks out tomorrow", etc. Still needs its own brainstorming pass: which events trigger a message, Twilio WhatsApp Business template approval, where the group/recipient config lives.
 
 ## Planning order (proposed)
 1. Core reservation management + multi-channel source tracking + base infra skeleton (Docker, two-app structure, subdomain routing)
