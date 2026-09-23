@@ -36,10 +36,15 @@ export function PageHeader({ title, subtitle, nav, backTo, backLabel = 'Volver' 
             ← {backLabel}
           </Link>
         )}
+        {/* tabIndex={-1} means this heading is never reachable via real keyboard Tab
+            navigation — the only way it's ever focused is the scripted focus() call above, on
+            every page load. There's no genuine keyboard-vs-mouse distinction to make here, so
+            no focus ring at all (not even via focus-visible, which still matches a scripted
+            focus() not preceded by a click) — see the fix commit this replaces. */}
         <h1
           ref={headingRef}
           tabIndex={-1}
-          className="font-heading text-2xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          className="font-heading text-2xl font-bold text-heading outline-none"
         >
           {title}
         </h1>

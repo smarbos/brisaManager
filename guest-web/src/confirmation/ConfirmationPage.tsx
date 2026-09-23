@@ -287,7 +287,7 @@ export function ConfirmationPage() {
             <h2
               ref={stepHeadingRef}
               tabIndex={-1}
-              className="font-heading text-xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              className="font-heading text-xl font-bold text-heading outline-none"
             >
               Confirmá tu reserva
             </h2>
@@ -374,7 +374,7 @@ export function ConfirmationPage() {
             <h2
               ref={stepHeadingRef}
               tabIndex={-1}
-              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              className="mt-2 font-heading text-xl font-bold text-heading outline-none"
             >
               Reglas de la casa
             </h2>
@@ -431,7 +431,7 @@ export function ConfirmationPage() {
             <h2
               ref={stepHeadingRef}
               tabIndex={-1}
-              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              className="mt-2 font-heading text-xl font-bold text-heading outline-none"
             >
               Pago y garantía
             </h2>
@@ -536,7 +536,7 @@ export function ConfirmationPage() {
             <h2
               ref={stepHeadingRef}
               tabIndex={-1}
-              className="mt-2 font-heading text-xl font-bold text-heading outline-none focus-visible:rounded focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              className="mt-2 font-heading text-xl font-bold text-heading outline-none"
             >
               Confirmación
             </h2>
