@@ -61,6 +61,7 @@ services:
       target: prod
       args:
         VITE_API_URL: ${VITE_API_URL}
+        VITE_COMMIT_HASH: ${VITE_COMMIT_HASH}
     restart: unless-stopped
     ports: !reset []
     volumes: !reset []

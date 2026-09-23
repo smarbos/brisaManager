@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { ConfirmationPage } from './confirmation/ConfirmationPage';
-import { DebugModeBanner } from './DebugModeBanner';
+import { AppFooter } from './AppFooter';
 import { PageContainer } from './ui';
 
 function HomePlaceholder() {
@@ -19,7 +19,7 @@ export function App() {
         <Route path="/" element={<HomePlaceholder />} />
         <Route path="/r/:token" element={<ConfirmationPage />} />
       </Routes>
-      <DebugModeBanner />
+      <AppFooter />
     </BrowserRouter>
   );
 }
