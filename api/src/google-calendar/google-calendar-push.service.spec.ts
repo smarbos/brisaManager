@@ -80,6 +80,7 @@ describe('GoogleCalendarPushService', () => {
     it('pushes every reservation and reports how many', async () => {
       authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
       insertMock.mockResolvedValue({ data: { id: 'event-1' } });
+      updateEventMock.mockResolvedValue({});
       prisma.reservation.findMany.mockResolvedValue([
         baseReservation,
         { ...baseReservation, id: 'res-2', status: 'CANCELLED', googleEventId: 'event-old' },
@@ -88,13 +89,17 @@ describe('GoogleCalendarPushService', () => {
       const result = await service.pushAllReservations();
 
       expect(result).toEqual({ pushed: 2 });
-      // The active reservation gets upserted...
       expect(insertMock).toHaveBeenCalledWith({
         calendarId: 'cal-1',
-        requestBody: expect.objectContaining({ summary: 'Jane Doe (Directo)' }),
+        requestBody: expect.objectContaining({ summary: '[Esperando confirmación] Jane Doe (Directo)' }),
       });
-      // ...and the cancelled one's lingering event gets removed, not upserted.
-      expect(deleteEventMock).toHaveBeenCalledWith({ calendarId: 'cal-1', eventId: 'event-old' });
+      // Cancelled reservations are upserted too (tagged, not deleted) so staff still see them.
+      expect(updateEventMock).toHaveBeenCalledWith({
+        calendarId: 'cal-1',
+        eventId: 'event-old',
+        requestBody: expect.objectContaining({ summary: '[Cancelada] Jane Doe (Directo)' }),
+      });
+      expect(deleteEventMock).not.toHaveBeenCalled();
     });
 
     it('reports 0 pushed when there are no reservations', async () => {
@@ -115,7 +120,7 @@ describe('GoogleCalendarPushService', () => {
     expect(insertMock).toHaveBeenCalledWith({
       calendarId: 'cal-1',
       requestBody: expect.objectContaining({
-        summary: 'Jane Doe (Directo)',
+        summary: '[Esperando confirmación] Jane Doe (Directo)',
         start: { date: '2026-05-01' },
         end: { date: '2026-05-05' },
       }),
@@ -126,23 +131,20 @@ describe('GoogleCalendarPushService', () => {
     });
   });
 
-  it('colors a PENDING reservation differently from a CONFIRMED one', async () => {
+  it.each([
+    ['PENDING', '5'],
+    ['CONFIRMED', '10'],
+    ['CANCELLED', '11'],
+    ['COMPLETED', '8'],
+  ] as const)('colors a %s reservation as %s', async (status, colorId) => {
     authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
     insertMock.mockResolvedValue({ data: { id: 'event-1' } });
 
-    await service.pushReservation(baseReservation); // status: PENDING
+    await service.pushReservation({ ...baseReservation, status });
 
     expect(insertMock).toHaveBeenCalledWith({
       calendarId: 'cal-1',
-      requestBody: expect.objectContaining({ colorId: '5' }),
-    });
-
-    insertMock.mockClear();
-    await service.pushReservation({ ...baseReservation, status: 'CONFIRMED' });
-
-    expect(insertMock).toHaveBeenCalledWith({
-      calendarId: 'cal-1',
-      requestBody: expect.objectContaining({ colorId: '10' }),
+      requestBody: expect.objectContaining({ colorId }),
     });
   });
 
@@ -155,32 +157,84 @@ describe('GoogleCalendarPushService', () => {
     expect(updateEventMock).toHaveBeenCalledWith({
       calendarId: 'cal-1',
       eventId: 'event-1',
-      requestBody: expect.objectContaining({ summary: 'Jane Doe (Directo)' }),
+      requestBody: expect.objectContaining({ summary: '[Esperando confirmación] Jane Doe (Directo)' }),
     });
     expect(insertMock).not.toHaveBeenCalled();
   });
 
-  it('deletes the calendar event and clears googleEventId when the reservation is cancelled', async () => {
+  it('updates (does not delete) the calendar event when the reservation is cancelled', async () => {
     authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+    updateEventMock.mockResolvedValue({});
     const reservation = { ...baseReservation, status: 'CANCELLED' as const, googleEventId: 'event-1' };
 
     await service.pushReservation(reservation);
 
-    expect(deleteEventMock).toHaveBeenCalledWith({ calendarId: 'cal-1', eventId: 'event-1' });
-    expect(prisma.reservation.update).toHaveBeenCalledWith({
-      where: { id: 'res-1' },
-      data: { googleEventId: null },
+    expect(updateEventMock).toHaveBeenCalledWith({
+      calendarId: 'cal-1',
+      eventId: 'event-1',
+      requestBody: expect.objectContaining({ summary: '[Cancelada] Jane Doe (Directo)' }),
     });
+    expect(deleteEventMock).not.toHaveBeenCalled();
   });
 
-  it('does nothing on cancel when there was never a googleEventId', async () => {
+  it('creates a new event, tagged, for a cancelled reservation with no existing googleEventId', async () => {
     authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+    insertMock.mockResolvedValue({ data: { id: 'event-1' } });
     const reservation = { ...baseReservation, status: 'CANCELLED' as const, googleEventId: null };
 
     await service.pushReservation(reservation);
 
+    expect(insertMock).toHaveBeenCalledWith({
+      calendarId: 'cal-1',
+      requestBody: expect.objectContaining({ summary: '[Cancelada] Jane Doe (Directo)' }),
+    });
     expect(deleteEventMock).not.toHaveBeenCalled();
-    expect(prisma.reservation.update).not.toHaveBeenCalled();
+  });
+
+  describe('status tag in the event summary', () => {
+    async function summaryFor(overrides: Partial<Reservation>): Promise<string> {
+      authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+      insertMock.mockClear();
+      insertMock.mockResolvedValue({ data: { id: 'event-1' } });
+      await service.pushReservation({ ...baseReservation, ...overrides });
+      return insertMock.mock.calls[0][0].requestBody.summary;
+    }
+
+    it('tags a reservation that hasn\'t started the guest wizard as "Esperando confirmación"', async () => {
+      expect(await summaryFor({})).toBe('[Esperando confirmación] Jane Doe (Directo)');
+    });
+
+    it('tags a reservation that confirmed dates but hasn\'t accepted the contract as "Esperando confirmación"', async () => {
+      expect(await summaryFor({ datesConfirmedAt: new Date() })).toBe('[Esperando confirmación] Jane Doe (Directo)');
+    });
+
+    it('tags a reservation that accepted the contract but hasn\'t paid as "Esperando pago"', async () => {
+      expect(await summaryFor({ datesConfirmedAt: new Date(), contractAcceptedAt: new Date() })).toBe(
+        '[Esperando pago] Jane Doe (Directo)',
+      );
+    });
+
+    it('tags a reservation with the confirmation payment received as "Confirmada", even while still PENDING', async () => {
+      expect(
+        await summaryFor({
+          datesConfirmedAt: new Date(),
+          contractAcceptedAt: new Date(),
+          confirmationPaymentReceivedAt: new Date(),
+        }),
+      ).toBe('[Confirmada] Jane Doe (Directo)');
+    });
+
+    it('tags a CONFIRMED reservation as "Confirmada" even if it never went through the guest wizard', async () => {
+      expect(await summaryFor({ status: 'CONFIRMED' })).toBe('[Confirmada] Jane Doe (Directo)');
+    });
+
+    it('tags a CANCELLED reservation as "Cancelada"', async () => {
+      expect(await summaryFor({ status: 'CANCELLED' })).toBe('[Cancelada] Jane Doe (Directo)');
+    });
+
+    it('tags a COMPLETED reservation as "Completada"', async () => {
+      expect(await summaryFor({ status: 'COMPLETED' })).toBe('[Completada] Jane Doe (Directo)');
+    });
   });
 
   it('never throws when the Calendar API call fails, and records the error', async () => {
@@ -206,11 +260,11 @@ describe('GoogleCalendarPushService', () => {
     expect(updateEventMock).toHaveBeenCalledWith({
       calendarId: 'cal-1',
       eventId: 'stale-event-1',
-      requestBody: expect.objectContaining({ summary: 'Jane Doe (Directo)' }),
+      requestBody: expect.objectContaining({ summary: '[Esperando confirmación] Jane Doe (Directo)' }),
     });
     expect(insertMock).toHaveBeenCalledWith({
       calendarId: 'cal-1',
-      requestBody: expect.objectContaining({ summary: 'Jane Doe (Directo)' }),
+      requestBody: expect.objectContaining({ summary: '[Esperando confirmación] Jane Doe (Directo)' }),
     });
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-1' },
