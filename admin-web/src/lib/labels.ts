@@ -110,3 +110,12 @@ export function getReservationWarnings(reservation: Reservation): string[] {
 
   return warnings;
 }
+
+const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  CALENDAR_MISMATCH: 'Calendario sin coincidencia',
+  PAYMENT_RECEIPT_UPLOADED: 'Comprobante subido',
+};
+
+export function notificationTypeLabel(type: string): string {
+  return NOTIFICATION_TYPE_LABELS[type] ?? type;
+}

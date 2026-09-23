@@ -1,4 +1,4 @@
-import { ChangeEvent, ClipboardEvent, FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
 import {
@@ -15,12 +15,12 @@ import {
   resendInitialEmail,
   updateReservation,
 } from '../api/reservations';
+import { getReservationImageBlob, listReservationImages, ReservationImage } from '../api/reservation-images';
 import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } from './types';
 import { PageContainer, PageHeader, Alert, Button, Card, FormField, Input, Select, Textarea } from '../ui';
 import { formatDate, formatDateTime } from '../lib/date';
 import { shortId } from '../lib/id';
 import { sourceLabel, eventTypeLabel } from '../lib/labels';
-import { parseScreenshot } from '../api/reservation-import';
 
 const emptyForm = {
   guestName: '',
@@ -58,6 +58,43 @@ function StepIcon({ done }: { done: boolean }) {
   );
 }
 
+// Receipts are financial documents served through an authenticated endpoint, not a plain
+// static URL — so each thumbnail needs its own blob fetch + object URL, revoked on unmount
+// to avoid leaking memory as staff browse between reservations.
+function ReceiptImage({ reservationId, image }: { reservationId: string; image: ReservationImage }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    getReservationImageBlob(reservationId, image.id)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [reservationId, image.id]);
+
+  if (!url) {
+    return <div className="h-24 w-24 animate-pulse rounded border border-border bg-bg" />;
+  }
+
+  return (
+    <a href={url} target="_blank" rel="noreferrer" title={image.originalName ?? 'Comprobante'}>
+      <img
+        src={url}
+        alt={image.originalName ?? 'Comprobante de pago'}
+        className="h-24 w-24 rounded border border-border object-cover"
+      />
+    </a>
+  );
+}
+
 export function ReservationFormPage() {
   const { id } = useParams<{ id: string }>();
   const isEditing = Boolean(id);
@@ -71,8 +108,7 @@ export function ReservationFormPage() {
   const [reservationRecord, setReservationRecord] = useState<Reservation | null>(null);
   const [events, setEvents] = useState<ReservationEvent[]>([]);
   const [overlaps, setOverlaps] = useState<Reservation[]>([]);
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
+  const [images, setImages] = useState<ReservationImage[]>([]);
   const guestWebUrl = import.meta.env.VITE_GUEST_WEB_URL as string;
 
   function loadReservation() {
@@ -96,6 +132,11 @@ export function ReservationFormPage() {
       .then(setEvents)
       .catch((err) => {
         console.error('Failed to load the reservation events', err);
+      });
+    listReservationImages(id)
+      .then(setImages)
+      .catch((err) => {
+        console.error('Failed to load the reservation receipts', err);
       });
   }
 
@@ -228,48 +269,6 @@ export function ReservationFormPage() {
     navigator.clipboard.writeText(`${guestWebUrl}/r/${reservationRecord.confirmationToken}`);
   }
 
-  async function applyExtractedFields(file: File) {
-    if (importing) return;
-    setImportError(null);
-    setImporting(true);
-    try {
-      const extracted = await parseScreenshot(file);
-      const gotAnything = Object.values(extracted).some((value) => value !== null);
-      if (!gotAnything) {
-        setImportError('No pudimos leer los datos de la captura — completá el formulario manualmente.');
-        return;
-      }
-      setForm((prev) => ({
-        ...prev,
-        guestName: extracted.guestName ?? prev.guestName,
-        checkIn: extracted.checkIn ?? prev.checkIn,
-        checkOut: extracted.checkOut ?? prev.checkOut,
-        paxCount: extracted.paxCount ?? prev.paxCount,
-        externalReference: extracted.externalReference ?? prev.externalReference,
-        source: 'BOOKING',
-      }));
-    } catch {
-      setImportError('No pudimos leer los datos de la captura — completá el formulario manualmente.');
-    } finally {
-      setImporting(false);
-    }
-  }
-
-  function handleScreenshotFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (file) {
-      void applyExtractedFields(file);
-    }
-  }
-
-  function handleScreenshotPaste(event: ClipboardEvent<HTMLDivElement>) {
-    const file = Array.from(event.clipboardData.files).find((f) => f.type.startsWith('image/'));
-    if (file) {
-      void applyExtractedFields(file);
-    }
-  }
-
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     // Only manual entry via this form is held to this: staff sometimes need to enter a
@@ -305,7 +304,7 @@ export function ReservationFormPage() {
         subtitle={
           isEditing
             ? 'Datos de la estadía y progreso del check-in online del huésped.'
-            : 'Cargá los datos de una nueva reserva manual o importalos desde una captura de Booking.com.'
+            : 'Cargá los datos de una nueva reserva manual.'
         }
         backTo="/"
         backLabel="Volver a reservas"
@@ -316,30 +315,6 @@ export function ReservationFormPage() {
             <p className="-mt-1 font-mono text-xs text-text-muted" title={id}>
               ID de reserva: {shortId(id)}
             </p>
-          )}
-          {!isEditing && (
-            <div
-              tabIndex={0}
-              onPaste={handleScreenshotPaste}
-              className="flex flex-col gap-2 rounded border border-dashed border-border p-4"
-            >
-              <FormField label="Importar desde captura de Booking.com">
-                {/* Raw input, not the shared Input primitive — file pickers render as a native
-                    browser button and don't benefit from the same text-input styling. */}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleScreenshotFileChange}
-                  disabled={importing}
-                  className="text-sm text-text"
-                />
-              </FormField>
-              <p className="text-xs text-text-muted">
-                También podés pegar una captura copiada (Ctrl+V) haciendo clic acá primero.
-              </p>
-              {importing && <p className="text-sm text-text-muted">Leyendo captura...</p>}
-              {importError && <Alert>{importError}</Alert>}
-            </div>
           )}
           {overlaps.length > 0 && (
             <Alert>
@@ -447,6 +422,42 @@ export function ReservationFormPage() {
       </Card>
       {isEditing && reservationRecord && (
         <>
+          {images.length > 0 ? (
+            <Card className="mt-6">
+              <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Comprobantes de pago</h2>
+              <p className="mb-4 text-sm text-text-muted">
+                Subidos por el huésped desde la página de check-in. Revisalos y marcá lo que corresponda como
+                recibido.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {images.map((image) => (
+                  <ReceiptImage key={image.id} reservationId={id!} image={image} />
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                {!reservationRecord.confirmationPaymentReceivedAt && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={actionLoading === 'markPayment'}
+                    onClick={handleMarkPaymentReceived}
+                  >
+                    Marcar pago del 30% como recibido
+                  </Button>
+                )}
+                {!reservationRecord.depositReceivedAt && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={actionLoading === 'markDeposit'}
+                    onClick={handleMarkDepositReceived}
+                  >
+                    Marcar depósito como recibido
+                  </Button>
+                )}
+              </div>
+            </Card>
+          ) : null}
           <Card className="mt-6">
             <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Progreso del onboarding</h2>
             <p className="mb-4 text-sm text-text-muted">Estado de cada paso del check-in online del huésped.</p>

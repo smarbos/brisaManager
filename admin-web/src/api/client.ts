@@ -6,21 +6,25 @@ export class ApiError extends Error {
   }
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const body = await response.text();
+async function throwIfNotOk(response: Response): Promise<void> {
+  if (response.ok) return;
 
-    if (response.status === 401) {
-      // The token is missing, invalid or expired: drop it and send the user back to
-      // the login page. This lives outside React Router, hence the full-page redirect.
-      localStorage.removeItem('accessToken');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
+  const body = await response.text();
+
+  if (response.status === 401) {
+    // The token is missing, invalid or expired: drop it and send the user back to
+    // the login page. This lives outside React Router, hence the full-page redirect.
+    localStorage.removeItem('accessToken');
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login';
     }
-
-    throw new ApiError(response.status, body);
   }
+
+  throw new ApiError(response.status, body);
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  await throwIfNotOk(response);
 
   if (response.status === 204) {
     return undefined as T;
@@ -61,8 +65,24 @@ async function upload<T>(path: string, formData: FormData, options: { signal?: A
   return handleResponse<T>(response);
 }
 
+// For a route that returns raw bytes (e.g. a receipt image), not JSON — handleResponse()
+// always calls response.json(), which would throw on a binary body.
+async function fetchBlob(path: string): Promise<Blob> {
+  const token = localStorage.getItem('accessToken');
+
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  await throwIfNotOk(response);
+
+  return response.blob();
+}
+
 export async function login(email: string, password: string): Promise<{ accessToken: string }> {
   return request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
 }
 
-export const apiClient = { request, upload };
+export const apiClient = { request, upload, fetchBlob };
