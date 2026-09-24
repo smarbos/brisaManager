@@ -565,24 +565,35 @@ export function ConfirmationPage() {
             <div
               tabIndex={0}
               onPaste={handleImagePaste}
-              className="mt-4 flex flex-col gap-2 rounded-lg border border-dashed border-border bg-bg p-4"
+              className="mt-4 flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-bg p-6 text-center"
             >
-              <FormField label="Subir comprobante de pago">
-                {/* Raw input, not the shared Input primitive — file pickers render as a
-                    native browser button and don't benefit from the same text-input styling. */}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageFileChange}
-                  disabled={uploadingImage}
-                  className="text-sm text-text"
-                />
-              </FormField>
+              <p className="text-sm font-semibold text-heading">Comprobante de pago</p>
+              {/* A <label htmlFor> wrapping a visually-hidden <input> is the standard way to
+                  restyle a file input: the browser's own file-picker chrome can't be
+                  re-skinned directly, but clicking any element labelling the input still
+                  opens it natively, no JS ref needed. Not using the shared FormField here
+                  since it wraps its children in its own <label> — nesting a second <label>
+                  inside it would be invalid. */}
+              <label
+                htmlFor="receipt-file-input"
+                className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded border border-border bg-surface px-4 py-2 text-sm font-semibold text-text transition-all duration-150 hover:bg-border active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
+                  uploadingImage ? 'pointer-events-none opacity-60' : ''
+                }`}
+              >
+                {uploadingImage ? 'Subiendo...' : 'Elegir foto o archivo'}
+              </label>
+              <input
+                id="receipt-file-input"
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileChange}
+                disabled={uploadingImage}
+                className="sr-only"
+              />
               <p className="text-xs text-text-muted">
                 También podés pegar una captura copiada (Ctrl+V) haciendo clic acá primero. Vale para la seña o
                 para el depósito — subí las que tengas.
               </p>
-              {uploadingImage && <p className="text-sm text-text-muted">Subiendo...</p>}
               {uploadError && <Alert>{uploadError}</Alert>}
               {images.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
