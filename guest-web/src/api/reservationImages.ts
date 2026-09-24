@@ -8,6 +8,7 @@ export interface ReservationImage {
   originalName: string | null;
   mimeType: string;
   sizeBytes: number;
+  message: string | null;
   createdAt: string;
 }
 
@@ -15,9 +16,21 @@ export function listReceiptImages(token: string): Promise<ReservationImage[]> {
   return request(`/public/reservations/${token}/images`);
 }
 
-export function uploadReceiptImage(token: string, file: File): Promise<ReservationImage> {
+// A single submission from the payment step's "Actualizar datos de pagos" form: zero or more
+// receipt images, an optional shared note, or both. The backend rejects neither being
+// present — the caller (the disabled submit button) is what actually prevents that case.
+export function submitPaymentUpdate(
+  token: string,
+  files: File[],
+  message?: string,
+): Promise<{ images: ReservationImage[] }> {
   const formData = new FormData();
-  formData.append('file', file);
+  for (const file of files) {
+    formData.append('files', file);
+  }
+  if (message) {
+    formData.append('message', message);
+  }
   return upload(`/public/reservations/${token}/images`, formData);
 }
 

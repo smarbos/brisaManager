@@ -17,7 +17,7 @@ import {
 } from '../api/reservations';
 import { getReservationImageBlob, listReservationImages, ReservationImage } from '../api/reservation-images';
 import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } from './types';
-import { PageContainer, PageHeader, Alert, Button, Card, FormField, Input, Select, Textarea } from '../ui';
+import { PageContainer, PageHeader, Alert, Button, Card, FormField, Input, Lightbox, Select, Textarea } from '../ui';
 import { formatDate, formatDateTime } from '../lib/date';
 import { shortId } from '../lib/id';
 import { sourceLabel, eventTypeLabel } from '../lib/labels';
@@ -63,6 +63,7 @@ function StepIcon({ done }: { done: boolean }) {
 // to avoid leaking memory as staff browse between reservations.
 function ReceiptImage({ reservationId, image }: { reservationId: string; image: ReservationImage }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -85,13 +86,26 @@ function ReceiptImage({ reservationId, image }: { reservationId: string; image: 
   }
 
   return (
-    <a href={url} target="_blank" rel="noreferrer" title={image.originalName ?? 'Comprobante'}>
-      <img
-        src={url}
-        alt={image.originalName ?? 'Comprobante de pago'}
-        className="h-24 w-24 rounded border border-border object-cover"
-      />
-    </a>
+    <>
+      <div className="flex flex-col items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setViewerOpen(true)}
+          title={image.originalName ?? 'Comprobante'}
+          className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+        >
+          <img
+            src={url}
+            alt={image.originalName ?? 'Comprobante de pago'}
+            className="h-24 w-24 rounded border border-border object-cover"
+          />
+        </button>
+        {image.message && <p className="max-w-24 truncate text-xs text-text-muted" title={image.message}>{image.message}</p>}
+      </div>
+      {viewerOpen && (
+        <Lightbox src={url} alt={image.originalName ?? 'Comprobante de pago'} onClose={() => setViewerOpen(false)} />
+      )}
+    </>
   );
 }
 

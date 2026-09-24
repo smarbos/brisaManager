@@ -4,6 +4,7 @@ export * from './Button';
 export * from './Card';
 export * from './EmptyState';
 export * from './FormField';
+export * from './Lightbox';
 export * from './LoadingState';
 export * from './Input';
 export * from './PageContainer';

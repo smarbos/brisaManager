@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PublicReservationsService } from './public-reservations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
@@ -7,6 +7,7 @@ import { ReservationEventsService } from '../reservation-events/reservation-even
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GuestsService } from '../guests/guests.service';
 import { ReservationImagesService } from '../reservation-images/reservation-images.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('PublicReservationsService', () => {
   let service: PublicReservationsService;
@@ -15,7 +16,13 @@ describe('PublicReservationsService', () => {
   let eventsService: { record: jest.Mock };
   let confirmationService: { maybeAutoConfirm: jest.Mock };
   let guestsService: { syncFromReservation: jest.Mock };
-  let reservationImagesService: { upload: jest.Mock; listForReservation: jest.Mock; getOne: jest.Mock; readFile: jest.Mock };
+  let reservationImagesService: {
+    upload: jest.Mock;
+    listForReservation: jest.Mock;
+    getOne: jest.Mock;
+    readFile: jest.Mock;
+  };
+  let notificationsService: { create: jest.Mock };
 
   const baseReservation = {
     id: 'res-1',
@@ -51,6 +58,7 @@ describe('PublicReservationsService', () => {
       getOne: jest.fn(),
       readFile: jest.fn(),
     };
+    notificationsService = { create: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -63,7 +71,11 @@ describe('PublicReservationsService', () => {
           useValue: confirmationService,
         },
         { provide: GuestsService, useValue: guestsService },
-        { provide: ReservationImagesService, useValue: reservationImagesService },
+        {
+          provide: ReservationImagesService,
+          useValue: reservationImagesService,
+        },
+        { provide: NotificationsService, useValue: notificationsService },
       ],
     }).compile();
 
@@ -183,7 +195,12 @@ describe('PublicReservationsService', () => {
       guestEmail: 'jane@example.com',
     });
 
-    await service.confirmDates('tok-1', 'Jane Doe', '+54 9 223 555-1234', 'Jane@Example.com');
+    await service.confirmDates(
+      'tok-1',
+      'Jane Doe',
+      '+54 9 223 555-1234',
+      'Jane@Example.com',
+    );
 
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-1' },
@@ -209,7 +226,12 @@ describe('PublicReservationsService', () => {
       datesConfirmedAt: alreadyConfirmedAt,
     });
 
-    const result = await service.confirmDates('tok-1', 'A Different Name', '+54911', 'a@example.com');
+    const result = await service.confirmDates(
+      'tok-1',
+      'A Different Name',
+      '+54911',
+      'a@example.com',
+    );
 
     expect(result).toEqual({ datesConfirmedAt: alreadyConfirmedAt });
     expect(prisma.reservation.update).not.toHaveBeenCalled();
@@ -226,7 +248,12 @@ describe('PublicReservationsService', () => {
       guestPhone: '+54911',
     });
 
-    await service.confirmDates('tok-1', 'Jane Q. Doe', '+54911', 'jane@example.com');
+    await service.confirmDates(
+      'tok-1',
+      'Jane Q. Doe',
+      '+54911',
+      'jane@example.com',
+    );
 
     expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-1', {
       email: 'jane@example.com',
@@ -242,7 +269,12 @@ describe('PublicReservationsService', () => {
       guestEmail: 'jane@example.com',
     });
 
-    await service.confirmDates('tok-1', 'A Different Name', '+54911', 'a@example.com');
+    await service.confirmDates(
+      'tok-1',
+      'A Different Name',
+      '+54911',
+      'a@example.com',
+    );
 
     expect(guestsService.syncFromReservation).not.toHaveBeenCalled();
   });
@@ -292,23 +324,91 @@ describe('PublicReservationsService', () => {
     expect(confirmationService.maybeAutoConfirm).not.toHaveBeenCalled();
   });
 
-  describe('uploadImage', () => {
-    it('resolves the token to a reservation id before delegating to ReservationImagesService', async () => {
+  describe('submitPaymentUpdate', () => {
+    const file = {
+      buffer: Buffer.from('x'),
+      originalname: 'a.jpg',
+      mimetype: 'image/jpeg',
+      size: 1,
+    } as Express.Multer.File;
+
+    it('uploads a single file, attaches the message to it, and sends one notification', async () => {
       prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
-      const file = { buffer: Buffer.from('x'), originalname: 'a.jpg', mimetype: 'image/jpeg', size: 1 } as Express.Multer.File;
       reservationImagesService.upload.mockResolvedValue({ id: 'img-1' });
 
-      const result = await service.uploadImage('tok-1', file);
+      const result = await service.submitPaymentUpdate(
+        'tok-1',
+        [file],
+        'es la seña',
+      );
 
-      expect(reservationImagesService.upload).toHaveBeenCalledWith('res-1', file);
-      expect(result).toEqual({ id: 'img-1' });
+      expect(reservationImagesService.upload).toHaveBeenCalledTimes(1);
+      expect(reservationImagesService.upload).toHaveBeenCalledWith(
+        'res-1',
+        file,
+        'es la seña',
+      );
+      expect(notificationsService.create).toHaveBeenCalledWith({
+        type: 'PAYMENT_RECEIPT_UPLOADED',
+        message: 'Jane Doe subió un comprobante de pago. Nota: "es la seña"',
+        reservationId: 'res-1',
+      });
+      expect(result).toEqual({ images: [{ id: 'img-1' }] });
+    });
+
+    it('uploads every file in a multi-file submission, and sends exactly one notification for the whole batch', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+      reservationImagesService.upload
+        .mockResolvedValueOnce({ id: 'img-1' })
+        .mockResolvedValueOnce({ id: 'img-2' });
+      const secondFile = { ...file, originalname: 'b.jpg' };
+
+      const result = await service.submitPaymentUpdate('tok-1', [
+        file,
+        secondFile,
+      ]);
+
+      expect(reservationImagesService.upload).toHaveBeenCalledTimes(2);
+      expect(notificationsService.create).toHaveBeenCalledTimes(1);
+      expect(notificationsService.create).toHaveBeenCalledWith({
+        type: 'PAYMENT_RECEIPT_UPLOADED',
+        message: 'Jane Doe subió 2 comprobantes de pago.',
+        reservationId: 'res-1',
+      });
+      expect(result).toEqual({ images: [{ id: 'img-1' }, { id: 'img-2' }] });
+    });
+
+    it('creates a GUEST_MESSAGE notification and no image when only a message is given', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+
+      const result = await service.submitPaymentUpdate(
+        'tok-1',
+        [],
+        'todavía no transferí',
+      );
+
+      expect(reservationImagesService.upload).not.toHaveBeenCalled();
+      expect(notificationsService.create).toHaveBeenCalledWith({
+        type: 'GUEST_MESSAGE',
+        message: 'Jane Doe escribió: "todavía no transferí"',
+        reservationId: 'res-1',
+      });
+      expect(result).toEqual({ images: [] });
+    });
+
+    it('rejects an empty submission (no files and no message) without hitting the database', async () => {
+      await expect(
+        service.submitPaymentUpdate('tok-1', []),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.reservation.findUnique).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException for an unknown token, never reaching ReservationImagesService', async () => {
       prisma.reservation.findUnique.mockResolvedValue(null);
-      const file = { buffer: Buffer.from('x'), originalname: 'a.jpg', mimetype: 'image/jpeg', size: 1 } as Express.Multer.File;
 
-      await expect(service.uploadImage('missing', file)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.submitPaymentUpdate('missing', [file]),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(reservationImagesService.upload).not.toHaveBeenCalled();
     });
   });
@@ -316,11 +416,15 @@ describe('PublicReservationsService', () => {
   describe('listImages', () => {
     it('resolves the token to a reservation id before listing', async () => {
       prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
-      reservationImagesService.listForReservation.mockResolvedValue([{ id: 'img-1' }]);
+      reservationImagesService.listForReservation.mockResolvedValue([
+        { id: 'img-1' },
+      ]);
 
       const result = await service.listImages('tok-1');
 
-      expect(reservationImagesService.listForReservation).toHaveBeenCalledWith('res-1');
+      expect(reservationImagesService.listForReservation).toHaveBeenCalledWith(
+        'res-1',
+      );
       expect(result).toEqual([{ id: 'img-1' }]);
     });
   });
@@ -334,7 +438,10 @@ describe('PublicReservationsService', () => {
 
       const result = await service.getImageFile('tok-1', 'img-1');
 
-      expect(reservationImagesService.getOne).toHaveBeenCalledWith('res-1', 'img-1');
+      expect(reservationImagesService.getOne).toHaveBeenCalledWith(
+        'res-1',
+        'img-1',
+      );
       expect(reservationImagesService.readFile).toHaveBeenCalledWith(image);
       expect(result).toEqual({ image, buffer: Buffer.from('bytes') });
     });

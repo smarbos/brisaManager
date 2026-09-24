@@ -12,9 +12,13 @@ describe('ReservationImagesController (e2e)', () => {
   let accessToken: string;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
     app = moduleRef.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     prisma = moduleRef.get(PrismaService);
@@ -28,15 +32,26 @@ describe('ReservationImagesController (e2e)', () => {
     });
 
     const authService = moduleRef.get(AuthService);
-    const { accessToken: token } = await authService.login(email, 'password123');
+    const { accessToken: token } = await authService.login(
+      email,
+      'password123',
+    );
     accessToken = token;
   });
 
   afterAll(async () => {
-    await prisma.notification.deleteMany({ where: { reservation: { guestName: 'Admin Images E2E Guest' } } });
-    await prisma.reservationImage.deleteMany({ where: { reservation: { guestName: 'Admin Images E2E Guest' } } });
-    await prisma.reservation.deleteMany({ where: { guestName: 'Admin Images E2E Guest' } });
-    await prisma.adminUser.deleteMany({ where: { email: 'e2e-reservation-images@labrisa.com.ar' } });
+    await prisma.notification.deleteMany({
+      where: { reservation: { guestName: 'Admin Images E2E Guest' } },
+    });
+    await prisma.reservationImage.deleteMany({
+      where: { reservation: { guestName: 'Admin Images E2E Guest' } },
+    });
+    await prisma.reservation.deleteMany({
+      where: { guestName: 'Admin Images E2E Guest' },
+    });
+    await prisma.adminUser.deleteMany({
+      where: { email: 'e2e-reservation-images@labrisa.com.ar' },
+    });
     await app.close();
   });
 
@@ -57,8 +72,12 @@ describe('ReservationImagesController (e2e)', () => {
   it('requires authentication', async () => {
     const reservation = await createReservation();
 
-    await request(app.getHttpServer()).get(`/reservations/${reservation.id}/images`).expect(401);
-    await request(app.getHttpServer()).get(`/reservations/${reservation.id}/images/some-id/file`).expect(401);
+    await request(app.getHttpServer())
+      .get(`/reservations/${reservation.id}/images`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get(`/reservations/${reservation.id}/images/some-id/file`)
+      .expect(401);
   });
 
   it('lists images uploaded through the public endpoint and streams the file back', async () => {
@@ -66,18 +85,22 @@ describe('ReservationImagesController (e2e)', () => {
 
     const uploadResponse = await request(app.getHttpServer())
       .post(`/public/reservations/${reservation.confirmationToken}/images`)
-      .attach('file', Buffer.from('fake png bytes'), { filename: 'comprobante.png', contentType: 'image/png' })
+      .attach('files', Buffer.from('fake png bytes'), {
+        filename: 'comprobante.png',
+        contentType: 'image/png',
+      })
       .expect(200);
+    const uploadedImage = uploadResponse.body.images[0];
 
     const listResponse = await request(app.getHttpServer())
       .get(`/reservations/${reservation.id}/images`)
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(listResponse.body).toHaveLength(1);
-    expect(listResponse.body[0].id).toBe(uploadResponse.body.id);
+    expect(listResponse.body[0].id).toBe(uploadedImage.id);
 
     const fileResponse = await request(app.getHttpServer())
-      .get(`/reservations/${reservation.id}/images/${uploadResponse.body.id}/file`)
+      .get(`/reservations/${reservation.id}/images/${uploadedImage.id}/file`)
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(fileResponse.headers['content-type']).toContain('image/png');
@@ -90,11 +113,16 @@ describe('ReservationImagesController (e2e)', () => {
 
     const uploadResponse = await request(app.getHttpServer())
       .post(`/public/reservations/${reservationA.confirmationToken}/images`)
-      .attach('file', Buffer.from('fake png bytes'), { filename: 'a.png', contentType: 'image/png' })
+      .attach('files', Buffer.from('fake png bytes'), {
+        filename: 'a.png',
+        contentType: 'image/png',
+      })
       .expect(200);
 
     await request(app.getHttpServer())
-      .get(`/reservations/${reservationB.id}/images/${uploadResponse.body.id}/file`)
+      .get(
+        `/reservations/${reservationB.id}/images/${uploadResponse.body.images[0].id}/file`,
+      )
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(404);
   });

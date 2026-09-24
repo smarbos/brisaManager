@@ -52,6 +52,9 @@ enum CampaignRecipientStatus {
 enum NotificationType {
   CALENDAR_MISMATCH
   PAYMENT_RECEIPT_UPLOADED
+  // A guest submitted a note from the check-in page's payment step without attaching any
+  // receipt image — see PublicReservationsService.submitPaymentUpdate().
+  GUEST_MESSAGE
 }
 
 model Reservation {
@@ -219,6 +222,10 @@ model ReservationImage {
   originalName  String?
   mimeType      String
   sizeBytes     Int
+  // Optional short note the guest typed alongside this upload (e.g. "es la seña") — shown
+  // as a caption wherever the image is displayed. Every image in the same submission shares
+  // the same message, since the guest writes one note per batch, not per photo.
+  message       String?
   createdAt     DateTime    @default(now())
 }
 

@@ -6,6 +6,7 @@ export interface ReservationImage {
   originalName: string | null;
   mimeType: string;
   sizeBytes: number;
+  message: string | null;
   createdAt: string;
 }
 

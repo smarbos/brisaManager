@@ -3,6 +3,7 @@ export * from './Badge';
 export * from './Button';
 export * from './FormField';
 export * from './Input';
+export * from './Lightbox';
 export * from './PageContainer';
 export * from './PageHeader';
 export * from './Select';

@@ -1,10 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GuestsService } from '../guests/guests.service';
 import { ReservationImagesService } from '../reservation-images/reservation-images.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { parsePercentage, resolveFeeAmount } from '../settings/fee-value';
 
 @Injectable()
@@ -16,6 +21,7 @@ export class PublicReservationsService {
     private readonly confirmationService: ReservationConfirmationService,
     private readonly guestsService: GuestsService,
     private readonly reservationImagesService: ReservationImagesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private async findByToken(token: string) {
@@ -43,8 +49,13 @@ export class PublicReservationsService {
       // confirmationPaymentAmount/securityDepositAmount below never had this problem since
       // resolveFeeAmount() already returns a real number.
       totalAmount: Number(reservation.totalAmount),
-      confirmationPaymentAmount: resolveFeeAmount(settings.confirmationPaymentValue, Number(reservation.totalAmount)),
-      confirmationPaymentPercentage: parsePercentage(settings.confirmationPaymentValue),
+      confirmationPaymentAmount: resolveFeeAmount(
+        settings.confirmationPaymentValue,
+        Number(reservation.totalAmount),
+      ),
+      confirmationPaymentPercentage: parsePercentage(
+        settings.confirmationPaymentValue,
+      ),
       currency: reservation.currency,
       datesConfirmedAt: reservation.datesConfirmedAt,
       contractAcceptedAt: reservation.contractAcceptedAt,
@@ -62,11 +73,19 @@ export class PublicReservationsService {
       bankCbu: settings.bankCbu,
       bankAlias: settings.bankAlias,
       bankName: settings.bankName,
-      securityDepositAmount: resolveFeeAmount(settings.securityDepositValue, Number(reservation.totalAmount)),
+      securityDepositAmount: resolveFeeAmount(
+        settings.securityDepositValue,
+        Number(reservation.totalAmount),
+      ),
     };
   }
 
-  async confirmDates(token: string, fullName: string, phone: string, email: string) {
+  async confirmDates(
+    token: string,
+    fullName: string,
+    phone: string,
+    email: string,
+  ) {
     const reservation = await this.findByToken(token);
 
     if (reservation.datesConfirmedAt) {
@@ -124,9 +143,44 @@ export class PublicReservationsService {
     return { contractAcceptedAt: updated.contractAcceptedAt };
   }
 
-  async uploadImage(token: string, file: Express.Multer.File) {
+  // A single submission from the check-in page's "Actualizar datos de pagos" form: zero or
+  // more receipt images, an optional shared note, or both — but never neither (the button is
+  // disabled client-side unless at least one is present; this is the server-side backstop).
+  // Sends exactly one staff notification for the whole batch, not one per image, whether or
+  // not any files were attached.
+  async submitPaymentUpdate(
+    token: string,
+    files: Express.Multer.File[],
+    message?: string,
+  ) {
+    if (files.length === 0 && !message) {
+      throw new BadRequestException('Either a file or a message is required');
+    }
+
     const reservation = await this.findByToken(token);
-    return this.reservationImagesService.upload(reservation.id, file);
+    const images = await Promise.all(
+      files.map((file) =>
+        this.reservationImagesService.upload(reservation.id, file, message),
+      ),
+    );
+
+    if (images.length > 0) {
+      const countLabel =
+        images.length > 1 ? `${images.length} comprobantes` : 'un comprobante';
+      await this.notificationsService.create({
+        type: 'PAYMENT_RECEIPT_UPLOADED',
+        message: `${reservation.guestName} subió ${countLabel} de pago.${message ? ` Nota: "${message}"` : ''}`,
+        reservationId: reservation.id,
+      });
+    } else {
+      await this.notificationsService.create({
+        type: 'GUEST_MESSAGE',
+        message: `${reservation.guestName} escribió: "${message}"`,
+        reservationId: reservation.id,
+      });
+    }
+
+    return { images };
   }
 
   async listImages(token: string) {
@@ -136,7 +190,10 @@ export class PublicReservationsService {
 
   async getImageFile(token: string, imageId: string) {
     const reservation = await this.findByToken(token);
-    const image = await this.reservationImagesService.getOne(reservation.id, imageId);
+    const image = await this.reservationImagesService.getOne(
+      reservation.id,
+      imageId,
+    );
     const buffer = await this.reservationImagesService.readFile(image);
     return { image, buffer };
   }

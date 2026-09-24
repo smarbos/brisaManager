@@ -5,16 +5,31 @@ import { PrismaService } from '../prisma/prisma.service';
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let prisma: {
-    notification: { create: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock; update: jest.Mock };
+    notification: {
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
+      update: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
     prisma = {
-      notification: { create: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn(), update: jest.fn() },
+      notification: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        count: jest.fn(),
+        update: jest.fn(),
+      },
     };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [NotificationsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        NotificationsService,
+        { provide: PrismaService, useValue: prisma },
+      ],
     }).compile();
 
     service = moduleRef.get(NotificationsService);
@@ -40,7 +55,10 @@ describe('NotificationsService', () => {
     });
 
     it('defaults reservationId and dedupeKey to null when omitted', async () => {
-      await service.create({ type: 'PAYMENT_RECEIPT_UPLOADED', message: 'Nuevo comprobante subido.' });
+      await service.create({
+        type: 'PAYMENT_RECEIPT_UPLOADED',
+        message: 'Nuevo comprobante subido.',
+      });
 
       expect(prisma.notification.create).toHaveBeenCalledWith({
         data: {
@@ -57,10 +75,15 @@ describe('NotificationsService', () => {
     it('returns true when an unread notification with that dedupeKey exists', async () => {
       prisma.notification.findFirst.mockResolvedValue({ id: 'n-1' });
 
-      const result = await service.hasOpen('calendar-mismatch:BOOKING:2026-11-06');
+      const result = await service.hasOpen(
+        'calendar-mismatch:BOOKING:2026-11-06',
+      );
 
       expect(prisma.notification.findFirst).toHaveBeenCalledWith({
-        where: { dedupeKey: 'calendar-mismatch:BOOKING:2026-11-06', readAt: null },
+        where: {
+          dedupeKey: 'calendar-mismatch:BOOKING:2026-11-06',
+          readAt: null,
+        },
         select: { id: true },
       });
       expect(result).toBe(true);
@@ -69,7 +92,9 @@ describe('NotificationsService', () => {
     it('returns false when no unread notification with that dedupeKey exists', async () => {
       prisma.notification.findFirst.mockResolvedValue(null);
 
-      const result = await service.hasOpen('calendar-mismatch:BOOKING:2026-11-06');
+      const result = await service.hasOpen(
+        'calendar-mismatch:BOOKING:2026-11-06',
+      );
 
       expect(result).toBe(false);
     });
@@ -81,7 +106,9 @@ describe('NotificationsService', () => {
 
       const result = await service.unreadCount();
 
-      expect(prisma.notification.count).toHaveBeenCalledWith({ where: { readAt: null } });
+      expect(prisma.notification.count).toHaveBeenCalledWith({
+        where: { readAt: null },
+      });
       expect(result).toBe(3);
     });
   });
