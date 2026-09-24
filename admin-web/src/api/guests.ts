@@ -22,3 +22,15 @@ export function listGuests(): Promise<Guest[]> {
 export function getGuest(id: string): Promise<GuestWithReservations> {
   return apiClient.request(`/guests/${id}`);
 }
+
+export interface GuestEvent {
+  id: string;
+  guestId: string;
+  type: string;
+  detail: string | null;
+  createdAt: string;
+}
+
+export function listGuestEvents(id: string): Promise<GuestEvent[]> {
+  return apiClient.request(`/guests/${id}/events`);
+}
