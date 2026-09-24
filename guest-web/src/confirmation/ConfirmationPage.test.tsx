@@ -216,7 +216,7 @@ describe('ConfirmationPage', () => {
 
     renderAt('tok-1');
 
-    const input = await screen.findByLabelText(/subir comprobante de pago/i);
+    const input = await screen.findByLabelText(/elegir foto o archivo/i);
     const file = new File(['fake-image-bytes'], 'comprobante.png', { type: 'image/png' });
     fireEvent.change(input, { target: { files: [file] } });
 
@@ -259,7 +259,7 @@ describe('ConfirmationPage', () => {
 
     renderAt('tok-1');
 
-    const input = await screen.findByLabelText(/subir comprobante de pago/i);
+    const input = await screen.findByLabelText(/elegir foto o archivo/i);
     const file = new File(['fake-image-bytes'], 'comprobante.png', { type: 'image/png' });
     fireEvent.change(input, { target: { files: [file] } });
 
