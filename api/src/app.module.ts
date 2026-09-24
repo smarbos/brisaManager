@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { SettingsModule } from './settings/settings.module';
 import { ReservationEventsModule } from './reservation-events/reservation-events.module';
+import { GuestEventsModule } from './guest-events/guest-events.module';
 import { EmailModule } from './email/email.module';
 import { PublicReservationsModule } from './public-reservations/public-reservations.module';
 import { ChannelSyncModule } from './channel-sync/channel-sync.module';
@@ -27,6 +28,7 @@ import { ReservationImagesModule } from './reservation-images/reservation-images
     ReservationsModule,
     SettingsModule,
     ReservationEventsModule,
+    GuestEventsModule,
     EmailModule,
     PublicReservationsModule,
     ChannelSyncModule,
