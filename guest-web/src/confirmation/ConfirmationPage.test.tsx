@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfirmationPage } from './ConfirmationPage';
@@ -197,7 +197,7 @@ describe('ConfirmationPage', () => {
     expect(screen.getByRole('button', { name: /ver reglas de la casa/i })).toBeInTheDocument();
   });
 
-  it('uploads a payment receipt from step 3 and shows it in the gallery', async () => {
+  it('disables "Actualizar datos de pagos" until a file is selected or a message is typed', async () => {
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
       datesConfirmedAt: '2026-01-01T00:00:00.000Z',
@@ -205,13 +205,37 @@ describe('ConfirmationPage', () => {
       contractAcceptedName: 'Jane Doe',
     });
     vi.spyOn(reservationImagesApi, 'listReceiptImages').mockResolvedValue([]);
-    const uploadSpy = vi.spyOn(reservationImagesApi, 'uploadReceiptImage').mockResolvedValue({
-      id: 'img-1',
-      reservationId: 'res-1',
-      originalName: 'comprobante.png',
-      mimeType: 'image/png',
-      sizeBytes: 123,
-      createdAt: '2026-01-02T00:00:00.000Z',
+
+    renderAt('tok-1');
+
+    const submitButton = await screen.findByRole('button', { name: /actualizar datos de pagos/i });
+    expect(submitButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/mensaje \(opcional\)/i), { target: { value: 'es la seña' } });
+    expect(submitButton).toBeEnabled();
+  });
+
+  it('submits selected files with the typed message, no confirmation needed, and shows the results in the gallery', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+    });
+    vi.spyOn(reservationImagesApi, 'listReceiptImages').mockResolvedValue([]);
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    const submitSpy = vi.spyOn(reservationImagesApi, 'submitPaymentUpdate').mockResolvedValue({
+      images: [
+        {
+          id: 'img-1',
+          reservationId: 'res-1',
+          originalName: 'comprobante.png',
+          mimeType: 'image/png',
+          sizeBytes: 123,
+          message: 'es la seña',
+          createdAt: '2026-01-02T00:00:00.000Z',
+        },
+      ],
     });
 
     renderAt('tok-1');
@@ -219,12 +243,15 @@ describe('ConfirmationPage', () => {
     const input = await screen.findByLabelText(/elegir foto o archivo/i);
     const file = new File(['fake-image-bytes'], 'comprobante.png', { type: 'image/png' });
     fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText(/mensaje \(opcional\)/i), { target: { value: 'es la seña' } });
+    fireEvent.click(screen.getByRole('button', { name: /actualizar datos de pagos/i }));
 
-    await waitFor(() => expect(uploadSpy).toHaveBeenCalledWith('tok-1', file));
+    await waitFor(() => expect(submitSpy).toHaveBeenCalledWith('tok-1', [file], 'es la seña'));
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(await screen.findByAltText('comprobante.png')).toBeInTheDocument();
   });
 
-  it('shows receipts already uploaded on a previous visit', async () => {
+  it('shows receipts already uploaded on a previous visit, with their caption', async () => {
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
       datesConfirmedAt: '2026-01-01T00:00:00.000Z',
@@ -238,6 +265,7 @@ describe('ConfirmationPage', () => {
         originalName: 'comprobante.png',
         mimeType: 'image/png',
         sizeBytes: 123,
+        message: 'es la seña',
         createdAt: '2026-01-02T00:00:00.000Z',
       },
     ]);
@@ -245,9 +273,68 @@ describe('ConfirmationPage', () => {
     renderAt('tok-1');
 
     expect(await screen.findByAltText('comprobante.png')).toBeInTheDocument();
+    expect(screen.getByText('es la seña')).toBeInTheDocument();
   });
 
-  it('shows an error notice when the upload fails', async () => {
+  it('opens an uploaded receipt in a lightbox viewer when clicked, and closes it', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+    });
+    vi.spyOn(reservationImagesApi, 'listReceiptImages').mockResolvedValue([
+      {
+        id: 'img-1',
+        reservationId: 'res-1',
+        originalName: 'comprobante.png',
+        mimeType: 'image/png',
+        sizeBytes: 123,
+        message: null,
+        createdAt: '2026-01-02T00:00:00.000Z',
+      },
+    ]);
+
+    renderAt('tok-1');
+
+    const thumbnail = await screen.findByAltText('comprobante.png');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(thumbnail);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('img')).toHaveAttribute('alt', 'comprobante.png');
+
+    fireEvent.click(screen.getByRole('button', { name: /cerrar/i }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('asks for confirmation before submitting a message with no files, and submits on Aceptar', async () => {
+    const getSpy = vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+    });
+    vi.spyOn(reservationImagesApi, 'listReceiptImages').mockResolvedValue([]);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const submitSpy = vi.spyOn(reservationImagesApi, 'submitPaymentUpdate').mockResolvedValue({ images: [] });
+
+    renderAt('tok-1');
+
+    fireEvent.change(await screen.findByLabelText(/mensaje \(opcional\)/i), {
+      target: { value: 'todavía no transferí' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /actualizar datos de pagos/i }));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => expect(submitSpy).toHaveBeenCalledWith('tok-1', [], 'todavía no transferí'));
+    // Re-fetches payment status too, same as the old standalone refresh button.
+    await waitFor(() => expect(getSpy).toHaveBeenCalledTimes(2));
+  });
+
+  it('does not submit a message-only update when the confirmation is declined', async () => {
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
       datesConfirmedAt: '2026-01-01T00:00:00.000Z',
@@ -255,15 +342,37 @@ describe('ConfirmationPage', () => {
       contractAcceptedName: 'Jane Doe',
     });
     vi.spyOn(reservationImagesApi, 'listReceiptImages').mockResolvedValue([]);
-    vi.spyOn(reservationImagesApi, 'uploadReceiptImage').mockRejectedValue(new Error('network error'));
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const submitSpy = vi.spyOn(reservationImagesApi, 'submitPaymentUpdate');
+
+    renderAt('tok-1');
+
+    fireEvent.change(await screen.findByLabelText(/mensaje \(opcional\)/i), {
+      target: { value: 'todavía no transferí' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /actualizar datos de pagos/i }));
+
+    expect(submitSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows an error notice when the submission fails', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+    });
+    vi.spyOn(reservationImagesApi, 'listReceiptImages').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'submitPaymentUpdate').mockRejectedValue(new Error('network error'));
 
     renderAt('tok-1');
 
     const input = await screen.findByLabelText(/elegir foto o archivo/i);
     const file = new File(['fake-image-bytes'], 'comprobante.png', { type: 'image/png' });
     fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: /actualizar datos de pagos/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/no pudimos subir el comprobante/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no pudimos actualizar los datos de pago/i);
   });
 
   it('shows the confirmation payment label without a percentage when it is a fixed amount', async () => {
@@ -280,21 +389,6 @@ describe('ConfirmationPage', () => {
     expect(await screen.findByText('Confirmación de reserva')).toBeInTheDocument();
     expect(screen.queryByText(/confirmación de reserva \(/i)).not.toBeInTheDocument();
     expect(screen.getByText('ARS 45.000')).toBeInTheDocument();
-  });
-
-  it('re-fetches the reservation when "Actualizar estado de los pagos" is clicked', async () => {
-    const getSpy = vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
-      ...baseReservation,
-      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
-      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
-    });
-
-    renderAt('tok-1');
-
-    await screen.findByText(/reglas aceptadas/i);
-    fireEvent.click(screen.getByRole('button', { name: /actualizar estado de los pagos/i }));
-
-    await waitFor(() => expect(getSpy).toHaveBeenCalledTimes(2));
   });
 
   it('resumes at step 4 (Confirmación) once payment and deposit are both received, showing the totals breakdown', async () => {

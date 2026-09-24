@@ -6,11 +6,11 @@ import { acceptContract, confirmDates, getReservationByToken } from '../api/publ
 import {
   listReceiptImages,
   receiptImageUrl,
-  uploadReceiptImage,
+  submitPaymentUpdate,
   ReservationImage,
 } from '../api/reservationImages';
 import { GuestReservation } from './types';
-import { Alert, Badge, Button, FormField, Input } from '../ui';
+import { Alert, Badge, Button, FormField, Input, Lightbox, Textarea } from '../ui';
 import { formatDate, formatLongDate } from '../lib/date';
 
 type Step = 1 | 2 | 3 | 4;
@@ -138,13 +138,16 @@ export function ConfirmationPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmingDates, setConfirmingDates] = useState(false);
   const [acceptingContract, setAcceptingContract] = useState(false);
-  const [refreshingPayments, setRefreshingPayments] = useState(false);
   const [copyStatus, setCopyStatus] = useState<Record<CopyField, CopyStatus | null>>({ cbu: null, alias: null });
   const [images, setImages] = useState<ReservationImage[]>([]);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [paymentMessage, setPaymentMessage] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [submittingPaymentUpdate, setSubmittingPaymentUpdate] = useState(false);
+  const [paymentUpdateError, setPaymentUpdateError] = useState<string | null>(null);
+  const [viewerImageId, setViewerImageId] = useState<string | null>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousStepRef = useRef<Step | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function load(): Promise<void> {
     if (!token) return Promise.resolve();
@@ -170,32 +173,17 @@ export function ConfirmationPage() {
       .catch(() => {});
   }
 
-  async function uploadImage(file: File) {
-    if (!token || uploadingImage) return;
-    setUploadError(null);
-    setUploadingImage(true);
-    try {
-      const image = await uploadReceiptImage(token, file);
-      setImages((prev) => [image, ...prev]);
-    } catch {
-      setUploadError('No pudimos subir el comprobante. Por favor, intentá de nuevo.');
-    } finally {
-      setUploadingImage(false);
-    }
-  }
-
+  // Selecting/pasting a file only stages it — nothing is sent to the server until the guest
+  // clicks "Actualizar datos de pagos", so a message typed alongside it travels with the
+  // same submission instead of firing one request per file.
   function handleImageFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (file) {
-      void uploadImage(file);
-    }
+    setSelectedFiles(Array.from(event.target.files ?? []));
   }
 
   function handleImagePaste(event: ClipboardEvent<HTMLDivElement>) {
     const file = Array.from(event.clipboardData.files).find((f) => f.type.startsWith('image/'));
     if (file) {
-      void uploadImage(file);
+      setSelectedFiles((prev) => [...prev, file]);
     }
   }
 
@@ -252,12 +240,33 @@ export function ConfirmationPage() {
     }
   }
 
-  async function handleRefreshPayments() {
-    setRefreshingPayments(true);
+  // Covers what used to be two separate actions: uploading receipts and refreshing payment
+  // status. A guest can submit files, a note, or both — never neither (the button is
+  // disabled until at least one is present) — and either way it also re-checks payment
+  // status afterward, same as the old standalone refresh button did on its own.
+  async function handleSubmitPaymentUpdate() {
+    if (!token) return;
+    const trimmedMessage = paymentMessage.trim();
+    if (selectedFiles.length === 0 && trimmedMessage) {
+      const confirmed = window.confirm(
+        '¿Confirmás que querés enviar esto sin subir ningún comprobante?',
+      );
+      if (!confirmed) return;
+    }
+
+    setPaymentUpdateError(null);
+    setSubmittingPaymentUpdate(true);
     try {
+      const { images: newImages } = await submitPaymentUpdate(token, selectedFiles, trimmedMessage || undefined);
+      setImages((prev) => [...newImages, ...prev]);
+      setPaymentMessage('');
+      setSelectedFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       await load();
+    } catch {
+      setPaymentUpdateError('No pudimos actualizar los datos de pago. Por favor, intentá de nuevo.');
     } finally {
-      setRefreshingPayments(false);
+      setSubmittingPaymentUpdate(false);
     }
   }
 
@@ -568,6 +577,14 @@ export function ConfirmationPage() {
               className="mt-4 flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-bg p-6 text-center"
             >
               <p className="text-sm font-semibold text-heading">Comprobante de pago</p>
+              <FormField label="Mensaje (opcional)" className="w-full text-left">
+                <Textarea
+                  value={paymentMessage}
+                  onChange={(e) => setPaymentMessage(e.target.value)}
+                  placeholder="Ej: es la seña, ya transferí el depósito..."
+                  rows={2}
+                />
+              </FormField>
               {/* A <label htmlFor> wrapping a visually-hidden <input> is the standard way to
                   restyle a file input: the browser's own file-picker chrome can't be
                   re-skinned directly, but clicking any element labelling the input still
@@ -577,54 +594,67 @@ export function ConfirmationPage() {
               <label
                 htmlFor="receipt-file-input"
                 className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded border border-border bg-surface px-4 py-2 text-sm font-semibold text-text transition-all duration-150 hover:bg-border active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
-                  uploadingImage ? 'pointer-events-none opacity-60' : ''
+                  submittingPaymentUpdate ? 'pointer-events-none opacity-60' : ''
                 }`}
               >
-                {uploadingImage ? 'Subiendo...' : 'Elegir foto o archivo'}
+                {selectedFiles.length > 0
+                  ? `${selectedFiles.length} archivo${selectedFiles.length > 1 ? 's' : ''} seleccionado${selectedFiles.length > 1 ? 's' : ''}`
+                  : 'Elegir foto o archivo'}
               </label>
               <input
+                ref={fileInputRef}
                 id="receipt-file-input"
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleImageFileChange}
-                disabled={uploadingImage}
+                disabled={submittingPaymentUpdate}
                 className="sr-only"
               />
               <p className="text-xs text-text-muted">
                 También podés pegar una captura copiada (Ctrl+V) haciendo clic acá primero. Vale para la seña o
                 para el depósito — subí las que tengas.
               </p>
-              {uploadError && <Alert>{uploadError}</Alert>}
+              {paymentUpdateError && <Alert>{paymentUpdateError}</Alert>}
               {images.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {images.map((image) => (
-                    <a
-                      key={image.id}
-                      href={receiptImageUrl(token!, image.id)}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={image.originalName ?? 'Comprobante'}
-                    >
-                      <img
-                        src={receiptImageUrl(token!, image.id)}
-                        alt={image.originalName ?? 'Comprobante de pago'}
-                        className="h-20 w-20 rounded border border-border object-cover"
-                      />
-                    </a>
+                    <div key={image.id} className="flex flex-col items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setViewerImageId(image.id)}
+                        title={image.originalName ?? 'Comprobante'}
+                        className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+                      >
+                        <img
+                          src={receiptImageUrl(token!, image.id)}
+                          alt={image.originalName ?? 'Comprobante de pago'}
+                          className="h-20 w-20 rounded border border-border object-cover"
+                        />
+                      </button>
+                      {image.message && <p className="max-w-20 truncate text-xs text-text-muted">{image.message}</p>}
+                    </div>
                   ))}
                 </div>
               )}
+              {viewerImageId && (
+                <Lightbox
+                  src={receiptImageUrl(token!, viewerImageId)}
+                  alt={images.find((image) => image.id === viewerImageId)?.originalName ?? 'Comprobante de pago'}
+                  onClose={() => setViewerImageId(null)}
+                />
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                loading={submittingPaymentUpdate}
+                disabled={selectedFiles.length === 0 && !paymentMessage.trim()}
+                onClick={handleSubmitPaymentUpdate}
+              >
+                Actualizar datos de pagos
+              </Button>
             </div>
-
-            <Button
-              type="button"
-              variant="secondary"
-              className="mt-4 w-full"
-              loading={refreshingPayments}
-              onClick={handleRefreshPayments}
-            >
-              Actualizar estado de los pagos
-            </Button>
           </>
         )}
 

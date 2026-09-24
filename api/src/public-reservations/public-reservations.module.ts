@@ -5,9 +5,16 @@ import { SettingsModule } from '../settings/settings.module';
 import { ReservationConfirmationModule } from '../reservation-confirmation/reservation-confirmation.module';
 import { GuestsModule } from '../guests/guests.module';
 import { ReservationImagesModule } from '../reservation-images/reservation-images.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [SettingsModule, ReservationConfirmationModule, GuestsModule, ReservationImagesModule],
+  imports: [
+    SettingsModule,
+    ReservationConfirmationModule,
+    GuestsModule,
+    ReservationImagesModule,
+    NotificationsModule,
+  ],
   controllers: [PublicReservationsController],
   providers: [PublicReservationsService],
 })

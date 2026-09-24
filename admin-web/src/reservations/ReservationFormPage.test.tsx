@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ReservationFormPage } from './ReservationFormPage';
@@ -148,6 +148,7 @@ describe('ReservationFormPage', () => {
         originalName: 'comprobante.png',
         mimeType: 'image/png',
         sizeBytes: 123,
+        message: 'es la seña',
         createdAt: '2026-01-02T00:00:00.000Z',
       },
     ]);
@@ -165,6 +166,7 @@ describe('ReservationFormPage', () => {
 
     expect(await screen.findByText(/comprobantes de pago/i)).toBeInTheDocument();
     expect(await screen.findByAltText('comprobante.png')).toHaveAttribute('src', 'blob:fake-url');
+    expect(screen.getByText('es la seña')).toBeInTheDocument();
 
     const paymentButtons = screen.getAllByRole('button', { name: /marcar pago del 30% como recibido/i });
     fireEvent.click(paymentButtons[0]);
@@ -173,6 +175,59 @@ describe('ReservationFormPage', () => {
     const depositButtons = screen.getAllByRole('button', { name: /marcar depósito como recibido/i });
     fireEvent.click(depositButtons[0]);
     await waitFor(() => expect(markDepositSpy).toHaveBeenCalledWith('1'));
+  });
+
+  it('opens a receipt in a lightbox viewer when clicked, and closes it', async () => {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn().mockReturnValue('blob:fake-url'),
+      revokeObjectURL: vi.fn(),
+    });
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([
+      {
+        id: 'img-1',
+        reservationId: '1',
+        originalName: 'comprobante.png',
+        mimeType: 'image/png',
+        sizeBytes: 123,
+        message: null,
+        createdAt: '2026-01-02T00:00:00.000Z',
+      },
+    ]);
+    vi.spyOn(reservationImagesApi, 'getReservationImageBlob').mockResolvedValue(new Blob(['x']));
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const thumbnail = await screen.findByAltText('comprobante.png');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(thumbnail);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', 'blob:fake-url');
+
+    fireEvent.click(screen.getByRole('button', { name: /cerrar/i }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('does not show the receipts section when no images were uploaded', async () => {
