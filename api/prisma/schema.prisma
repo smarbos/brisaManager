@@ -38,6 +38,13 @@ enum ReservationEventType {
   CANCELLATION_EMAIL_FAILED
 }
 
+enum GuestEventType {
+  NAME_CHANGED
+  PHONE_CHANGED
+  EMAIL_CHANGED
+  UNSUBSCRIBED
+}
+
 enum CampaignFilterType {
   ALL
   STAYED_WITHIN_MONTHS
@@ -170,8 +177,22 @@ model Guest {
   unsubscribeToken   String              @unique @default(uuid())
   reservations       Reservation[]
   campaignRecipients CampaignRecipient[]
+  guestEvents        GuestEvent[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+}
+
+// One row per actual change to a Guest's tracked fields — written only by
+// GuestsService.syncFromReservation() (name/phone/email) and
+// GuestsService.unsubscribeByToken() (UNSUBSCRIBED), the only two places those
+// fields are ever written. Mirrors ReservationEvent's shape exactly.
+model GuestEvent {
+  id        String         @id @default(uuid())
+  guestId   String
+  guest     Guest          @relation(fields: [guestId], references: [id])
+  type      GuestEventType
+  detail    String?
+  createdAt DateTime       @default(now())
 }
 
 model CampaignTemplate {
