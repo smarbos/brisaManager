@@ -119,3 +119,14 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
 export function notificationTypeLabel(type: string): string {
   return NOTIFICATION_TYPE_LABELS[type] ?? type;
 }
+
+const GUEST_EVENT_TYPE_LABELS: Record<string, string> = {
+  NAME_CHANGED: 'Nombre modificado',
+  PHONE_CHANGED: 'Teléfono modificado',
+  EMAIL_CHANGED: 'Email modificado',
+  UNSUBSCRIBED: 'Se dio de baja',
+};
+
+export function guestEventTypeLabel(type: string): string {
+  return GUEST_EVENT_TYPE_LABELS[type] ?? type;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sourceLabel, statusLabel, statusBadgeTone, eventTypeLabel, recipientStatusLabel } from './labels';
+import { sourceLabel, statusLabel, statusBadgeTone, eventTypeLabel, recipientStatusLabel, guestEventTypeLabel } from './labels';
 
 describe('sourceLabel', () => {
   it('translates each reservation source to Spanish', () => {
@@ -43,5 +43,18 @@ describe('recipientStatusLabel', () => {
   it('translates each campaign recipient status to Spanish', () => {
     expect(recipientStatusLabel('SENT')).toBe('Enviado');
     expect(recipientStatusLabel('FAILED')).toBe('Fallido');
+  });
+});
+
+describe('guestEventTypeLabel', () => {
+  it('returns the Spanish label for a known type', () => {
+    expect(guestEventTypeLabel('NAME_CHANGED')).toBe('Nombre modificado');
+    expect(guestEventTypeLabel('PHONE_CHANGED')).toBe('Teléfono modificado');
+    expect(guestEventTypeLabel('EMAIL_CHANGED')).toBe('Email modificado');
+    expect(guestEventTypeLabel('UNSUBSCRIBED')).toBe('Se dio de baja');
+  });
+
+  it('falls back to the raw type for an unknown value', () => {
+    expect(guestEventTypeLabel('SOMETHING_ELSE')).toBe('SOMETHING_ELSE');
   });
 });
