@@ -252,19 +252,26 @@ describe('GuestsService', () => {
   });
 
   describe('unsubscribeByToken', () => {
-    it('sets unsubscribedAt for the matching token', async () => {
+    it('sets unsubscribedAt and records an UNSUBSCRIBED event for the matching token', async () => {
+      prisma.guest.findFirst.mockResolvedValue({ id: 'guest-1' });
+
       await service.unsubscribeByToken('tok-1');
 
-      expect(prisma.guest.updateMany).toHaveBeenCalledWith({
-        where: { unsubscribeToken: 'tok-1' },
+      expect(prisma.guest.findFirst).toHaveBeenCalledWith({ where: { unsubscribeToken: 'tok-1' } });
+      expect(prisma.guest.update).toHaveBeenCalledWith({
+        where: { id: 'guest-1' },
         data: { unsubscribedAt: expect.any(Date) },
       });
+      expect(guestEventsService.record).toHaveBeenCalledWith('guest-1', 'UNSUBSCRIBED');
     });
 
-    it('does not throw for an unknown token', async () => {
-      prisma.guest.updateMany.mockResolvedValue({ count: 0 });
+    it('does nothing for an unknown token, without erroring', async () => {
+      prisma.guest.findFirst.mockResolvedValue(null);
 
       await expect(service.unsubscribeByToken('unknown')).resolves.toBeUndefined();
+
+      expect(prisma.guest.update).not.toHaveBeenCalled();
+      expect(guestEventsService.record).not.toHaveBeenCalled();
     });
   });
 });
