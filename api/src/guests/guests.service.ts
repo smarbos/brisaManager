@@ -55,10 +55,6 @@ export class GuestsService {
             update: { name },
           });
 
-      if (existing) {
-        await this.recordFieldChanges(guest.id, existing, { name, phone, email });
-      }
-
       await this.prisma.reservation.update({
         where: { id: reservationId },
         data: { guestId: guest.id },
@@ -74,6 +70,10 @@ export class GuestsService {
         where: { id: guest.id },
         data: { totalStays: stats._count._all, lastStayAt: stats._max.checkOut },
       });
+
+      if (existing) {
+        await this.recordFieldChanges(guest.id, existing, { name, phone, email });
+      }
     } catch (error) {
       this.logger.error(`Guest sync failed for reservation ${reservationId}: ${(error as Error).message}`);
     }
