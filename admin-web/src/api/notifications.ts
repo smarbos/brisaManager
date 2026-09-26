@@ -1,6 +1,11 @@
 import { apiClient } from './client';
 
-export type NotificationType = 'CALENDAR_MISMATCH' | 'PAYMENT_RECEIPT_UPLOADED';
+export type NotificationType =
+  | 'CALENDAR_MISMATCH'
+  | 'PAYMENT_RECEIPT_UPLOADED'
+  | 'GUEST_MESSAGE'
+  | 'AMBIENT_ALERT'
+  | 'DEVICE_OFFLINE';
 
 export interface Notification {
   id: string;

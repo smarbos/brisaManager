@@ -55,6 +55,12 @@ enum NotificationType {
   // A guest submitted a note from the check-in page's payment step without attaching any
   // receipt image — see PublicReservationsService.submitPaymentUpdate().
   GUEST_MESSAGE
+  // Reported by an ambient-control device (see AmbientEvent) — a sensor threshold rule
+  // fired, e.g. repeated loud noise or smoke detected.
+  AMBIENT_ALERT
+  // An ambient-control device's heartbeat went stale (see AmbientOfflineSchedulerService) —
+  // it may be unplugged, tampered with, or lost WiFi.
+  DEVICE_OFFLINE
 }
 
 model Reservation {
@@ -265,4 +271,47 @@ model ExtensionErrorLog {
   url             String
   extensionVersion String?
   createdAt       DateTime @default(now())
+}
+
+// Reported by an ambient-control ESP32 device (see /home/smarbos/dev/brisaManager/ambient-control)
+// whenever a sensor threshold rule fires. Every report lands here regardless of whether it
+// also created a Notification, so this is the full history — Notification (deduped, markable
+// read) is the actionable queue built on top of it.
+model AmbientEvent {
+  id        String   @id @default(uuid())
+  deviceId  String
+  // Free string, not an enum: new sensor types (smoke, temperature) can be added on the
+  // firmware side without an API migration. The admin UI just displays whatever arrives.
+  sensor    String
+  level     Int?
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([deviceId, sensor])
+}
+
+// One row per ambient-control device (living room, first floor, ...). Created/updated
+// automatically on every heartbeat or alert it sends - there's no separate "register a
+// device" step, since a device introduces itself just by talking to the API.
+model AmbientDevice {
+  id         String                 @id // the device's own deviceId, e.g. "ambient-control-living-room"
+  name       String                 @default("")
+  lastSeenAt DateTime?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+  readings   AmbientDeviceReading[]
+}
+
+// The latest reading for one (device, sensor) pair - overwritten on every heartbeat/alert
+// that reports that sensor, so this is "what does it read right now", not a history. See
+// AmbientEvent for the full history of threshold-triggered alerts.
+model AmbientDeviceReading {
+  id        String        @id @default(uuid())
+  deviceId  String
+  device    AmbientDevice @relation(fields: [deviceId], references: [id])
+  sensor    String
+  level     Int
+  updatedAt DateTime      @updatedAt
+
+  @@unique([deviceId, sensor])
 }

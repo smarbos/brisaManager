@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listActivityLog, ActivityLogEntry } from '../api/reservation-events';
 import { ExtensionErrorsTab } from './ExtensionErrorsTab';
+import { AmbientEventsTab } from './AmbientEventsTab';
 import {
   PageContainer,
   PageHeader,
@@ -23,6 +24,7 @@ import { eventTypeLabel } from '../lib/labels';
 const TABS = [
   { id: 'events', label: 'Eventos de reservas' },
   { id: 'extension-errors', label: 'Errores del plugin' },
+  { id: 'ambient-events', label: 'Alertas ambientales' },
 ];
 
 export function ActivityLogPage() {
@@ -77,6 +79,10 @@ export function ActivityLogPage() {
       {activeTab === 'extension-errors' ? (
         <Card>
           <ExtensionErrorsTab />
+        </Card>
+      ) : activeTab === 'ambient-events' ? (
+        <Card>
+          <AmbientEventsTab />
         </Card>
       ) : (
         <>

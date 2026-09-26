@@ -11,6 +11,7 @@ import { TemplatesPage } from './templates/TemplatesPage';
 import { CampaignsPage } from './campaigns/CampaignsPage';
 import { ActivityLogPage } from './activity/ActivityLogPage';
 import { NotificationsPage } from './notifications/NotificationsPage';
+import { SensorsPage } from './sensors/SensorsPage';
 import { AppFooter } from './layout/AppFooter';
 
 export function App() {
@@ -30,6 +31,7 @@ export function App() {
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/activity" element={<ActivityLogPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/sensors" element={<SensorsPage />} />
           </Route>
         </Routes>
         <AppFooter />

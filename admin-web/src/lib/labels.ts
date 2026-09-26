@@ -114,8 +114,23 @@ export function getReservationWarnings(reservation: Reservation): string[] {
 const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   CALENDAR_MISMATCH: 'Calendario sin coincidencia',
   PAYMENT_RECEIPT_UPLOADED: 'Comprobante subido',
+  GUEST_MESSAGE: 'Mensaje del huésped',
+  AMBIENT_ALERT: 'Alerta ambiental',
+  DEVICE_OFFLINE: 'Dispositivo sin conexión',
 };
 
 export function notificationTypeLabel(type: string): string {
   return NOTIFICATION_TYPE_LABELS[type] ?? type;
+}
+
+// Reported by an ambient-control device (see AmbientEventEntry) as a free string, so a new
+// sensor type on the firmware side shows up as its raw value here until a label is added.
+const AMBIENT_SENSOR_LABELS: Record<string, string> = {
+  sound: 'Sonido',
+  smoke: 'Humo',
+  temperature: 'Temperatura',
+};
+
+export function ambientSensorLabel(sensor: string): string {
+  return AMBIENT_SENSOR_LABELS[sensor] ?? sensor;
 }

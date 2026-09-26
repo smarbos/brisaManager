@@ -17,6 +17,7 @@ const sections = [
   { to: '/campaigns', label: 'Campañas' },
   { to: '/activity', label: 'Registro de actividad' },
   { to: '/notifications', label: 'Notificaciones' },
+  { to: '/sensors', label: 'Sensores' },
   { to: '/settings', label: 'Configuración' },
 ];
 

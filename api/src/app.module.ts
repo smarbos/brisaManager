@@ -18,6 +18,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ExtensionErrorsModule } from './extension-errors/extension-errors.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReservationImagesModule } from './reservation-images/reservation-images.module';
+import { AmbientModule } from './ambient/ambient.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ReservationImagesModule } from './reservation-images/reservation-images
     ExtensionErrorsModule,
     NotificationsModule,
     ReservationImagesModule,
+    AmbientModule,
   ],
   controllers: [AppController],
 })

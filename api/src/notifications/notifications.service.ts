@@ -52,4 +52,15 @@ export class NotificationsService {
       data: { readAt: new Date() },
     });
   }
+
+  // Auto-resolves an open notification when whatever it was warning about goes away on its
+  // own - e.g. a DEVICE_OFFLINE notification once the device's next heartbeat arrives (see
+  // AmbientService.recordDeviceActivity). A no-op if nothing's open for this key, so callers
+  // can call it unconditionally rather than checking hasOpen() first.
+  async resolveOpen(dedupeKey: string): Promise<void> {
+    await this.prisma.notification.updateMany({
+      where: { dedupeKey, readAt: null },
+      data: { readAt: new Date() },
+    });
+  }
 }
