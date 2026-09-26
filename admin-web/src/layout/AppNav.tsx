@@ -2,12 +2,15 @@ import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { getUnreadNotificationCount } from '../api/notifications';
+import { subscribeToUnreadCountChanges } from '../notifications/unreadCountBus';
 import { Button } from '../ui';
 
 const MOBILE_NAV_ID = 'mobile-nav';
 
 // Polled rather than pushed — the app has no websocket/SSE channel, and a once-a-minute
-// staleness window is fine for a low-traffic single-property admin tool.
+// staleness window is fine for a low-traffic single-property admin tool. Actions taken in
+// this same tab (e.g. marking a notification read) refresh it immediately instead of waiting
+// for the next tick - see unreadCountBus.
 const UNREAD_POLL_MS = 60_000;
 
 const sections = [
@@ -42,7 +45,11 @@ export function AppNav() {
     }
     refreshUnreadCount();
     const interval = setInterval(refreshUnreadCount, UNREAD_POLL_MS);
-    return () => clearInterval(interval);
+    const unsubscribe = subscribeToUnreadCountChanges(refreshUnreadCount);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
   }, []);
 
   // Move focus into the opened menu (first link) so keyboard/screen-reader users land

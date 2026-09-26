@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listNotifications, markNotificationRead, Notification } from '../api/notifications';
+import { notifyUnreadCountChanged } from './unreadCountBus';
 import {
   PageContainer,
   PageHeader,
@@ -39,6 +40,7 @@ export function NotificationsPage() {
     try {
       await markNotificationRead(id);
       load();
+      notifyUnreadCountChanged();
     } catch {
       setError('No se pudo marcar la notificación como leída. Por favor, intentá de nuevo.');
     } finally {
