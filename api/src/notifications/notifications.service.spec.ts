@@ -11,6 +11,7 @@ describe('NotificationsService', () => {
       findMany: jest.Mock;
       count: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
   };
 
@@ -22,6 +23,7 @@ describe('NotificationsService', () => {
         findMany: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
 
@@ -119,6 +121,17 @@ describe('NotificationsService', () => {
 
       expect(prisma.notification.update).toHaveBeenCalledWith({
         where: { id: 'n-1' },
+        data: { readAt: expect.any(Date) },
+      });
+    });
+  });
+
+  describe('resolveOpen', () => {
+    it('marks every unread notification with that dedupeKey as read', async () => {
+      await service.resolveOpen('device-offline:ambient-control-01');
+
+      expect(prisma.notification.updateMany).toHaveBeenCalledWith({
+        where: { dedupeKey: 'device-offline:ambient-control-01', readAt: null },
         data: { readAt: expect.any(Date) },
       });
     });
