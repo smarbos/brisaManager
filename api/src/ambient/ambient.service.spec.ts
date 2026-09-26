@@ -1,5 +1,10 @@
 import { Test } from '@nestjs/testing';
-import { AmbientService, DEVICE_OFFLINE_THRESHOLD_MS, DEVICE_OFFLINE_CRITICAL_THRESHOLD_MS } from './ambient.service';
+import {
+  AmbientService,
+  DEVICE_OFFLINE_THRESHOLD_MS,
+  DEVICE_OFFLINE_CRITICAL_THRESHOLD_MS,
+  DEVICE_ONLINE_DISPLAY_THRESHOLD_MS,
+} from './ambient.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -169,7 +174,7 @@ describe('AmbientService', () => {
   });
 
   describe('listDevices', () => {
-    it('marks a device online when its last heartbeat is within the offline threshold', async () => {
+    it('marks a device online when its last heartbeat is within the online-display threshold', async () => {
       prisma.ambientDevice.findMany.mockResolvedValue([
         { id: 'ambient-control-01', name: 'Living room', lastSeenAt: new Date(), readings: [] },
       ]);
@@ -179,10 +184,24 @@ describe('AmbientService', () => {
       expect(device.online).toBe(true);
     });
 
-    it('marks a device offline once its last heartbeat is older than the threshold', async () => {
-      const staleDate = new Date(Date.now() - DEVICE_OFFLINE_THRESHOLD_MS - 1000);
+    it('marks a device offline once its last heartbeat is older than the online-display threshold', async () => {
+      const staleDate = new Date(Date.now() - DEVICE_ONLINE_DISPLAY_THRESHOLD_MS - 1000);
       prisma.ambientDevice.findMany.mockResolvedValue([
         { id: 'ambient-control-01', name: 'Living room', lastSeenAt: staleDate, readings: [] },
+      ]);
+
+      const [device] = await service.listDevices();
+
+      expect(device.online).toBe(false);
+    });
+
+    it('marks a device offline for display purposes well before the (looser) alerting threshold fires', async () => {
+      // Simulates the bug report this threshold split fixes: a device that just went silent
+      // shouldn't still read "online" for the full 12-minute alerting grace period.
+      const justPastOnlineWindow = new Date(Date.now() - DEVICE_ONLINE_DISPLAY_THRESHOLD_MS - 1000);
+      expect(Date.now() - justPastOnlineWindow.getTime()).toBeLessThan(DEVICE_OFFLINE_THRESHOLD_MS);
+      prisma.ambientDevice.findMany.mockResolvedValue([
+        { id: 'ambient-control-01', name: 'Living room', lastSeenAt: justPastOnlineWindow, readings: [] },
       ]);
 
       const [device] = await service.listDevices();

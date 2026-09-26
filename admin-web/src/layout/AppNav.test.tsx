@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppNav } from './AppNav';
 import { AuthProvider } from '../auth/AuthContext';
 import * as notificationsApi from '../api/notifications';
+import { notifyUnreadCountChanged } from '../notifications/unreadCountBus';
 
 function renderNav() {
   return render(
@@ -36,6 +37,23 @@ describe('AppNav', () => {
     renderNav();
 
     expect(await screen.findByLabelText('3 sin leer')).toBeInTheDocument();
+  });
+
+  it('refreshes the unread count immediately when notified, without waiting for the poll interval', async () => {
+    const getCountSpy = vi
+      .spyOn(notificationsApi, 'getUnreadNotificationCount')
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+
+    renderNav();
+
+    await screen.findByRole('link', { name: 'Notificaciones' });
+    expect(screen.queryByLabelText(/sin leer/)).not.toBeInTheDocument();
+
+    notifyUnreadCountChanged();
+
+    expect(await screen.findByLabelText('1 sin leer')).toBeInTheDocument();
+    expect(getCountSpy).toHaveBeenCalledTimes(2);
   });
 
   it('shows no badge when there are no unread notifications', async () => {

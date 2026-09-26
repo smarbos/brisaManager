@@ -16,6 +16,12 @@ export const DEVICE_OFFLINE_THRESHOLD_MS = 12 * 60 * 1000;
 // at once and both auto-resolve on their own the moment the device checks back in.
 export const DEVICE_OFFLINE_CRITICAL_THRESHOLD_MS = 30 * 60 * 1000;
 
+// How stale a device's last heartbeat can be before the Sensores page shows it as offline.
+// Deliberately tighter than the alerting thresholds above (which have slack to avoid
+// false-alarm notifications from one delayed beat) - this is a live status display, not an
+// alert, so it should reflect reality close to one missed heartbeat, not several.
+export const DEVICE_ONLINE_DISPLAY_THRESHOLD_MS = 7 * 60 * 1000;
+
 function deviceOfflineDedupeKey(deviceId: string): string {
   return `device-offline:${deviceId}`;
 }
@@ -126,7 +132,7 @@ export class AmbientService {
     const now = Date.now();
     return devices.map((device) => ({
       ...device,
-      online: device.lastSeenAt != null && now - device.lastSeenAt.getTime() <= DEVICE_OFFLINE_THRESHOLD_MS,
+      online: device.lastSeenAt != null && now - device.lastSeenAt.getTime() <= DEVICE_ONLINE_DISPLAY_THRESHOLD_MS,
     }));
   }
 

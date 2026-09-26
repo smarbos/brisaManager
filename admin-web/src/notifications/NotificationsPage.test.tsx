@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { NotificationsPage } from './NotificationsPage';
 import * as notificationsApi from '../api/notifications';
+import { subscribeToUnreadCountChanges } from './unreadCountBus';
 
 function renderPage() {
   return render(
@@ -79,6 +80,31 @@ describe('NotificationsPage', () => {
 
     await waitFor(() => expect(markReadSpy).toHaveBeenCalledWith('n-1'));
     await waitFor(() => expect(listSpy).toHaveBeenCalledTimes(2));
+  });
+
+  it('tells the nav badge to refresh immediately after marking a notification as read', async () => {
+    vi.spyOn(notificationsApi, 'listNotifications').mockResolvedValue([
+      {
+        id: 'n-1',
+        type: 'CALENDAR_MISMATCH',
+        message: 'Booking.com muestra un día bloqueado sin reserva cargada.',
+        reservationId: null,
+        reservation: null,
+        readAt: null,
+        createdAt: '2026-09-20T12:00:00.000Z',
+      },
+    ]);
+    vi.spyOn(notificationsApi, 'markNotificationRead').mockResolvedValue({} as never);
+    const listener = vi.fn();
+    const unsubscribe = subscribeToUnreadCountChanges(listener);
+
+    renderPage();
+
+    const button = await screen.findByRole('button', { name: /marcar como leída/i });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
+    unsubscribe();
   });
 
   it('does not show a "mark as read" button for an already-read notification', async () => {
