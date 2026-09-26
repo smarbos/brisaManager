@@ -12,7 +12,7 @@ import {
   tableThClass as thClass,
   tableTdClass as tdClass,
 } from '../ui';
-import { formatDateTime } from '../lib/date';
+import { formatDateTime, formatRelativeTime } from '../lib/date';
 import { ambientSensorLabel } from '../lib/labels';
 
 // Polled rather than pushed, same reasoning as AppNav's unread-count badge - no
@@ -77,7 +77,13 @@ export function SensorsPage() {
                   <td className={tdClass}>
                     <Badge tone={device.online ? 'success' : 'danger'}>{device.online ? 'En línea' : 'Sin conexión'}</Badge>
                   </td>
-                  <td className={tdClass}>{device.lastSeenAt ? formatDateTime(device.lastSeenAt) : 'Nunca'}</td>
+                  <td className={tdClass}>
+                    {device.lastSeenAt ? (
+                      <span title={formatDateTime(device.lastSeenAt)}>{formatRelativeTime(device.lastSeenAt)}</span>
+                    ) : (
+                      'Nunca'
+                    )}
+                  </td>
                   <td className={tdClass}>{readingsSummary(device)}</td>
                 </tr>
               ))}
