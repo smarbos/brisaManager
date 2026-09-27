@@ -38,6 +38,8 @@ const SENSOR_MESSAGE_BUILDERS: Record<string, (deviceId: string, detail?: string
   sound: (deviceId, detail) =>
     `Ruido fuerte repetido detectado (dispositivo ${deviceId})${detail ? `: ${detail}` : '.'}`,
   smoke: (deviceId, detail) => `¡Posible humo detectado! (dispositivo ${deviceId})${detail ? `: ${detail}` : '.'}`,
+  co: (deviceId, detail) =>
+    `¡Posible monóxido de carbono detectado! (dispositivo ${deviceId})${detail ? `: ${detail}` : '.'}`,
 };
 
 function buildMessage(sensor: string, deviceId: string, detail?: string | null): string {
