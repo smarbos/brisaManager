@@ -9,7 +9,9 @@ import {
   submitPaymentUpdate,
   ReservationImage,
 } from '../api/reservationImages';
+import { getConfig } from '../api/config';
 import { GuestReservation } from './types';
+import { AmbientStatus } from './AmbientStatus';
 import { Alert, Badge, Button, FormField, Input, Lightbox, Textarea } from '../ui';
 import { formatDate, formatLongDate } from '../lib/date';
 
@@ -145,6 +147,7 @@ export function ConfirmationPage() {
   const [submittingPaymentUpdate, setSubmittingPaymentUpdate] = useState(false);
   const [paymentUpdateError, setPaymentUpdateError] = useState<string | null>(null);
   const [viewerImageId, setViewerImageId] = useState<string | null>(null);
+  const [debugMode, setDebugMode] = useState(false);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousStepRef = useRef<Step | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -191,6 +194,12 @@ export function ConfirmationPage() {
     load();
     loadImages();
   }, [token]);
+
+  useEffect(() => {
+    getConfig()
+      .then((config) => setDebugMode(config.debugMode))
+      .catch(() => setDebugMode(false));
+  }, []);
 
   // Move focus to the new step's heading when the guest advances (confirm dates, accept
   // contract) so keyboard/screen-reader users land on the new content instead of being
@@ -312,6 +321,10 @@ export function ConfirmationPage() {
   }
 
   const step = currentStep(reservation);
+  const isFullyConfirmed = Boolean(reservation.confirmationPaymentReceivedAt) && Boolean(reservation.depositReceivedAt);
+  const now = new Date();
+  const isDuringStay = now >= new Date(reservation.checkIn) && now <= new Date(reservation.checkOut);
+  const showAmbient = debugMode || (isFullyConfirmed && isDuringStay);
   const ruleLines = reservation.houseRulesText
     .split('\n')
     .map((line) => line.trim())
@@ -711,6 +724,7 @@ export function ConfirmationPage() {
           </>
         )}
       </div>
+      {showAmbient && <AmbientStatus token={token!} />}
     </PageShell>
   );
 }

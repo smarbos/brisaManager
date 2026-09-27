@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { ConfirmationPage } from './ConfirmationPage';
 import * as publicApi from '../api/publicReservations';
 import * as reservationImagesApi from '../api/reservationImages';
+import * as configApi from '../api/config';
+import * as ambientApi from '../api/ambient';
 import { ApiError } from '../api/client';
 
 const baseReservation = {
@@ -451,5 +453,82 @@ describe('ConfirmationPage', () => {
     // appears on step 4, which isn't reached until both are received.
     expect(await screen.findByText(/reglas aceptadas/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('Recibido')).not.toBeInTheDocument();
+  });
+
+  it('shows ambient sensor status once fully confirmed and during the stay dates', async () => {
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      checkIn: yesterday,
+      checkOut: tomorrow,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      confirmationPaymentReceivedAt: '2026-01-02T00:00:00.000Z',
+      depositReceivedAt: '2026-01-02T00:00:00.000Z',
+    });
+    vi.spyOn(ambientApi, 'getAmbientReadings').mockResolvedValue([
+      { id: 'dev-1', name: 'Living room', online: true, lastSeenAt: now.toISOString(), readings: [] },
+    ]);
+
+    renderAt('tok-1');
+
+    expect(await screen.findByText('Living room')).toBeInTheDocument();
+  });
+
+  it('does not show ambient sensor status outside the stay dates, even when fully confirmed', async () => {
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      confirmationPaymentReceivedAt: '2026-01-02T00:00:00.000Z',
+      depositReceivedAt: '2026-01-02T00:00:00.000Z',
+    });
+    const getAmbientReadings = vi.spyOn(ambientApi, 'getAmbientReadings');
+
+    renderAt('tok-1');
+
+    await screen.findByText(/pago confirmado/i);
+    expect(getAmbientReadings).not.toHaveBeenCalled();
+  });
+
+  it('shows ambient sensor status regardless of confirmation or dates when debug mode is on', async () => {
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true });
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+    vi.spyOn(ambientApi, 'getAmbientReadings').mockResolvedValue([
+      { id: 'dev-1', name: 'Living room', online: true, lastSeenAt: null, readings: [] },
+    ]);
+
+    renderAt('tok-1');
+
+    expect(await screen.findByText('Living room')).toBeInTheDocument();
+  });
+
+  it('does not show ambient sensor status during the stay dates when not yet fully confirmed', async () => {
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      checkIn: yesterday,
+      checkOut: tomorrow,
+      // Dates confirmed and contract accepted, but payment/deposit still pending — this
+      // reservation is "in range" but not "fully confirmed", the other half of the AND from
+      // the previous test (which was fully confirmed but out of range).
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      confirmationPaymentReceivedAt: null,
+      depositReceivedAt: null,
+    });
+    const getAmbientReadings = vi.spyOn(ambientApi, 'getAmbientReadings');
+
+    renderAt('tok-1');
+
+    await screen.findByText(/pago y garantía/i);
+    expect(getAmbientReadings).not.toHaveBeenCalled();
   });
 });
