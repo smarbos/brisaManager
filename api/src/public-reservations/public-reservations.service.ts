@@ -213,7 +213,11 @@ export class PublicReservationsService {
     const isDebugMode = process.env.DEBUG_MODE === 'true';
     const isFullyConfirmed = reservation.confirmationPaymentReceivedAt != null && reservation.depositReceivedAt != null;
     const now = new Date();
-    const isDuringStay = now >= reservation.checkIn && now <= reservation.checkOut;
+    // checkIn/checkOut are stored as midnight-UTC dates with no time component (see
+    // guest-web/src/lib/date.ts's header comment) — "inclusive of the check-out day" means
+    // extending the window through the end of that day, not stopping at its very start.
+    const stayEnd = new Date(reservation.checkOut.getTime() + 24 * 60 * 60 * 1000);
+    const isDuringStay = now >= reservation.checkIn && now < stayEnd;
 
     if (!isDebugMode && !(isFullyConfirmed && isDuringStay)) {
       throw new ForbiddenException('Ambient sensor data is not available for this reservation right now');

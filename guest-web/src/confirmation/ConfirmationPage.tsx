@@ -323,7 +323,11 @@ export function ConfirmationPage() {
   const step = currentStep(reservation);
   const isFullyConfirmed = Boolean(reservation.confirmationPaymentReceivedAt) && Boolean(reservation.depositReceivedAt);
   const now = new Date();
-  const isDuringStay = now >= new Date(reservation.checkIn) && now <= new Date(reservation.checkOut);
+  // checkIn/checkOut are stored as midnight-UTC dates with no time component — "inclusive of
+  // the check-out day" means extending the window through the end of that day, matching the
+  // same fix in the backend's own eligibility check (the real gate this only mirrors for UX).
+  const stayEnd = new Date(new Date(reservation.checkOut).getTime() + 24 * 60 * 60 * 1000);
+  const isDuringStay = now >= new Date(reservation.checkIn) && now < stayEnd;
   const showAmbient = debugMode || (isFullyConfirmed && isDuringStay);
   const ruleLines = reservation.houseRulesText
     .split('\n')
