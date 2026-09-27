@@ -76,6 +76,21 @@ describe('AmbientService', () => {
       });
     });
 
+    it('builds a co-specific message, distinct from sound and smoke', async () => {
+      prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
+
+      await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'co', level: 2100 });
+
+      expect(prisma.ambientEvent.create).toHaveBeenCalledWith({
+        data: {
+          deviceId: 'ambient-control-01',
+          sensor: 'co',
+          level: 2100,
+          message: '¡Posible monóxido de carbono detectado! (dispositivo ambient-control-01).',
+        },
+      });
+    });
+
     it('falls back to a generic message for an unrecognized sensor type', async () => {
       prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
 
