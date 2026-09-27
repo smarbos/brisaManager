@@ -20,10 +20,10 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer()).get('/health').expect(200).expect({ status: 'ok' });
   });
 
-  it('/config (GET) reports email debug mode', () => {
+  it('/config (GET) reports debug mode', () => {
     return request(app.getHttpServer())
       .get('/config')
       .expect(200)
-      .expect({ emailDebugMode: process.env.EMAIL_DEBUG_MODE === 'true' });
+      .expect({ debugMode: process.env.DEBUG_MODE === 'true' });
   });
 });
