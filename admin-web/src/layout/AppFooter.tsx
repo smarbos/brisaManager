@@ -5,7 +5,7 @@ import { getConfig } from '../api/config';
 // warning stays visible even while scrolling, instead of being easy to scroll past — see
 // PageContainer's bottom padding, which reserves space so this never covers page content.
 export function AppFooter() {
-  const [emailDebugMode, setEmailDebugMode] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
   // null until /config responds — the API version isn't known at build time like the
   // client's own, so it's just left out of the label rather than shown as a placeholder.
   const [apiVersion, setApiVersion] = useState<string | null>(null);
@@ -13,10 +13,10 @@ export function AppFooter() {
   useEffect(() => {
     getConfig()
       .then((config) => {
-        setEmailDebugMode(config.emailDebugMode);
+        setDebugMode(config.debugMode);
         setApiVersion(config.version);
       })
-      .catch(() => setEmailDebugMode(false));
+      .catch(() => setDebugMode(false));
   }, []);
 
   return (
@@ -25,7 +25,7 @@ export function AppFooter() {
         v{__APP_VERSION__}
         {apiVersion && ` · API v${apiVersion}`}
       </span>
-      {emailDebugMode && (
+      {debugMode && (
         <span className="rounded bg-warning-bg px-2 py-0.5 font-semibold text-warning">
           Modo debug activo: los emails no se envían a los huéspedes reales.
         </span>

@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 
 export interface AppConfig {
-  emailDebugMode: boolean;
+  debugMode: boolean;
   version: string;
 }
 
