@@ -349,4 +349,116 @@ describe('PublicReservationsController (e2e)', () => {
         .expect(404);
     });
   });
+
+  describe('GET /public/reservations/:token/ambient', () => {
+    const originalDebugMode = process.env.DEBUG_MODE;
+    const AMBIENT_DEVICE_ID = 'e2e-public-ambient-device';
+
+    beforeEach(() => {
+      process.env.DEBUG_MODE = 'false';
+    });
+
+    afterEach(async () => {
+      process.env.DEBUG_MODE = originalDebugMode;
+      await prisma.ambientDeviceReading.deleteMany({ where: { deviceId: AMBIENT_DEVICE_ID } });
+      await prisma.ambientDevice.deleteMany({ where: { id: AMBIENT_DEVICE_ID } });
+    });
+
+    it('returns 404 for an unknown token', async () => {
+      await request(app.getHttpServer())
+        .get('/public/reservations/does-not-exist/ambient')
+        .expect(404);
+    });
+
+    it('returns 403 for a reservation that is not fully confirmed, even during its stay dates', async () => {
+      const now = new Date();
+      const reservation = await prisma.reservation.create({
+        data: {
+          guestName: 'Public E2E Guest',
+          checkIn: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+          checkOut: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+          paxCount: 2,
+          source: 'DIRECT',
+          totalAmount: 100000,
+          currency: 'ARS',
+        },
+      });
+
+      await request(app.getHttpServer())
+        .get(`/public/reservations/${reservation.confirmationToken}/ambient`)
+        .expect(403);
+    });
+
+    it('returns 403 for a fully-confirmed reservation outside its stay dates', async () => {
+      const reservation = await prisma.reservation.create({
+        data: {
+          guestName: 'Public E2E Guest',
+          checkIn: new Date('2020-01-01'),
+          checkOut: new Date('2020-01-05'),
+          paxCount: 2,
+          source: 'DIRECT',
+          totalAmount: 100000,
+          currency: 'ARS',
+          confirmationPaymentReceivedAt: new Date(),
+          depositReceivedAt: new Date(),
+        },
+      });
+
+      await request(app.getHttpServer())
+        .get(`/public/reservations/${reservation.confirmationToken}/ambient`)
+        .expect(403);
+    });
+
+    it('returns current device readings for a fully-confirmed reservation during its stay', async () => {
+      const now = new Date();
+      const reservation = await prisma.reservation.create({
+        data: {
+          guestName: 'Public E2E Guest',
+          checkIn: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+          checkOut: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+          paxCount: 2,
+          source: 'DIRECT',
+          totalAmount: 100000,
+          currency: 'ARS',
+          confirmationPaymentReceivedAt: now,
+          depositReceivedAt: now,
+        },
+      });
+      await prisma.ambientDevice.create({
+        data: { id: AMBIENT_DEVICE_ID, name: 'E2E Living Room', lastSeenAt: now },
+      });
+      await prisma.ambientDeviceReading.create({
+        data: { deviceId: AMBIENT_DEVICE_ID, sensor: 'temperature', level: 23 },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/public/reservations/${reservation.confirmationToken}/ambient`)
+        .expect(200);
+
+      const device = response.body.find((d: { id: string }) => d.id === AMBIENT_DEVICE_ID);
+      expect(device).toBeTruthy();
+      expect(device.readings).toEqual(
+        expect.arrayContaining([expect.objectContaining({ sensor: 'temperature', level: 23 })]),
+      );
+    });
+
+    it('returns current device readings regardless of confirmation/dates when DEBUG_MODE is on', async () => {
+      process.env.DEBUG_MODE = 'true';
+      const reservation = await prisma.reservation.create({
+        data: {
+          guestName: 'Public E2E Guest',
+          checkIn: new Date('2020-01-01'),
+          checkOut: new Date('2020-01-05'),
+          paxCount: 2,
+          source: 'DIRECT',
+          totalAmount: 100000,
+          currency: 'ARS',
+        },
+      });
+
+      await request(app.getHttpServer())
+        .get(`/public/reservations/${reservation.confirmationToken}/ambient`)
+        .expect(200);
+    });
+  });
 });
