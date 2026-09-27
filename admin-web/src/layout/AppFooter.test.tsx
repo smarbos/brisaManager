@@ -5,7 +5,7 @@ import * as configApi from '../api/config';
 
 describe('AppFooter', () => {
   it('always shows the client version', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ emailDebugMode: false, version: '9.9.9' });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, version: '9.9.9' });
 
     render(<AppFooter />);
 
@@ -15,7 +15,7 @@ describe('AppFooter', () => {
   });
 
   it('shows the API version once /config responds', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ emailDebugMode: false, version: '9.9.9' });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, version: '9.9.9' });
 
     render(<AppFooter />);
 
@@ -32,7 +32,7 @@ describe('AppFooter', () => {
   });
 
   it('shows the debug warning when email debug mode is on', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ emailDebugMode: true, version: '9.9.9' });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true, version: '9.9.9' });
 
     render(<AppFooter />);
 
@@ -40,7 +40,7 @@ describe('AppFooter', () => {
   });
 
   it('does not show the debug warning when email debug mode is off', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ emailDebugMode: false, version: '9.9.9' });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, version: '9.9.9' });
 
     render(<AppFooter />);
 
