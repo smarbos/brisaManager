@@ -11,7 +11,7 @@ describe('EmailService', () => {
   let service: EmailService;
   let sendMock: jest.Mock;
   let settingsService: { get: jest.Mock };
-  const originalDebugMode = process.env.EMAIL_DEBUG_MODE;
+  const originalDebugMode = process.env.DEBUG_MODE;
   const originalDebugRecipient = process.env.EMAIL_DEBUG_RECIPIENT;
 
   const baseSettings = {
@@ -25,7 +25,7 @@ describe('EmailService', () => {
   afterAll(() => {
     // Restores whatever the real .env had, so these mutations can't leak into another
     // spec file that happens to share this Jest worker and construct its own EmailService.
-    process.env.EMAIL_DEBUG_MODE = originalDebugMode;
+    process.env.DEBUG_MODE = originalDebugMode;
     process.env.EMAIL_DEBUG_RECIPIENT = originalDebugRecipient;
   });
 
@@ -33,10 +33,10 @@ describe('EmailService', () => {
     process.env.EMAIL_FROM = 'reservas@labrisa.com.ar';
     process.env.ALERT_EMAIL = 'owner@labrisa.com.ar';
     // Pinned explicitly so these tests behave the same regardless of the real .env this
-    // container loads (which has EMAIL_DEBUG_MODE=true for local guest-safe testing) —
+    // container loads (which has DEBUG_MODE=true for local guest-safe testing) —
     // the debug-redirect behavior itself is covered by its own tests below, which set
     // these deliberately instead of relying on ambient state.
-    process.env.EMAIL_DEBUG_MODE = 'false';
+    process.env.DEBUG_MODE = 'false';
     delete process.env.EMAIL_DEBUG_RECIPIENT;
     settingsService = { get: jest.fn().mockResolvedValue(baseSettings) };
     service = new EmailService(settingsService as never);
@@ -139,9 +139,9 @@ describe('EmailService', () => {
   describe('debug mode', () => {
     // Fields are read once at construction, so each test builds its own instance after
     // setting the env vars it needs — the shared beforeEach above already pinned
-    // EMAIL_DEBUG_MODE/EMAIL_DEBUG_RECIPIENT to a known-off state before this runs.
+    // DEBUG_MODE/EMAIL_DEBUG_RECIPIENT to a known-off state before this runs.
     function buildDebugService(recipient?: string) {
-      process.env.EMAIL_DEBUG_MODE = 'true';
+      process.env.DEBUG_MODE = 'true';
       if (recipient) {
         process.env.EMAIL_DEBUG_RECIPIENT = recipient;
       } else {

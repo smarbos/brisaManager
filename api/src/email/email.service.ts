@@ -14,10 +14,10 @@ export class EmailService {
   private readonly from = process.env.EMAIL_FROM as string;
   private readonly alertEmail = process.env.ALERT_EMAIL ?? process.env.ADMIN_SEED_EMAIL;
 
-  // Named EMAIL_* rather than a bare DEBUG env var deliberately: several transitive
+  // Named DEBUG_MODE rather than a bare DEBUG env var deliberately: several transitive
   // dependencies (Express included) treat a bare DEBUG env var as their own logging
   // namespace switch, which would enable unrelated verbose logging as a side effect.
-  private readonly debugMode = process.env.EMAIL_DEBUG_MODE === 'true';
+  private readonly debugMode = process.env.DEBUG_MODE === 'true';
   private readonly debugRecipient = process.env.EMAIL_DEBUG_RECIPIENT;
 
   constructor(private readonly settingsService: SettingsService) {}
@@ -32,7 +32,7 @@ export class EmailService {
       return to;
     }
     if (!this.debugRecipient) {
-      this.logger.warn('EMAIL_DEBUG_MODE is enabled but EMAIL_DEBUG_RECIPIENT is not set — sending to the real recipient.');
+      this.logger.warn('DEBUG_MODE is enabled but EMAIL_DEBUG_RECIPIENT is not set — sending to the real recipient.');
       return to;
     }
     return this.debugRecipient;
