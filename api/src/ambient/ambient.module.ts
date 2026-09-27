@@ -19,5 +19,6 @@ import { AmbientService } from './ambient.service';
     AmbientDevicesController,
   ],
   providers: [AmbientService, AmbientOfflineSchedulerService],
+  exports: [AmbientService],
 })
 export class AmbientModule {}

@@ -31,6 +31,11 @@ export class PublicReservationsController {
     return this.service.getByToken(token);
   }
 
+  @Get(':token/ambient')
+  getAmbientReadings(@Param('token') token: string) {
+    return this.service.getAmbientReadings(token);
+  }
+
   @Post(':token/confirm-dates')
   confirmDates(@Param('token') token: string, @Body() dto: ConfirmDatesDto) {
     return this.service.confirmDates(token, dto.fullName, dto.phone, dto.email);

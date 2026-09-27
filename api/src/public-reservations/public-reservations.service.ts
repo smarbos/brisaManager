@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import { ReservationConfirmationService } from '../reservation-confirmation/rese
 import { GuestsService } from '../guests/guests.service';
 import { ReservationImagesService } from '../reservation-images/reservation-images.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AmbientService } from '../ambient/ambient.service';
 import { parsePercentage, resolveFeeAmount } from '../settings/fee-value';
 
 @Injectable()
@@ -22,6 +24,7 @@ export class PublicReservationsService {
     private readonly guestsService: GuestsService,
     private readonly reservationImagesService: ReservationImagesService,
     private readonly notificationsService: NotificationsService,
+    private readonly ambientService: AmbientService,
   ) {}
 
   private async findByToken(token: string) {
@@ -196,5 +199,26 @@ export class PublicReservationsService {
     );
     const buffer = await this.reservationImagesService.readFile(image);
     return { image, buffer };
+  }
+
+  // A guest sees the property's current ambient sensor readings only once they're fully
+  // confirmed (both the reservation payment and the security deposit received) and only while
+  // their stay is actually happening (now falls within checkIn..checkOut) — or, in a debug
+  // environment, always, so this is easy to test without waiting for a real reservation
+  // window. This is a real, server-side gate: whether a client renders the section is a UX
+  // nicety, not the security boundary.
+  async getAmbientReadings(token: string) {
+    const reservation = await this.findByToken(token);
+
+    const isDebugMode = process.env.DEBUG_MODE === 'true';
+    const isFullyConfirmed = reservation.confirmationPaymentReceivedAt != null && reservation.depositReceivedAt != null;
+    const now = new Date();
+    const isDuringStay = now >= reservation.checkIn && now <= reservation.checkOut;
+
+    if (!isDebugMode && !(isFullyConfirmed && isDuringStay)) {
+      throw new ForbiddenException('Ambient sensor data is not available for this reservation right now');
+    }
+
+    return this.ambientService.listDevices();
   }
 }
