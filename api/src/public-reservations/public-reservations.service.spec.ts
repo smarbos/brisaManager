@@ -484,6 +484,25 @@ describe('PublicReservationsService', () => {
       expect(result).toEqual([{ id: 'dev-1', name: 'Living room', readings: [] }]);
     });
 
+    it('remains eligible through the end of the check-out day, not just its midnight start', async () => {
+      process.env.DEBUG_MODE = 'false';
+      const today = new Date();
+      const todayDateOnly = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+      const yesterdayDateOnly = new Date(todayDateOnly.getTime() - 24 * 60 * 60 * 1000);
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        checkIn: yesterdayDateOnly,
+        checkOut: todayDateOnly,
+        confirmationPaymentReceivedAt: new Date('2026-01-01'),
+        depositReceivedAt: new Date('2026-01-01'),
+      });
+      ambientService.listDevices.mockResolvedValue([{ id: 'dev-1', name: 'Living room', readings: [] }]);
+
+      const result = await service.getAmbientReadings('tok-1');
+
+      expect(result).toEqual([{ id: 'dev-1', name: 'Living room', readings: [] }]);
+    });
+
     it('throws ForbiddenException when fully confirmed but before check-in', async () => {
       process.env.DEBUG_MODE = 'false';
       const now = new Date();
@@ -505,7 +524,7 @@ describe('PublicReservationsService', () => {
       process.env.DEBUG_MODE = 'false';
       const now = new Date();
       const past1 = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
-      const past2 = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const past2 = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
       prisma.reservation.findUnique.mockResolvedValue({
         ...baseReservation,
         checkIn: past1,

@@ -27,7 +27,7 @@ export function AppFooter() {
       </span>
       {debugMode && (
         <span className="rounded bg-warning-bg px-2 py-0.5 font-semibold text-warning">
-          Modo debug activo: los emails no se envían a los huéspedes reales.
+          Modo debug activo: los emails no se envían a los huéspedes reales y los sensores son visibles para cualquier reserva.
         </span>
       )}
     </footer>
