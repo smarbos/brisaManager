@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sourceLabel, statusLabel, statusBadgeTone, eventTypeLabel, recipientStatusLabel } from './labels';
+import { sourceLabel, statusLabel, statusBadgeTone, eventTypeLabel, recipientStatusLabel, ambientSensorLabel } from './labels';
 
 describe('sourceLabel', () => {
   it('translates each reservation source to Spanish', () => {
@@ -43,5 +43,19 @@ describe('recipientStatusLabel', () => {
   it('translates each campaign recipient status to Spanish', () => {
     expect(recipientStatusLabel('SENT')).toBe('Enviado');
     expect(recipientStatusLabel('FAILED')).toBe('Fallido');
+  });
+});
+
+describe('ambientSensorLabel', () => {
+  it('translates each known ambient sensor type to Spanish', () => {
+    expect(ambientSensorLabel('sound')).toBe('Sonido');
+    expect(ambientSensorLabel('smoke')).toBe('Humo');
+    expect(ambientSensorLabel('temperature')).toBe('Temperatura');
+    expect(ambientSensorLabel('co')).toBe('Monóxido de carbono');
+    expect(ambientSensorLabel('humidity')).toBe('Humedad');
+  });
+
+  it('falls back to the raw sensor string for an unknown type', () => {
+    expect(ambientSensorLabel('vibration')).toBe('vibration');
   });
 });

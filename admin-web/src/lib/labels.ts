@@ -129,6 +129,8 @@ const AMBIENT_SENSOR_LABELS: Record<string, string> = {
   sound: 'Sonido',
   smoke: 'Humo',
   temperature: 'Temperatura',
+  co: 'Monóxido de carbono',
+  humidity: 'Humedad',
 };
 
 export function ambientSensorLabel(sensor: string): string {
