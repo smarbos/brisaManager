@@ -6,6 +6,7 @@ import { ReservationConfirmationModule } from '../reservation-confirmation/reser
 import { GuestsModule } from '../guests/guests.module';
 import { ReservationImagesModule } from '../reservation-images/reservation-images.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AmbientModule } from '../ambient/ambient.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     GuestsModule,
     ReservationImagesModule,
     NotificationsModule,
+    AmbientModule,
   ],
   controllers: [PublicReservationsController],
   providers: [PublicReservationsService],

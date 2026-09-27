@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PublicReservationsService } from './public-reservations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
@@ -8,6 +8,7 @@ import { ReservationConfirmationService } from '../reservation-confirmation/rese
 import { GuestsService } from '../guests/guests.service';
 import { ReservationImagesService } from '../reservation-images/reservation-images.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AmbientService } from '../ambient/ambient.service';
 
 describe('PublicReservationsService', () => {
   let service: PublicReservationsService;
@@ -23,6 +24,7 @@ describe('PublicReservationsService', () => {
     readFile: jest.Mock;
   };
   let notificationsService: { create: jest.Mock };
+  let ambientService: { listDevices: jest.Mock };
 
   const baseReservation = {
     id: 'res-1',
@@ -59,6 +61,7 @@ describe('PublicReservationsService', () => {
       readFile: jest.fn(),
     };
     notificationsService = { create: jest.fn() };
+    ambientService = { listDevices: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -76,6 +79,7 @@ describe('PublicReservationsService', () => {
           useValue: reservationImagesService,
         },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: AmbientService, useValue: ambientService },
       ],
     }).compile();
 
@@ -444,6 +448,105 @@ describe('PublicReservationsService', () => {
       );
       expect(reservationImagesService.readFile).toHaveBeenCalledWith(image);
       expect(result).toEqual({ image, buffer: Buffer.from('bytes') });
+    });
+  });
+
+  describe('getAmbientReadings', () => {
+    const originalDebugMode = process.env.DEBUG_MODE;
+
+    afterEach(() => {
+      process.env.DEBUG_MODE = originalDebugMode;
+    });
+
+    it('throws NotFoundException for an unknown token', async () => {
+      process.env.DEBUG_MODE = 'false';
+      prisma.reservation.findUnique.mockResolvedValue(null);
+
+      await expect(service.getAmbientReadings('missing')).rejects.toThrow(NotFoundException);
+    });
+
+    it('returns device readings when fully confirmed and currently within the stay dates', async () => {
+      process.env.DEBUG_MODE = 'false';
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        checkIn: yesterday,
+        checkOut: tomorrow,
+        confirmationPaymentReceivedAt: new Date('2026-01-01'),
+        depositReceivedAt: new Date('2026-01-01'),
+      });
+      ambientService.listDevices.mockResolvedValue([{ id: 'dev-1', name: 'Living room', readings: [] }]);
+
+      const result = await service.getAmbientReadings('tok-1');
+
+      expect(result).toEqual([{ id: 'dev-1', name: 'Living room', readings: [] }]);
+    });
+
+    it('throws ForbiddenException when fully confirmed but before check-in', async () => {
+      process.env.DEBUG_MODE = 'false';
+      const now = new Date();
+      const future = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const farFuture = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        checkIn: future,
+        checkOut: farFuture,
+        confirmationPaymentReceivedAt: new Date('2026-01-01'),
+        depositReceivedAt: new Date('2026-01-01'),
+      });
+
+      await expect(service.getAmbientReadings('tok-1')).rejects.toThrow(ForbiddenException);
+      expect(ambientService.listDevices).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when fully confirmed but after check-out', async () => {
+      process.env.DEBUG_MODE = 'false';
+      const now = new Date();
+      const past1 = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+      const past2 = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        checkIn: past1,
+        checkOut: past2,
+        confirmationPaymentReceivedAt: new Date('2026-01-01'),
+        depositReceivedAt: new Date('2026-01-01'),
+      });
+
+      await expect(service.getAmbientReadings('tok-1')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException when currently within stay dates but not fully confirmed', async () => {
+      process.env.DEBUG_MODE = 'false';
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        checkIn: yesterday,
+        checkOut: tomorrow,
+        confirmationPaymentReceivedAt: null,
+        depositReceivedAt: null,
+      });
+
+      await expect(service.getAmbientReadings('tok-1')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('returns device readings regardless of confirmation/dates when DEBUG_MODE is on', async () => {
+      process.env.DEBUG_MODE = 'true';
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        checkIn: new Date('2020-01-01'),
+        checkOut: new Date('2020-01-05'),
+        confirmationPaymentReceivedAt: null,
+        depositReceivedAt: null,
+      });
+      ambientService.listDevices.mockResolvedValue([{ id: 'dev-1', name: 'Living room', readings: [] }]);
+
+      const result = await service.getAmbientReadings('tok-1');
+
+      expect(result).toEqual([{ id: 'dev-1', name: 'Living room', readings: [] }]);
     });
   });
 });
