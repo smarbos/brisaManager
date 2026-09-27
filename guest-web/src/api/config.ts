@@ -1,7 +1,7 @@
 import { request } from './client';
 
 export interface AppConfig {
-  emailDebugMode: boolean;
+  debugMode: boolean;
 }
 
 export function getConfig(): Promise<AppConfig> {

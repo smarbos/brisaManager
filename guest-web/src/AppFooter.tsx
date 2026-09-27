@@ -11,18 +11,18 @@ const COMMIT_HASH = (import.meta.env.VITE_COMMIT_HASH as string) || 'dev';
 // (or check a screenshot) to identify exactly which deployed build they're looking at —
 // unlike admin-web's semver, this is a commit hash since guest-web isn't otherwise versioned.
 export function AppFooter() {
-  const [emailDebugMode, setEmailDebugMode] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
 
   useEffect(() => {
     getConfig()
-      .then((config) => setEmailDebugMode(config.emailDebugMode))
-      .catch(() => setEmailDebugMode(false));
+      .then((config) => setDebugMode(config.debugMode))
+      .catch(() => setDebugMode(false));
   }, []);
 
   return (
     <footer className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 border-t border-border bg-surface px-3 py-1.5 text-xs text-text-muted">
       <span>{COMMIT_HASH}</span>
-      {emailDebugMode && (
+      {debugMode && (
         <span className="rounded bg-warning-bg px-2 py-0.5 font-semibold text-warning">
           Modo debug activo: los emails no se envían a los huéspedes reales.
         </span>

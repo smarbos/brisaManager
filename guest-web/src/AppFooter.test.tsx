@@ -5,7 +5,7 @@ import * as configApi from './api/config';
 
 describe('AppFooter', () => {
   it('always shows a build identifier', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ emailDebugMode: false });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
 
     render(<AppFooter />);
 
@@ -14,7 +14,7 @@ describe('AppFooter', () => {
   });
 
   it('shows the debug warning when email debug mode is on', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ emailDebugMode: true });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true });
 
     render(<AppFooter />);
 
@@ -22,7 +22,7 @@ describe('AppFooter', () => {
   });
 
   it('does not show the debug warning when email debug mode is off', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ emailDebugMode: false });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
 
     render(<AppFooter />);
 
