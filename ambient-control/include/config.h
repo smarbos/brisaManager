@@ -23,3 +23,34 @@ constexpr unsigned long WIFI_RETRY_INTERVAL_MS = 10000; // 10 seconds
 // - see AmbientOfflineSchedulerService on the API side, which alerts staff if a device misses
 // enough of these in a row.
 constexpr unsigned long HEARTBEAT_INTERVAL_MS = 5UL * 60UL * 1000UL; // 5 minutes
+
+// MQ-7 (carbon monoxide) sensor timing. The sensor's reading isn't meaningful until it's been
+// powered for a while (manufacturing datasheet burn-in behavior) - readings are sampled and
+// reported from boot, but CO_WARMUP_MS suppresses alert logic until the reading has settled.
+constexpr unsigned long CO_WARMUP_MS = 3UL * 60UL * 1000UL; // 3 minutes
+
+// A CO reading must stay at/above coAlertThreshold continuously for this long before it counts
+// as a real exposure worth alerting on - unlike the sound sensor's spike detection, a single
+// noisy ADC sample shouldn't trigger a carbon monoxide alert.
+constexpr unsigned long CO_SUSTAINED_MS = 60UL * 1000UL; // 1 minute
+
+// Once sustained-high, re-sends an ALERT at most this often while it stays elevated - the API
+// dedupes repeated alerts for the same device+sensor into one open notification (see
+// AmbientService.recordAlert), so this is a "still elevated" ping, not new-notification spam.
+constexpr unsigned long CO_REALERT_INTERVAL_MS = HEARTBEAT_INTERVAL_MS; // 5 minutes
+
+// MQ-2 (smoke/combustible gas) sensor timing. Same warm-up rationale as the MQ-7 (readings
+// aren't meaningful until the sensor's settled), but unlike CO's sustained-exposure model,
+// smoke alerts fire immediately on a threshold crossing - smoke response needs to be fast, not
+// averaged over a minute like CO exposure.
+constexpr unsigned long SMOKE_WARMUP_MS = 3UL * 60UL * 1000UL; // 3 minutes
+
+// While still elevated after the initial alert, re-sends at most this often - avoids spamming
+// the API from ADC noise bouncing right at the threshold, while still re-confirming quickly
+// (much shorter than CO's re-alert interval, since smoke is more urgent).
+constexpr unsigned long SMOKE_REALERT_INTERVAL_MS = 2UL * 60UL * 1000UL; // 2 minutes
+
+// DHT22 (temperature/humidity) read interval. The sensor's datasheet requires at least 2s
+// between reads; sampled independently from the 100ms analog-sensor loop, well above that
+// minimum with margin.
+constexpr unsigned long DHT_SAMPLE_INTERVAL_MS = 5000; // 5 seconds
