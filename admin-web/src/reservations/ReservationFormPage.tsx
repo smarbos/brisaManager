@@ -416,6 +416,7 @@ export function ReservationFormPage() {
             <Input
               type="number"
               min={0}
+              step="0.01"
               value={form.totalAmount}
               onChange={(e) => setForm({ ...form, totalAmount: Number(e.target.value) })}
               required
