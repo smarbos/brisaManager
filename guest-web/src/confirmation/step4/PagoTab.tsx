@@ -76,13 +76,15 @@ export function PagoTab({ reservation }: { reservation: GuestReservation }) {
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
+          aria-expanded={isOpen}
+          aria-controls="pago-bank-details"
           className="flex w-full cursor-pointer items-center justify-between bg-bg px-4 py-3 text-sm font-semibold text-heading hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
         >
           Datos de la cuenta para transferir
           <ChevronIcon />
         </button>
         {isOpen && (
-          <div className="p-4">
+          <div id="pago-bank-details" className="p-4">
             <BankDetails
               accountHolder={reservation.bankAccountHolder}
               cuil={reservation.bankCuil}
