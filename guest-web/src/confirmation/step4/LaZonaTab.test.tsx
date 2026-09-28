@@ -11,7 +11,5 @@ describe('LaZonaTab', () => {
     expect(screen.getByText('Puerto de Mar del Plata')).toBeInTheDocument();
     expect(screen.getByText('Comer y comprar')).toBeInTheDocument();
     expect(screen.getByText('Zona Güemes')).toBeInTheDocument();
-    expect(screen.getByText('Moverse')).toBeInTheDocument();
-    expect(screen.getByText('Transporte')).toBeInTheDocument();
   });
 });

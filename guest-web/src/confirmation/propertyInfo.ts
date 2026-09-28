@@ -40,23 +40,6 @@ export const PROPERTY_ZONE: ZoneGroup[] = [
   },
   {
     group: 'Comer y comprar',
-    places: [
-      { icon: 'fork', name: 'Zona Güemes', description: 'Bares, cafés y restaurantes para salir a la noche.' },
-      {
-        icon: 'bag',
-        name: 'Supermercados y farmacias',
-        description: 'Completá con los más cercanos al departamento.',
-      },
-    ],
-  },
-  {
-    group: 'Moverse',
-    places: [
-      {
-        icon: 'bus',
-        name: 'Transporte',
-        description: 'Completá con paradas de colectivo y recomendaciones de remis o taxi.',
-      },
-    ],
+    places: [{ icon: 'fork', name: 'Zona Güemes', description: 'Bares, cafés y restaurantes para salir a la noche.' }],
   },
 ];
