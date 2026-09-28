@@ -16,7 +16,8 @@ describe('EmailService', () => {
 
   const baseSettings = {
     initialEmailTemplate: 'Hola {{guestName}}, confirmá acá: {{confirmationUrl}}',
-    finalEmailTemplate: 'Hola {{guestName}}, dirección: {{propertyAddress}} — mapa: {{googleMapsUrl}}',
+    finalEmailTemplate:
+      'Hola {{guestName}}, dirección: {{propertyAddress}} — mapa: {{googleMapsUrl}} — más info: {{confirmationUrl}}',
     cancellationEmailTemplate: 'Hola {{guestName}}, se canceló tu reserva del {{checkIn}} al {{checkOut}}',
     propertyAddress: 'Calle Falsa 123, Mar del Plata',
     googleMapsUrl: 'https://maps.example/labrisa',
@@ -68,15 +69,17 @@ describe('EmailService', () => {
     ).rejects.toThrow('bounced');
   });
 
-  it('sends the final confirmation email with the address and maps link rendered from settings', async () => {
+  it('sends the final confirmation email with the address, maps link, and check-in link rendered from settings', async () => {
     sendMock.mockResolvedValue({ error: null });
 
-    await expect(service.sendFinalConfirmationEmail('guest@example.com', 'Jane Doe')).resolves.toBeUndefined();
+    await expect(
+      service.sendFinalConfirmationEmail('guest@example.com', 'Jane Doe', 'https://reservas.labrisa.com.ar/r/abc'),
+    ).resolves.toBeUndefined();
 
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'guest@example.com',
-        html: 'Hola Jane Doe, dirección: Calle Falsa 123, Mar del Plata — mapa: https://maps.example/labrisa',
+        html: 'Hola Jane Doe, dirección: Calle Falsa 123, Mar del Plata — mapa: https://maps.example/labrisa — más info: https://reservas.labrisa.com.ar/r/abc',
       }),
     );
   });

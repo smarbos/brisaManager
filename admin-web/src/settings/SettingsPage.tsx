@@ -394,7 +394,7 @@ export function SettingsPage() {
               <Textarea value={finalEmailTemplate} onChange={(e) => setFinalEmailTemplate(e.target.value)} rows={6} />
             </FormField>
             <p className="-mt-2 text-xs text-text-muted">
-              Variables: {'{{guestName}} {{propertyAddress}} {{googleMapsUrl}}'}
+              Variables: {'{{guestName}} {{propertyAddress}} {{googleMapsUrl}} {{confirmationUrl}}'}
             </p>
 
             <FormField label="Email de cancelación">
