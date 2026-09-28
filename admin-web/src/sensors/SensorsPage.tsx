@@ -21,11 +21,27 @@ import { ambientSensorLabel } from '../lib/labels';
 // window here doesn't hide anything meaningful.
 const REFRESH_POLL_MS = 30_000;
 
+// Raw sensor readings are uncalibrated ADC counts (0-4095) with no real-world unit - "1242"
+// means nothing on its own. Showing it against the device's own calibrated alert threshold
+// (e.g. "1242 / 2500 (50%)") gives it a reference point a human can actually reason about,
+// without needing real ppm calibration this hardware can't provide (see ambient-control's
+// README "Note on MQ-7/MQ-2 accuracy"). Sensors with no threshold concept (temperature,
+// humidity) just show the bare reading, same as before.
+function formatReading(reading: { level: number; threshold: number | null }): string {
+  if (!reading.threshold) {
+    return String(reading.level);
+  }
+  const percent = Math.round((reading.level / reading.threshold) * 100);
+  return `${reading.level} / ${reading.threshold} (${percent}%)`;
+}
+
 function readingsSummary(device: AmbientDeviceEntry): string {
   if (device.readings.length === 0) {
     return '—';
   }
-  return device.readings.map((reading) => `${ambientSensorLabel(reading.sensor)}: ${reading.level}`).join(' · ');
+  return device.readings
+    .map((reading) => `${ambientSensorLabel(reading.sensor)}: ${formatReading(reading)}`)
+    .join(' · ');
 }
 
 export function SensorsPage() {
