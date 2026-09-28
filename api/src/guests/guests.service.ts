@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CampaignFilterType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { GuestEventsService } from '../guest-events/guest-events.service';
 
 interface SyncInput {
   email?: string | null;
@@ -8,32 +9,50 @@ interface SyncInput {
   phone?: string | null;
 }
 
+interface GuestSnapshot {
+  name: string;
+  phone: string | null;
+  email: string | null;
+}
+
+function formatPreviousValue(value: string | null): string {
+  return value === null ? '(vacío)' : `"${value}"`;
+}
+
 @Injectable()
 export class GuestsService {
   private readonly logger = new Logger(GuestsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly guestEventsService: GuestEventsService,
+  ) {}
 
   async syncFromReservation(reservationId: string, input: SyncInput): Promise<void> {
     try {
       const email = input.email?.trim().toLowerCase() || null;
       const phone = input.phone?.trim() || null;
+      const name = input.name.trim();
       if (!email && !phone) {
         return;
       }
 
       // Airbnb's hosting messages page never exposes the guest's email, only their phone —
       // key the upsert on whichever identifier is actually present.
+      const existing = email
+        ? await this.prisma.guest.findUnique({ where: { email } })
+        : await this.prisma.guest.findUnique({ where: { phone: phone as string } });
+
       const guest = email
         ? await this.prisma.guest.upsert({
             where: { email },
-            create: { email, name: input.name, phone: phone ?? undefined },
-            update: { name: input.name, phone: phone ?? undefined },
+            create: { email, name, phone: phone ?? undefined },
+            update: { name, phone: phone ?? undefined },
           })
         : await this.prisma.guest.upsert({
             where: { phone: phone as string },
-            create: { phone: phone as string, name: input.name },
-            update: { name: input.name },
+            create: { phone: phone as string, name },
+            update: { name },
           });
 
       await this.prisma.reservation.update({
@@ -51,8 +70,44 @@ export class GuestsService {
         where: { id: guest.id },
         data: { totalStays: stats._count._all, lastStayAt: stats._max.checkOut },
       });
+
+      if (existing) {
+        await this.recordFieldChanges(guest.id, existing, { name, phone, email });
+      }
     } catch (error) {
       this.logger.error(`Guest sync failed for reservation ${reservationId}: ${(error as Error).message}`);
+    }
+  }
+
+  // Only compares/records a field as changed when this sync's input actually supplies a
+  // value for it — when phone/email is omitted this time, Prisma's `?? undefined` in the
+  // upsert above leaves the stored value untouched, so there is nothing to diff for it.
+  // `name` is always present (required on SyncInput), so it's always compared.
+  private async recordFieldChanges(
+    guestId: string,
+    existing: GuestSnapshot,
+    next: { name: string; phone: string | null; email: string | null },
+  ): Promise<void> {
+    if (existing.name !== next.name) {
+      await this.guestEventsService.record(
+        guestId,
+        'NAME_CHANGED',
+        `Nombre: "${existing.name}" → "${next.name}"`,
+      );
+    }
+    if (next.phone !== null && existing.phone !== next.phone) {
+      await this.guestEventsService.record(
+        guestId,
+        'PHONE_CHANGED',
+        `Teléfono: ${formatPreviousValue(existing.phone)} → "${next.phone}"`,
+      );
+    }
+    if (next.email !== null && existing.email !== next.email) {
+      await this.guestEventsService.record(
+        guestId,
+        'EMAIL_CHANGED',
+        `Email: ${formatPreviousValue(existing.email)} → "${next.email}"`,
+      );
     }
   }
 
@@ -90,11 +145,17 @@ export class GuestsService {
   }
 
   async unsubscribeByToken(token: string): Promise<void> {
-    // updateMany silently matches zero rows for an unknown token — intentional: the public
-    // endpoint must never leak whether a given token is valid.
-    await this.prisma.guest.updateMany({
-      where: { unsubscribeToken: token },
+    // A findFirst-then-update (rather than the previous anonymous updateMany) is what gives
+    // us a guest id to attach the GuestEvent to — the "never leak whether a token is valid"
+    // behavior is unchanged: an unknown token still silently no-ops with no error either way.
+    const guest = await this.prisma.guest.findFirst({ where: { unsubscribeToken: token } });
+    if (!guest) {
+      return;
+    }
+    await this.prisma.guest.update({
+      where: { id: guest.id },
       data: { unsubscribedAt: new Date() },
     });
+    await this.guestEventsService.record(guest.id, 'UNSUBSCRIBED');
   }
 }

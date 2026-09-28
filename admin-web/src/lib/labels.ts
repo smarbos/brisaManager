@@ -136,3 +136,14 @@ const AMBIENT_SENSOR_LABELS: Record<string, string> = {
 export function ambientSensorLabel(sensor: string): string {
   return AMBIENT_SENSOR_LABELS[sensor] ?? sensor;
 }
+
+const GUEST_EVENT_TYPE_LABELS: Record<string, string> = {
+  NAME_CHANGED: 'Nombre modificado',
+  PHONE_CHANGED: 'Teléfono modificado',
+  EMAIL_CHANGED: 'Email modificado',
+  UNSUBSCRIBED: 'Se dio de baja',
+};
+
+export function guestEventTypeLabel(type: string): string {
+  return GUEST_EVENT_TYPE_LABELS[type] ?? type;
+}
