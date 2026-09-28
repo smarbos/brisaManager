@@ -147,10 +147,22 @@ describe('AmbientService', () => {
       });
       expect(prisma.ambientDeviceReading.upsert).toHaveBeenCalledWith({
         where: { deviceId_sensor: { deviceId: 'ambient-control-01', sensor: 'sound' } },
-        create: { deviceId: 'ambient-control-01', sensor: 'sound', level: 1935 },
-        update: { level: 1935 },
+        create: { deviceId: 'ambient-control-01', sensor: 'sound', level: 1935, threshold: null },
+        update: { level: 1935, threshold: null },
       });
       expect(notificationsService.resolveOpen).toHaveBeenCalledWith('device-offline:ambient-control-01');
+    });
+
+    it('carries the threshold through to the reading upsert when the alert includes one', async () => {
+      prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
+
+      await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'co', level: 2600, threshold: 2500 });
+
+      expect(prisma.ambientDeviceReading.upsert).toHaveBeenCalledWith({
+        where: { deviceId_sensor: { deviceId: 'ambient-control-01', sensor: 'co' } },
+        create: { deviceId: 'ambient-control-01', sensor: 'co', level: 2600, threshold: 2500 },
+        update: { level: 2600, threshold: 2500 },
+      });
     });
 
     it('skips the reading upsert when the alert carries no level', async () => {
@@ -177,10 +189,31 @@ describe('AmbientService', () => {
       });
       expect(prisma.ambientDeviceReading.upsert).toHaveBeenCalledWith({
         where: { deviceId_sensor: { deviceId: 'ambient-control-01', sensor: 'sound' } },
-        create: { deviceId: 'ambient-control-01', sensor: 'sound', level: 120 },
-        update: { level: 120 },
+        create: { deviceId: 'ambient-control-01', sensor: 'sound', level: 120, threshold: null },
+        update: { level: 120, threshold: null },
       });
       expect(notificationsService.resolveOpen).toHaveBeenCalledWith('device-offline:ambient-control-01');
+    });
+
+    it('stores the threshold a reading carries, and null for a sensor with none (e.g. temperature)', async () => {
+      await service.recordHeartbeat({
+        deviceId: 'ambient-control-01',
+        readings: [
+          { sensor: 'smoke', level: 445, threshold: 2500 },
+          { sensor: 'temperature', level: 21 },
+        ],
+      });
+
+      expect(prisma.ambientDeviceReading.upsert).toHaveBeenCalledWith({
+        where: { deviceId_sensor: { deviceId: 'ambient-control-01', sensor: 'smoke' } },
+        create: { deviceId: 'ambient-control-01', sensor: 'smoke', level: 445, threshold: 2500 },
+        update: { level: 445, threshold: 2500 },
+      });
+      expect(prisma.ambientDeviceReading.upsert).toHaveBeenCalledWith({
+        where: { deviceId_sensor: { deviceId: 'ambient-control-01', sensor: 'temperature' } },
+        create: { deviceId: 'ambient-control-01', sensor: 'temperature', level: 21, threshold: null },
+        update: { level: 21, threshold: null },
+      });
     });
 
     it('does not overwrite the stored name when deviceName is omitted', async () => {

@@ -317,6 +317,12 @@ model AmbientDeviceReading {
   device    AmbientDevice @relation(fields: [deviceId], references: [id])
   sensor    String
   level     Int
+  // The device's own calibrated alert threshold for this sensor at the time of the most
+  // recent reading (see ambient-control's CALIBRATE_CO/CALIBRATE_SMOKE/CALIBRATE commands) -
+  // null for sensors with no threshold concept (temperature, humidity). Lets the UI show a
+  // raw ADC reading relative to what actually triggers an alert on this specific device,
+  // instead of a bare number with no reference point.
+  threshold Int?
   updatedAt DateTime      @updatedAt
 
   @@unique([deviceId, sensor])

@@ -17,6 +17,13 @@ export class LogAmbientAlertDto {
   @IsInt()
   level?: number | null;
 
+  // Same calibrated-threshold value described on AmbientReadingDto - included here too so an
+  // alert updates the Sensors page's displayed threshold immediately, not just the next
+  // heartbeat (up to 5 minutes later).
+  @IsOptional()
+  @IsInt()
+  threshold?: number | null;
+
   // Technical detail from the firmware (e.g. "5 loud events within 30000ms") — the service
   // composes the human-facing, sensor-specific Spanish message around this, it isn't shown
   // to staff verbatim.
