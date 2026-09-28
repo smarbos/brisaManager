@@ -68,7 +68,7 @@ interface Step4ConfirmationProps {
   reservation: GuestReservation;
   token: string;
   showAmbient: boolean;
-  stepHeadingRef: RefObject<HTMLHeadingElement>;
+  stepHeadingRef: RefObject<HTMLHeadingElement | null>;
 }
 
 export function Step4Confirmation({ reservation, token, showAmbient, stepHeadingRef }: Step4ConfirmationProps) {

@@ -35,7 +35,7 @@ const reservation: GuestReservation = {
 
 describe('Step4Confirmation', () => {
   it('shows the Pago tab by default', () => {
-    render(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef()} />);
+    render(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef<HTMLHeadingElement>()} />);
 
     expect(screen.getByRole('tab', { name: /pago/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Total a pagar')).toBeInTheDocument();
@@ -44,7 +44,7 @@ describe('Step4Confirmation', () => {
   });
 
   it('switches to another tab on click', () => {
-    render(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef()} />);
+    render(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef<HTMLHeadingElement>()} />);
 
     fireEvent.click(screen.getByRole('tab', { name: /cómo llegar/i }));
 
@@ -55,7 +55,7 @@ describe('Step4Confirmation', () => {
   });
 
   it('moves to the next tab with ArrowRight and moves focus with it', () => {
-    render(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef()} />);
+    render(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef<HTMLHeadingElement>()} />);
 
     const pagoTab = screen.getByRole('tab', { name: /pago/i });
     pagoTab.focus();
@@ -67,7 +67,7 @@ describe('Step4Confirmation', () => {
   });
 
   it('wraps from the last tab back to the first with ArrowRight', () => {
-    render(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef()} />);
+    render(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef<HTMLHeadingElement>()} />);
 
     const zonaTab = screen.getByRole('tab', { name: /la zona/i });
     zonaTab.focus();
@@ -79,12 +79,12 @@ describe('Step4Confirmation', () => {
   it('only shows the Sensores tab when showAmbient is true', () => {
     vi.spyOn(ambientApi, 'getAmbientReadings').mockResolvedValue([]);
     const { rerender } = render(
-      <Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef()} />,
+      <Step4Confirmation reservation={reservation} token="tok-1" showAmbient={false} stepHeadingRef={createRef<HTMLHeadingElement>()} />,
     );
 
     expect(screen.queryByRole('tab', { name: /sensores/i })).not.toBeInTheDocument();
 
-    rerender(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={true} stepHeadingRef={createRef()} />);
+    rerender(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={true} stepHeadingRef={createRef<HTMLHeadingElement>()} />);
 
     expect(screen.getByRole('tab', { name: /sensores/i })).toBeInTheDocument();
   });
