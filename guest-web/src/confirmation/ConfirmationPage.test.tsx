@@ -393,7 +393,7 @@ describe('ConfirmationPage', () => {
     expect(screen.getByText('ARS 45.000')).toBeInTheDocument();
   });
 
-  it('resumes at step 4 (Confirmación) once payment and deposit are both received, showing the totals breakdown', async () => {
+  it('resumes at step 4 (Confirmación) once payment and deposit are both received, showing the Pago tab by default', async () => {
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
       datesConfirmedAt: '2026-01-01T00:00:00.000Z',
@@ -412,8 +412,8 @@ describe('ConfirmationPage', () => {
     expect(screen.getByText(/pago de reserva \(30%\)/i)).toBeInTheDocument();
     expect(screen.getByText('Restante a pagar en el lugar')).toBeInTheDocument();
     expect(screen.getByText('ARS 70.000')).toBeInTheDocument();
-    // Two checkmarks: one for the reservation payment, one for the deposit
-    expect(screen.getAllByLabelText('Recibido')).toHaveLength(2);
+    // Two "Confirmado" badges: one for the reservation payment, one for the deposit
+    expect(screen.getAllByText('✓ Confirmado')).toHaveLength(2);
   });
 
   it('reveals the accepted house rules and acceptance date when "Ver reglas de la casa" is clicked', async () => {
@@ -495,9 +495,20 @@ describe('ConfirmationPage', () => {
     expect(getAmbientReadings).not.toHaveBeenCalled();
   });
 
-  it('shows ambient sensor status regardless of confirmation or dates when debug mode is on', async () => {
+  it('shows ambient sensor status when debug mode is on, even outside the stay dates, once step 4 is reached', async () => {
+    // Ambient data now lives inside step 4's Sensores tab, which only exists once both
+    // payments are received (debug mode does not bypass that) - what debug mode still bypasses
+    // is the stay-date window check, tested here with dates far in the past.
     vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true });
-    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      confirmationPaymentReceivedAt: '2026-01-02T00:00:00.000Z',
+      depositReceivedAt: '2026-01-02T00:00:00.000Z',
+      checkIn: '2020-01-01T00:00:00.000Z',
+      checkOut: '2020-01-02T00:00:00.000Z',
+    });
     vi.spyOn(ambientApi, 'getAmbientReadings').mockResolvedValue([
       { id: 'dev-1', name: 'Living room', online: true, lastSeenAt: null, readings: [] },
     ]);

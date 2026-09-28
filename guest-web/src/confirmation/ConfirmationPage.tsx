@@ -11,7 +11,7 @@ import {
 } from '../api/reservationImages';
 import { getConfig } from '../api/config';
 import { GuestReservation } from './types';
-import { AmbientStatus } from './AmbientStatus';
+import { Step4Confirmation } from './step4/Step4Confirmation';
 import { BankDetails } from './BankDetails';
 import { Alert, Badge, Button, FormField, Input, Lightbox, Textarea } from '../ui';
 import { formatDate, formatLongDate } from '../lib/date';
@@ -297,7 +297,6 @@ export function ConfirmationPage() {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
-  const remainingAtProperty = reservation.totalAmount - reservation.confirmationPaymentAmount;
 
   return (
     <PageShell>
@@ -613,59 +612,14 @@ export function ConfirmationPage() {
         )}
 
         {step === 4 && (
-          <>
-            <Badge tone="success">✓ Pago confirmado</Badge>
-            <h2
-              ref={stepHeadingRef}
-              tabIndex={-1}
-              className="mt-2 font-heading text-xl font-bold text-heading outline-none"
-            >
-              Confirmación
-            </h2>
-            <p className="mt-1 text-sm text-text-muted">{reservation.confirmationStepText}</p>
-
-            <dl className="mt-6 flex flex-col gap-3 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-text-muted">Total a pagar</dt>
-                <dd className="font-semibold text-heading">
-                  {formatMoney(reservation.currency, reservation.totalAmount)}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-text-muted">
-                  Pago de reserva
-                  {reservation.confirmationPaymentPercentage !== null &&
-                    ` (${reservation.confirmationPaymentPercentage}%)`}
-                </dt>
-                <dd className="font-semibold text-heading">
-                  {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
-                  {reservation.confirmationPaymentReceivedAt && (
-                    <span className="ml-1 text-success" aria-label="Recibido">
-                      ✓
-                    </span>
-                  )}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-text-muted">Restante a pagar en el lugar</dt>
-                <dd className="font-semibold text-heading">{formatMoney(reservation.currency, remainingAtProperty)}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-text-muted">Depósito de garantía</dt>
-                <dd className="font-semibold text-heading">
-                  {formatMoney(reservation.currency, reservation.securityDepositAmount)}
-                  {reservation.depositReceivedAt && (
-                    <span className="ml-1 text-success" aria-label="Recibido">
-                      ✓
-                    </span>
-                  )}
-                </dd>
-              </div>
-            </dl>
-          </>
+          <Step4Confirmation
+            reservation={reservation}
+            token={token!}
+            showAmbient={showAmbient}
+            stepHeadingRef={stepHeadingRef}
+          />
         )}
       </div>
-      {showAmbient && <AmbientStatus token={token!} />}
     </PageShell>
   );
 }
