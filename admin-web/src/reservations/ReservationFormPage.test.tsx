@@ -562,8 +562,7 @@ describe('ReservationFormPage', () => {
     expect(await screen.findByText(/other guest/i)).toBeInTheDocument();
   });
 
-  it('cancels the reservation after confirming, and refreshes the record', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('cancels the reservation after a second click confirms it, and refreshes the record', async () => {
     vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
       id: '1',
       guestName: 'Jane Doe',
@@ -590,13 +589,15 @@ describe('ReservationFormPage', () => {
 
     const button = await screen.findByRole('button', { name: /cancelar reserva/i });
     fireEvent.click(button);
+    expect(cancelSpy).not.toHaveBeenCalled();
 
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Jane Doe'));
+    const confirmButton = await screen.findByRole('button', { name: /¿cancelar\? tocá de nuevo/i });
+    fireEvent.click(confirmButton);
+
     await waitFor(() => expect(cancelSpy).toHaveBeenCalledWith('1'));
   });
 
-  it('does not cancel when the confirmation dialog is dismissed', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('does not cancel on a single click — it only arms the confirmation', async () => {
     vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
       id: '1',
       guestName: 'Jane Doe',

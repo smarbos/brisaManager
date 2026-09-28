@@ -17,7 +17,19 @@ import {
 } from '../api/reservations';
 import { getReservationImageBlob, listReservationImages, ReservationImage } from '../api/reservation-images';
 import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } from './types';
-import { PageContainer, PageHeader, Alert, Button, Card, FormField, Input, Lightbox, Select, Textarea } from '../ui';
+import {
+  PageContainer,
+  PageHeader,
+  Alert,
+  Button,
+  Card,
+  FormField,
+  Input,
+  Lightbox,
+  Select,
+  Textarea,
+  useTwoStepConfirm,
+} from '../ui';
 import { formatDate, formatDateTime } from '../lib/date';
 import { shortId } from '../lib/id';
 import { sourceLabel, eventTypeLabel } from '../lib/labels';
@@ -263,9 +275,6 @@ export function ReservationFormPage() {
 
   async function handleCancel() {
     if (!id || !reservationRecord) return;
-    if (!window.confirm(`¿Cancelar la reserva de ${reservationRecord.guestName}?`)) {
-      return;
-    }
     setActionError(null);
     setActionLoading('cancel');
     try {
@@ -282,6 +291,8 @@ export function ReservationFormPage() {
     if (!reservationRecord) return;
     navigator.clipboard.writeText(`${guestWebUrl}/r/${reservationRecord.confirmationToken}`);
   }
+
+  const cancelConfirm = useTwoStepConfirm(handleCancel, { armedLabel: '¿Cancelar? Tocá de nuevo' });
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -628,8 +639,13 @@ export function ReservationFormPage() {
                 Copiar link de confirmación para el huésped
               </Button>
               {reservationRecord.status !== 'CANCELLED' && reservationRecord.status !== 'COMPLETED' && (
-                <Button type="button" variant="danger" loading={actionLoading === 'cancel'} onClick={handleCancel}>
-                  Cancelar reserva
+                <Button
+                  type="button"
+                  variant="danger-outline"
+                  loading={actionLoading === 'cancel'}
+                  onClick={cancelConfirm.handleClick}
+                >
+                  {cancelConfirm.armed ? cancelConfirm.armedLabel : 'Cancelar reserva'}
                 </Button>
               )}
             </div>

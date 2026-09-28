@@ -84,7 +84,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: /pagos/i }));
+    // Deposit description lives on the default "Check-in del huésped" tab — no tab switch needed.
     await waitFor(() =>
       expect(screen.getByLabelText(/descripción del depósito de garantía/i)).toHaveValue('Deposit info'),
     );
@@ -93,7 +93,7 @@ describe('SettingsPage', () => {
     expect(screen.getByLabelText(/dirección del alojamiento/i)).toHaveValue('123 Main St');
     expect(screen.getByLabelText(/link de google maps/i)).toHaveValue('https://maps.example/labrisa');
 
-    fireEvent.click(screen.getByRole('tab', { name: /comunicaciones/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /mensajes/i }));
     expect(screen.getByLabelText(/^email inicial/i)).toHaveValue('Hi {{guestName}}, {{confirmationUrl}}');
     expect(screen.getByLabelText(/email de confirmación final/i)).toHaveValue(
       'Hi {{guestName}}, {{propertyAddress}} {{googleMapsUrl}}',
@@ -118,7 +118,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: /comunicaciones/i }));
+    fireEvent.click(await screen.findByRole('tab', { name: /mensajes/i }));
     await waitFor(() =>
       expect(screen.getByLabelText(/días antes del check-in/i)).toHaveValue(3),
     );
@@ -148,7 +148,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: /pagos/i }));
+    // Bank details and payment percentages live on the default "Check-in del huésped" tab.
     await waitFor(() => expect(screen.getByLabelText(/titular/i)).toHaveValue('Jane Doe'));
     expect(screen.getByLabelText(/cuil/i)).toHaveValue('27111111111');
     expect(screen.getByLabelText(/número de cuenta/i)).toHaveValue('1234567890');
@@ -159,10 +159,10 @@ describe('SettingsPage', () => {
     expect(screen.getByLabelText(/^depósito de garantía$/i)).toHaveValue('15%');
     expect(screen.getByLabelText(/texto del paso de confirmación final/i)).toHaveValue('All done!');
 
-    fireEvent.click(screen.getByRole('tab', { name: /reglas y contenido/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /mensajes/i }));
     expect(screen.getByLabelText(/mensaje de check-in de airbnb/i)).toHaveValue('Hi {{guestName}}, {{confirmationUrl}}');
 
-    fireEvent.click(screen.getByRole('tab', { name: /pagos/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /check-in del huésped/i }));
     fireEvent.change(screen.getByLabelText(/^banco/i), { target: { value: 'Banco Nuevo' } });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
@@ -177,7 +177,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: /pagos/i }));
+    // Fee fields live on the default "Check-in del huésped" tab — no tab switch needed.
     const confirmationInput = await screen.findByLabelText(/^pago de confirmación$/i);
     fireEvent.change(confirmationInput, { target: { value: '210000' } });
 
@@ -233,7 +233,7 @@ describe('SettingsPage', () => {
     fireEvent.click(await screen.findByRole('tab', { name: /alojamiento/i }));
     await waitFor(() => expect(screen.getByLabelText(/url de ical de booking\.com/i)).toHaveValue('https://booking.example/cal.ics'));
 
-    fireEvent.click(screen.getByRole('tab', { name: /integraciones/i }));
+    // Channel sync and Google Calendar now live inline on the "Alojamiento" tab, not a separate tab.
     fireEvent.click(screen.getByRole('button', { name: /sincronizar ahora/i }));
 
     await waitFor(() => expect(syncSpy).toHaveBeenCalled());
@@ -249,7 +249,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: /integraciones/i }));
+    fireEvent.click(await screen.findByRole('tab', { name: /alojamiento/i }));
     const connectButton = await screen.findByRole('button', { name: /conectar google calendar/i });
     fireEvent.click(connectButton);
 
@@ -273,7 +273,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: /integraciones/i }));
+    fireEvent.click(await screen.findByRole('tab', { name: /alojamiento/i }));
     expect(await screen.findByRole('button', { name: /desconectar/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /sincronizar google calendar ahora/i }));
@@ -297,7 +297,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: /integraciones/i }));
+    fireEvent.click(await screen.findByRole('tab', { name: /alojamiento/i }));
     const button = await screen.findByRole('button', { name: /forzar sync de reservas al calendario/i });
     fireEvent.click(button);
 
@@ -317,7 +317,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(await screen.findByRole('tab', { name: /integraciones/i }));
+    fireEvent.click(await screen.findByRole('tab', { name: /alojamiento/i }));
     fireEvent.click(await screen.findByRole('button', { name: /desconectar/i }));
 
     expect(disconnectSpy).not.toHaveBeenCalled();

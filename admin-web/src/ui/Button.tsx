@@ -1,6 +1,6 @@
 import { ButtonHTMLAttributes } from 'react';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger' | 'danger-outline';
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -12,7 +12,13 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 const variantClasses: Record<ButtonVariant, string> = {
   primary: 'bg-accent text-accent-fg hover:bg-accent-hover disabled:bg-border disabled:text-text-muted',
   secondary: 'bg-surface text-text border border-border hover:bg-border disabled:text-text-muted',
+  // Transparent with just a border — lower visual weight than `secondary`'s filled
+  // background, for an action that's available but not the row/panel's main draw (e.g.
+  // "Copiar link", "Probar sirena").
+  outline: 'bg-transparent text-text border border-border hover:bg-bg disabled:text-text-muted',
   danger: 'bg-danger text-white hover:opacity-90 disabled:bg-border disabled:text-text-muted',
+  'danger-outline':
+    'bg-transparent text-danger border border-danger-bg hover:bg-danger-bg disabled:text-text-muted disabled:border-border',
 };
 
 export function Button({
@@ -25,7 +31,7 @@ export function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded px-4 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${variantClasses[variant]} ${className}`}
+      className={`inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${variantClasses[variant]} ${className}`}
       disabled={disabled || loading}
       {...props}
     >

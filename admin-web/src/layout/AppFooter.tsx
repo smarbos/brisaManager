@@ -20,7 +20,7 @@ export function AppFooter() {
   }, []);
 
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 border-t border-border bg-surface px-3 py-1.5 text-xs text-text-muted">
+    <footer className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 border-t border-border bg-surface px-3 py-1.5 text-xs text-text-muted sm:left-[252px]">
       <span>
         v{__APP_VERSION__}
         {apiVersion && ` · API v${apiVersion}`}
