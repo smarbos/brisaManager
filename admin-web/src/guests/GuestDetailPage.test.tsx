@@ -68,6 +68,51 @@ describe('GuestDetailPage', () => {
     expect(reservationLink).toHaveAttribute('href', '/reservations/res-1');
   });
 
+  it("shows the guest's change history", async () => {
+    vi.spyOn(guestsApi, 'getGuest').mockResolvedValue({
+      id: 'guest-1',
+      email: 'jane@example.com',
+      name: 'Jane Doe',
+      phone: '+54911',
+      totalStays: 1,
+      lastStayAt: null,
+      unsubscribedAt: null,
+      reservations: [],
+    });
+    vi.spyOn(guestsApi, 'listGuestEvents').mockResolvedValue([
+      {
+        id: 'evt-1',
+        guestId: 'guest-1',
+        type: 'NAME_CHANGED',
+        detail: 'Nombre: "Jane" → "Jane Doe"',
+        createdAt: '2026-09-20T12:00:00.000Z',
+      },
+    ]);
+
+    renderAt('guest-1');
+
+    expect(await screen.findByText('Nombre modificado')).toBeInTheDocument();
+    expect(screen.getByText('Nombre: "Jane" → "Jane Doe"')).toBeInTheDocument();
+  });
+
+  it('shows an empty state when the guest has no change history', async () => {
+    vi.spyOn(guestsApi, 'getGuest').mockResolvedValue({
+      id: 'guest-1',
+      email: 'jane@example.com',
+      name: 'Jane Doe',
+      phone: '+54911',
+      totalStays: 1,
+      lastStayAt: null,
+      unsubscribedAt: null,
+      reservations: [],
+    });
+    vi.spyOn(guestsApi, 'listGuestEvents').mockResolvedValue([]);
+
+    renderAt('guest-1');
+
+    expect(await screen.findByText('Sin cambios registrados.')).toBeInTheDocument();
+  });
+
   it('shows a message when the guest has no reservations', async () => {
     vi.spyOn(guestsApi, 'getGuest').mockResolvedValue({
       id: 'guest-1',

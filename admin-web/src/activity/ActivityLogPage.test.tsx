@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ActivityLogPage } from './ActivityLogPage';
 import * as reservationEventsApi from '../api/reservation-events';
 import * as extensionErrorsApi from '../api/extension-errors';
+import * as guestEventsApi from '../api/guest-events';
 
 function renderPage() {
   return render(
@@ -180,5 +181,28 @@ describe('ActivityLogPage', () => {
 
     expect(await screen.findByText('No pudimos conectar con La Brisa.')).toBeInTheDocument();
     expect(listExtensionErrors).toHaveBeenCalledTimes(1);
+  });
+
+  it('switches to the guest changes tab and loads it lazily', async () => {
+    vi.spyOn(reservationEventsApi, 'listActivityLog').mockResolvedValue([]);
+    const listGuestActivityLog = vi.spyOn(guestEventsApi, 'listGuestActivityLog').mockResolvedValue([
+      {
+        id: 'evt-1',
+        guestId: 'guest-1',
+        type: 'NAME_CHANGED',
+        detail: 'Nombre: "Jane" → "Jane Doe"',
+        createdAt: '2026-09-20T12:00:00.000Z',
+        guest: { name: 'Jane Doe', email: 'jane@example.com' },
+      },
+    ]);
+
+    renderPage();
+    await screen.findByText('Todavía no hay eventos registrados.');
+    expect(listGuestActivityLog).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Cambios de huéspedes' }));
+
+    expect(await screen.findByText('Nombre modificado')).toBeInTheDocument();
+    expect(listGuestActivityLog).toHaveBeenCalledTimes(1);
   });
 });

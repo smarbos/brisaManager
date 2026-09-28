@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { listActivityLog, ActivityLogEntry } from '../api/reservation-events';
 import { ExtensionErrorsTab } from './ExtensionErrorsTab';
 import { AmbientEventsTab } from './AmbientEventsTab';
+import { GuestEventsTab } from './GuestEventsTab';
 import {
   PageContainer,
   PageHeader,
@@ -23,6 +24,7 @@ import { eventTypeLabel } from '../lib/labels';
 
 const TABS = [
   { id: 'events', label: 'Eventos de reservas' },
+  { id: 'guest-events', label: 'Cambios de huéspedes' },
   { id: 'extension-errors', label: 'Errores del plugin' },
   { id: 'ambient-events', label: 'Alertas ambientales' },
 ];
@@ -83,6 +85,10 @@ export function ActivityLogPage() {
       ) : activeTab === 'ambient-events' ? (
         <Card>
           <AmbientEventsTab />
+        </Card>
+      ) : activeTab === 'guest-events' ? (
+        <Card>
+          <GuestEventsTab />
         </Card>
       ) : (
         <>
