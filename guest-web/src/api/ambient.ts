@@ -4,6 +4,10 @@ export interface AmbientDeviceReadingEntry {
   id: string;
   sensor: string;
   level: number;
+  // The device's own calibrated alert threshold for this sensor, if it has one (sound, co,
+  // smoke do; temperature/humidity report null) - see SensoresTab for how this drives the
+  // Ideal/Alto status chip.
+  threshold: number | null;
   updatedAt: string;
 }
 
