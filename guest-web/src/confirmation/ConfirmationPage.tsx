@@ -12,6 +12,7 @@ import {
 import { getConfig } from '../api/config';
 import { GuestReservation } from './types';
 import { AmbientStatus } from './AmbientStatus';
+import { BankDetails } from './BankDetails';
 import { Alert, Badge, Button, FormField, Input, Lightbox, Textarea } from '../ui';
 import { formatDate, formatLongDate } from '../lib/date';
 
@@ -39,33 +40,6 @@ function currentStep(reservation: GuestReservation): Step {
 
 function formatMoney(currency: string, amount: number): string {
   return `${currency} ${amount.toLocaleString('es-AR')}`;
-}
-
-type CopyField = 'cbu' | 'alias';
-type CopyStatus = 'copied' | 'failed';
-
-function CopyButton({
-  value,
-  field,
-  status,
-  onCopy,
-}: {
-  value: string;
-  field: CopyField;
-  status: CopyStatus | null;
-  onCopy: (field: CopyField, value: string) => void;
-}) {
-  return (
-    <span role="status" aria-live="polite">
-      <button
-        type="button"
-        onClick={() => onCopy(field, value)}
-        className="min-h-11 shrink-0 rounded px-2 text-sm font-semibold text-accent underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-      >
-        {status === 'copied' ? '¡Copiado!' : status === 'failed' ? 'No se pudo copiar' : 'Copiar'}
-      </button>
-    </span>
-  );
 }
 
 function WaveIcon() {
@@ -140,7 +114,6 @@ export function ConfirmationPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmingDates, setConfirmingDates] = useState(false);
   const [acceptingContract, setAcceptingContract] = useState(false);
-  const [copyStatus, setCopyStatus] = useState<Record<CopyField, CopyStatus | null>>({ cbu: null, alias: null });
   const [images, setImages] = useState<ReservationImage[]>([]);
   const [paymentMessage, setPaymentMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -277,15 +250,6 @@ export function ConfirmationPage() {
     } finally {
       setSubmittingPaymentUpdate(false);
     }
-  }
-
-  function handleCopy(field: CopyField, value: string) {
-    if (!value) return;
-    navigator.clipboard
-      ?.writeText(value)
-      .then(() => setCopyStatus((prev) => ({ ...prev, [field]: 'copied' })))
-      .catch(() => setCopyStatus((prev) => ({ ...prev, [field]: 'failed' })));
-    setTimeout(() => setCopyStatus((prev) => ({ ...prev, [field]: null })), 2000);
   }
 
   if (notFound) {
@@ -530,43 +494,16 @@ export function ConfirmationPage() {
                   breakpoint: this card sits in a fixed max-w-md container regardless of
                   device, so a long value like the CBU can overlap the label on any screen
                   width, not just narrow ones. */}
-              <dl className="mt-4 flex flex-col gap-3 text-sm">
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-text-muted">Titular</dt>
-                  <dd className="font-medium text-heading">{reservation.bankAccountHolder}</dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-text-muted">CUIL</dt>
-                  <dd className="font-medium text-heading">{reservation.bankCuil}</dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-text-muted">Caja de ahorro en pesos</dt>
-                  <dd className="font-medium text-heading">{reservation.bankAccountNumber}</dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-text-muted">CBU</dt>
-                  <dd className="flex flex-wrap items-center gap-2 font-medium text-heading">
-                    <span className="break-all">{reservation.bankCbu}</span>
-                    <CopyButton value={reservation.bankCbu} field="cbu" status={copyStatus.cbu} onCopy={handleCopy} />
-                  </dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-text-muted">Alias</dt>
-                  <dd className="flex flex-wrap items-center gap-2 font-medium text-heading">
-                    <span className="break-all">{reservation.bankAlias}</span>
-                    <CopyButton
-                      value={reservation.bankAlias}
-                      field="alias"
-                      status={copyStatus.alias}
-                      onCopy={handleCopy}
-                    />
-                  </dd>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-text-muted">Banco</dt>
-                  <dd className="font-medium text-heading">{reservation.bankName}</dd>
-                </div>
-              </dl>
+              <div className="mt-4">
+                <BankDetails
+                  accountHolder={reservation.bankAccountHolder}
+                  cuil={reservation.bankCuil}
+                  accountNumber={reservation.bankAccountNumber}
+                  cbu={reservation.bankCbu}
+                  alias={reservation.bankAlias}
+                  bankName={reservation.bankName}
+                />
+              </div>
               <p className="mt-4 rounded bg-surface p-3 text-xs text-text-muted">
                 Una vez transferido, subí el comprobante acá abajo (o mandalo por WhatsApp o email) para que
                 actualicemos el estado del pago.
