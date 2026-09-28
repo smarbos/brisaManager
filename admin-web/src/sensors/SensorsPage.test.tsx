@@ -31,7 +31,7 @@ describe('SensorsPage', () => {
         name: 'Living room',
         lastSeenAt: fiveMinutesAgo.toISOString(),
         online: true,
-        readings: [{ id: 'r-1', sensor: 'sound', level: 120, updatedAt: fiveMinutesAgo.toISOString() }],
+        readings: [{ id: 'r-1', sensor: 'sound', level: 120, threshold: null, updatedAt: fiveMinutesAgo.toISOString() }],
       },
     ]);
 
@@ -41,6 +41,26 @@ describe('SensorsPage', () => {
     expect(screen.getByText('En línea')).toBeInTheDocument();
     expect(screen.getByText('hace 5 minutos')).toBeInTheDocument();
     expect(screen.getByText('Sonido: 120')).toBeInTheDocument();
+  });
+
+  it('shows a reading with a calibrated threshold as a fraction and percentage', async () => {
+    vi.spyOn(ambientDevicesApi, 'listAmbientDevices').mockResolvedValue([
+      {
+        id: 'ambient-control-living-room',
+        name: 'Living room',
+        lastSeenAt: null,
+        online: true,
+        readings: [
+          { id: 'r-1', sensor: 'co', level: 1242, threshold: 2500, updatedAt: new Date().toISOString() },
+          { id: 'r-2', sensor: 'temperature', level: 21, threshold: null, updatedAt: new Date().toISOString() },
+        ],
+      },
+    ]);
+
+    render(<SensorsPage />);
+
+    expect(await screen.findByText(/Monóxido de carbono: 1242 \/ 2500 \(50%\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Temperatura: 21/)).toBeInTheDocument();
   });
 
   it('shows a device offline, falling back to the raw deviceId when it has no name', async () => {

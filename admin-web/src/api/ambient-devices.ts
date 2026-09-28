@@ -4,6 +4,9 @@ export interface AmbientDeviceReadingEntry {
   id: string;
   sensor: string;
   level: number;
+  // The device's own calibrated alert threshold for this sensor - null for sensors with no
+  // threshold concept (temperature, humidity).
+  threshold: number | null;
   updatedAt: string;
 }
 
