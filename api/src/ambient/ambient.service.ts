@@ -73,7 +73,7 @@ export class AmbientService {
 
     // An alert also proves the device is alive - and it's a reading in its own right, so the
     // Sensors page reflects it too even between heartbeats.
-    const readings = dto.level != null ? [{ sensor: dto.sensor, level: dto.level }] : [];
+    const readings = dto.level != null ? [{ sensor: dto.sensor, level: dto.level, threshold: dto.threshold }] : [];
     await this.recordDeviceActivity(dto.deviceId, undefined, readings);
 
     // Deduped the same way CALENDAR_MISMATCH is (see NotificationsService.hasOpen): while an
@@ -137,10 +137,11 @@ export class AmbientService {
     });
 
     for (const reading of readings) {
+      const threshold = reading.threshold ?? null;
       await this.prisma.ambientDeviceReading.upsert({
         where: { deviceId_sensor: { deviceId, sensor: reading.sensor } },
-        create: { deviceId, sensor: reading.sensor, level: reading.level },
-        update: { level: reading.level },
+        create: { deviceId, sensor: reading.sensor, level: reading.level, threshold },
+        update: { level: reading.level, threshold },
       });
     }
 
