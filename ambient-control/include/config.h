@@ -54,3 +54,14 @@ constexpr unsigned long SMOKE_REALERT_INTERVAL_MS = 2UL * 60UL * 1000UL; // 2 mi
 // between reads; sampled independently from the 100ms analog-sensor loop, well above that
 // minimum with margin.
 constexpr unsigned long DHT_SAMPLE_INTERVAL_MS = 5000; // 5 seconds
+
+// "Emergency" tier: sustained, much-higher-than-alert readings from either gas sensor sound the
+// physical alert buzzer (see BUZZER_PIN in main.cpp), on top of the existing API alerts above.
+// Each sensor's emergency threshold is a multiple of that sensor's own calibrated alert
+// threshold, so it stays proportional across recalibration instead of needing its own
+// CALIBRATE_* command and persisted value.
+constexpr int EMERGENCY_THRESHOLD_MULTIPLIER = 2;
+
+// How long a reading must stay at/above the emergency threshold before the buzzer sounds - a
+// brief spike isn't an emergency, only a sustained one.
+constexpr unsigned long EMERGENCY_SUSTAINED_MS = 60UL * 1000UL; // 1 minute

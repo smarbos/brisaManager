@@ -1,7 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SensorsPage } from './SensorsPage';
 import * as ambientDevicesApi from '../api/ambient-devices';
+
+const device = {
+  id: 'ambient-control-living-room',
+  name: 'Living room',
+  lastSeenAt: null,
+  online: true,
+  readings: [],
+};
 
 describe('SensorsPage', () => {
   it('shows an empty state when no device has connected yet', async () => {
@@ -59,5 +67,30 @@ describe('SensorsPage', () => {
     render(<SensorsPage />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudieron cargar los dispositivos/i);
+  });
+
+  it('queues a buzzer test and confirms it was sent', async () => {
+    vi.spyOn(ambientDevicesApi, 'listAmbientDevices').mockResolvedValue([device]);
+    const testSpy = vi.spyOn(ambientDevicesApi, 'testAmbientDeviceBuzzer').mockResolvedValue(device);
+
+    render(<SensorsPage />);
+
+    const button = await screen.findByRole('button', { name: /probar sirena/i });
+    fireEvent.click(button);
+
+    await waitFor(() => expect(testSpy).toHaveBeenCalledWith('ambient-control-living-room'));
+    expect(await screen.findByText(/próximo heartbeat/i)).toBeInTheDocument();
+  });
+
+  it('shows an alert when queuing the buzzer test fails', async () => {
+    vi.spyOn(ambientDevicesApi, 'listAmbientDevices').mockResolvedValue([device]);
+    vi.spyOn(ambientDevicesApi, 'testAmbientDeviceBuzzer').mockRejectedValue(new Error('network error'));
+
+    render(<SensorsPage />);
+
+    const button = await screen.findByRole('button', { name: /probar sirena/i });
+    fireEvent.click(button);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no se pudo enviar el comando/i);
   });
 });

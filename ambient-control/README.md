@@ -10,6 +10,7 @@ reporting them to a server for storage and threshold notifications.
 - MQ-7 carbon monoxide sensor module (4-pin: VCC, GND, AO, DO)
 - MQ-2 smoke/combustible gas sensor module (4-pin: VCC, GND, AO, DO)
 - DHT22 temperature/humidity sensor module (3-pin: VCC, DATA, GND)
+- Active buzzer module (2-3 pin, has its own oscillator) - alert buzzer
 
 ## Wiring (sound sensor)
 
@@ -71,6 +72,20 @@ needed. Requires the "DHT sensor library" + "Adafruit Unified Sensor"
 dependencies (declared in `platformio.ini`'s `lib_deps` - PlatformIO
 fetches them automatically on build).
 
+## Wiring (alert buzzer)
+
+| Buzzer pin | ESP32 pin |
+|------------|-----------|
+| VCC/+      | 3V3       |
+| GND/-      | GND       |
+| I/O        | GPIO26    |
+
+This is an active buzzer (has its own oscillator), so it's driven with a
+plain digital HIGH/LOW - no `tone()`/PWM needed. GPIO26 is a
+general-purpose digital output pin, distinct from every other pin already
+in use. It only sounds during a declared "emergency" - see the Current
+status section below for what that means and how it clears.
+
 ## Setup
 
 The device talks to the **production** API at `api.labrisa.com.ar` over
@@ -100,7 +115,15 @@ notification (Notifications page + Activity Log's "Alertas ambientales" tab).
 The MQ-7 CO and MQ-2 smoke sensors are read the same way, alongside it,
 each with its own alert rule (see below). The DHT22 temperature/humidity
 sensor is reported passively (heartbeat only, no alerting) on its own
-slower timer.
+slower timer. On top of its own immediate alert, each gas sensor also has
+an "emergency" tier - a sustained, much-higher-than-alert reading - that
+sounds the physical alert buzzer (GPIO26) for as long as the emergency
+persists, auto-clearing once the reading drops back down. The buzzer can
+also be tested on demand - either by sending `TEST_BUZZER` over Serial, or
+remotely, by clicking "Probar sirena" for the device on the admin web's
+Sensores page (queued on the server, delivered on the device's next
+heartbeat - see the API's `AmbientService.recordHeartbeat` - so it can take
+up to `HEARTBEAT_INTERVAL_MS`, 5 minutes, to actually beep).
 
 The sound module is confirmed analog: OUT is a peak-detector envelope that
 spikes on a loud sound and decays back to ~0. It has no usable digital
@@ -115,10 +138,13 @@ ALERT,millis,5 loud events within 30000ms   <- repeat-noise rule triggered, POST
 CO,millis,analog                     <- CO sample, every 100ms
 CO_HIGH,millis,analog                <- CO reading just crossed coAlertThreshold
 CO_ALERT,millis,CO level sustained...  <- stayed elevated for CO_SUSTAINED_MS, POSTed to the API
+CO_EMERGENCY,millis,EMERGENCIA: CO level sustained...  <- crossed the (higher) emergency threshold for a full minute; buzzer sounds, POSTed to the API
 SMOKE,millis,analog                  <- smoke sample, every 100ms
 SMOKE_ALERT,millis,Smoke level at/above...  <- crossed smokeAlertThreshold, POSTed to the API
+SMOKE_EMERGENCY,millis,EMERGENCIA: smoke level sustained...  <- crossed the (higher) emergency threshold for a full minute; buzzer sounds, POSTed to the API
 TEMPERATURE,celsius                  <- DHT22 sample, every 5s (only on a successful read)
 HUMIDITY,percent                     <- DHT22 sample, every 5s (only on a successful read)
+TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or admin page)
 ```
 
 - `loudThreshold` marks a sample as "loud" - starts at `DEFAULT_LOUD_THRESHOLD`
@@ -171,6 +197,30 @@ HUMIDITY,percent                     <- DHT22 sample, every 5s (only on a succes
   (or drops later), `maintainWiFi()` (called every `loop()`) retries
   `WiFi.begin()` every `WIFI_RETRY_INTERVAL_MS` (10s) until it's back -
   covers a router reboot or a temporary outage without a manual reset.
+- An "emergency" is a sustained, much-higher-than-alert reading from
+  either gas sensor: at/above `smokeAlertThreshold` (or `coAlertThreshold`)
+  times `EMERGENCY_THRESHOLD_MULTIPLIER` (2x), continuously, for
+  `EMERGENCY_SUSTAINED_MS` (1 minute) - independent of, and in addition to,
+  that sensor's own immediate/sustained alert above. The emergency
+  threshold is derived from the sensor's own calibrated alert threshold, so
+  it stays proportional across recalibration; there's no separate
+  `CALIBRATE_*_EMERGENCY` command. The physical buzzer (GPIO26) sounds for
+  as long as either sensor is in its emergency state, and auto-clears the
+  instant both drop back below their emergency thresholds - no
+  acknowledgment/reset needed. Each emergency also fires its own
+  `sendAmbientAlert` once, on the rising edge into the emergency state
+  (not repeated every loop, since the buzzer itself is the continuous
+  local signal and the existing alert above already re-confirms
+  periodically over the API).
+- `TEST_BUZZER` beeps the buzzer for exactly one second, independent of any
+  real emergency - send it over Serial, or trigger it remotely from the
+  admin web's Sensores page ("Probar sirena" button). The remote trigger
+  works by queuing the command server-side (`AmbientDevice.pendingCommand`)
+  and piggybacking it onto the device's next heartbeat response - there's
+  no separate inbound channel to the device - so it can take up to
+  `HEARTBEAT_INTERVAL_MS` (5 minutes) to actually beep, and delivery is
+  best-effort (if the response never reaches the device, the command is
+  silently lost; just click the button again).
 
 ### Heartbeat / device offline detection
 
@@ -196,7 +246,7 @@ arrives. Each device's last-seen time and latest readings are visible on
 the admin UI's "Sensores" page.
 
 All five sensors this device is expected to carry (sound, CO, smoke,
-temperature, humidity) are now implemented.
+temperature, humidity) are now implemented, along with the alert buzzer.
 
 Note on MQ-7/MQ-2 accuracy: neither breakout exposes heater control, so
 readings are a relative trend rather than a datasheet-calibrated ppm
