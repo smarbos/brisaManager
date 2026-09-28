@@ -39,6 +39,8 @@ describe('Step4Confirmation', () => {
 
     expect(screen.getByRole('tab', { name: /pago/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Total a pagar')).toBeInTheDocument();
+    expect(document.querySelector('#panel-pago')).toBeVisible();
+    expect(document.querySelector('#panel-llegar')).not.toBeVisible();
   });
 
   it('switches to another tab on click', () => {
@@ -48,6 +50,8 @@ describe('Step4Confirmation', () => {
 
     expect(screen.getByRole('tab', { name: /cómo llegar/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Formosa 259, Depto L')).toBeInTheDocument();
+    expect(document.querySelector('#panel-llegar')).toBeVisible();
+    expect(document.querySelector('#panel-pago')).not.toBeVisible();
   });
 
   it('moves to the next tab with ArrowRight and moves focus with it', () => {
