@@ -32,6 +32,34 @@ describe('ReservationFormPage', () => {
     );
   });
 
+  it('accepts a decimal total amount (dollars and cents)', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // step="0.01" is what lets the browser's native number-input validation accept cents
+    // instead of rejecting anything but a whole number (the bug this test guards against).
+    expect(screen.getByLabelText(/monto total/i)).toHaveAttribute('step', '0.01');
+
+    fireEvent.change(screen.getByLabelText(/nombre del huésped/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/email del huésped/i), { target: { value: 'jane@example.com' } });
+    fireEvent.change(screen.getByLabelText(/teléfono del huésped/i), { target: { value: '+5491100000000' } });
+    fireEvent.change(screen.getByLabelText(/check-in/i), { target: { value: '2026-01-10' } });
+    fireEvent.change(screen.getByLabelText(/check-out/i), { target: { value: '2026-01-15' } });
+    fireEvent.change(screen.getByLabelText(/monto total/i), { target: { value: '145.80' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() =>
+      expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ totalAmount: 145.8 })),
+    );
+  });
+
   it('blocks saving and shows an inline error for an invalid guest phone', async () => {
     const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
 
