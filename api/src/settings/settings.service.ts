@@ -23,7 +23,7 @@ const DEFAULT_INITIAL_EMAIL_TEMPLATE =
   'Hola {{guestName}},<br><br>Por favor confirmá tu reserva y completá unos pasos rápidos:<br><a href="{{confirmationUrl}}">{{confirmationUrl}}</a>';
 
 const DEFAULT_FINAL_EMAIL_TEMPLATE =
-  'Hola {{guestName}},<br><br>Tu reserva en La Brisa de Mar del Plata está completamente confirmada. ¡Te esperamos!<br><br>Dirección: {{propertyAddress}} — <a href="{{googleMapsUrl}}">Ver en Google Maps</a>';
+  'Hola {{guestName}},<br><br>Tu reserva en La Brisa de Mar del Plata está completamente confirmada. ¡Te esperamos!<br><br>Dirección: {{propertyAddress}} — <a href="{{googleMapsUrl}}">Ver en Google Maps</a><br><br>Para más información sobre tu reserva y el departamento, <a href="{{confirmationUrl}}">hacé clic acá</a>.';
 
 const DEFAULT_CANCELLATION_EMAIL_TEMPLATE =
   'Hola {{guestName}},<br><br>Te confirmamos que tu reserva del {{checkIn}} al {{checkOut}} en La Brisa de Mar del Plata fue cancelada. Si creés que esto es un error, por favor contactanos.';

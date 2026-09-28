@@ -59,14 +59,17 @@ export class EmailService {
     }
   }
 
-  // guestName/propertyAddress/googleMapsUrl are the only variables this template supports —
-  // both come from Settings, fetched here rather than passed in by the caller.
-  async sendFinalConfirmationEmail(to: string, guestName: string): Promise<void> {
+  // guestName/propertyAddress/googleMapsUrl/confirmationUrl are the only variables this
+  // template supports. propertyAddress/googleMapsUrl come from Settings, fetched here rather
+  // than passed in by the caller; confirmationUrl is the guest's own check-in page link, same
+  // one used in the initial email, so they can get back to it after the stay is confirmed.
+  async sendFinalConfirmationEmail(to: string, guestName: string, confirmationUrl: string): Promise<void> {
     const settings = await this.settingsService.get();
     const html = renderTemplate(settings.finalEmailTemplate, {
       guestName,
       propertyAddress: settings.propertyAddress,
       googleMapsUrl: settings.googleMapsUrl,
+      confirmationUrl,
     });
 
     const { error } = await this.resend.emails.send({

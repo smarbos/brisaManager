@@ -46,9 +46,11 @@ export class ReservationConfirmationService {
   // ReservationsService.sendInitialEmail()'s same contract.
   async sendFinalEmail(reservation: Reservation): Promise<boolean> {
     try {
+      const confirmationUrl = `${process.env.GUEST_WEB_ORIGIN}/r/${reservation.confirmationToken}`;
       await this.emailService.sendFinalConfirmationEmail(
         reservation.guestEmail as string,
         reservation.guestName,
+        confirmationUrl,
       );
       await this.prisma.reservation.update({
         where: { id: reservation.id },

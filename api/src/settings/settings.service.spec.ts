@@ -42,6 +42,7 @@ describe('SettingsService', () => {
     expect(result.initialEmailTemplate).toContain('{{confirmationUrl}}');
     expect(result.finalEmailTemplate).toContain('{{propertyAddress}}');
     expect(result.finalEmailTemplate).toContain('{{googleMapsUrl}}');
+    expect(result.finalEmailTemplate).toContain('{{confirmationUrl}}');
     expect(result.cancellationEmailTemplate).toContain('{{checkIn}}');
     expect(result.cancellationEmailTemplate).toContain('{{checkOut}}');
     expect(result.propertyAddress).toBeTruthy();

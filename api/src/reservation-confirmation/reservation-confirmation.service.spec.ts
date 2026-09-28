@@ -20,6 +20,7 @@ describe('ReservationConfirmationService', () => {
     id: 'res-1',
     guestName: 'Jane Doe',
     guestEmail: 'jane@example.com',
+    confirmationToken: 'tok-1',
     status: 'PENDING',
     datesConfirmedAt: null,
     contractAcceptedAt: null,
@@ -99,6 +100,7 @@ describe('ReservationConfirmationService', () => {
     expect(emailService.sendFinalConfirmationEmail).toHaveBeenCalledWith(
       'jane@example.com',
       'Jane Doe',
+      expect.stringContaining('tok-1'),
     );
     expect(eventsService.record).toHaveBeenCalledWith(
       'res-1',
@@ -138,7 +140,11 @@ describe('ReservationConfirmationService', () => {
 
       expect(sent).toBe(true);
       expect(reservation).toBe(confirmed);
-      expect(emailService.sendFinalConfirmationEmail).toHaveBeenCalledWith('jane@example.com', 'Jane Doe');
+      expect(emailService.sendFinalConfirmationEmail).toHaveBeenCalledWith(
+        'jane@example.com',
+        'Jane Doe',
+        expect.stringContaining('tok-1'),
+      );
       expect(prisma.reservation.update).toHaveBeenCalledWith({
         where: { id: 'res-1' },
         data: { finalConfirmationEmailSentAt: expect.any(Date) },
