@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { listAmbientDevices, AmbientDeviceEntry } from '../api/ambient-devices';
+import { listAmbientDevices, testAmbientDeviceBuzzer, AmbientDeviceEntry } from '../api/ambient-devices';
 import {
   PageContainer,
   PageHeader,
   Alert,
   Badge,
+  Button,
   Card,
   EmptyState,
   LoadingState,
@@ -30,7 +31,9 @@ function readingsSummary(device: AmbientDeviceEntry): string {
 export function SensorsPage() {
   const [devices, setDevices] = useState<AmbientDeviceEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [testingId, setTestingId] = useState<string | null>(null);
 
   function load() {
     listAmbientDevices()
@@ -48,6 +51,22 @@ export function SensorsPage() {
     return () => clearInterval(interval);
   }, []);
 
+  async function handleTestBuzzer(deviceId: string) {
+    setTestingId(deviceId);
+    setError(null);
+    setNotice(null);
+    try {
+      await testAmbientDeviceBuzzer(deviceId);
+      // The command is only delivered on the device's next heartbeat, not applied instantly -
+      // see AmbientService.recordHeartbeat.
+      setNotice('Comando enviado. Sonará en el próximo heartbeat del dispositivo (hasta 5 minutos).');
+    } catch {
+      setError('No se pudo enviar el comando. Por favor, intentá de nuevo.');
+    } finally {
+      setTestingId(null);
+    }
+  }
+
   return (
     <PageContainer>
       <PageHeader
@@ -55,6 +74,7 @@ export function SensorsPage() {
         subtitle="Dispositivos ambient-control: última conexión y última lectura de cada sensor."
       />
       {error && <Alert>{error}</Alert>}
+      {notice && <Alert tone="success">{notice}</Alert>}
       <Card>
         {loading ? (
           <LoadingState />
@@ -68,6 +88,7 @@ export function SensorsPage() {
                 <th className={thClass}>Estado</th>
                 <th className={thClass}>Última conexión</th>
                 <th className={thClass}>Últimas lecturas</th>
+                <th className={thClass}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -85,6 +106,16 @@ export function SensorsPage() {
                     )}
                   </td>
                   <td className={tdClass}>{readingsSummary(device)}</td>
+                  <td className={tdClass}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={testingId === device.id}
+                      onClick={() => handleTestBuzzer(device.id)}
+                    >
+                      Probar sirena
+                    </Button>
+                  </td>
                 </tr>
               ))}
             </tbody>

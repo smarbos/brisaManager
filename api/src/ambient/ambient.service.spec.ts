@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
   AmbientService,
@@ -12,7 +13,7 @@ describe('AmbientService', () => {
   let service: AmbientService;
   let prisma: {
     ambientEvent: { create: jest.Mock; findMany: jest.Mock };
-    ambientDevice: { upsert: jest.Mock; findMany: jest.Mock };
+    ambientDevice: { upsert: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     ambientDeviceReading: { upsert: jest.Mock };
   };
   let notificationsService: { hasOpen: jest.Mock; create: jest.Mock; resolveOpen: jest.Mock };
@@ -20,7 +21,12 @@ describe('AmbientService', () => {
   beforeEach(async () => {
     prisma = {
       ambientEvent: { create: jest.fn(), findMany: jest.fn() },
-      ambientDevice: { upsert: jest.fn().mockResolvedValue({ id: 'ambient-control-01' }), findMany: jest.fn() },
+      ambientDevice: {
+        upsert: jest.fn().mockResolvedValue({ id: 'ambient-control-01', pendingCommand: null }),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
       ambientDeviceReading: { upsert: jest.fn() },
     };
     notificationsService = {
@@ -185,6 +191,47 @@ describe('AmbientService', () => {
         create: { id: 'ambient-control-01', name: '', lastSeenAt: expect.any(Date) },
         update: { lastSeenAt: expect.any(Date) },
       });
+    });
+
+    it('responds with a null pendingCommand and touches nothing else when none is queued', async () => {
+      prisma.ambientDevice.upsert.mockResolvedValue({ id: 'ambient-control-01', pendingCommand: null });
+
+      const result = await service.recordHeartbeat({ deviceId: 'ambient-control-01', readings: [] });
+
+      expect(result).toEqual({ pendingCommand: null });
+      expect(prisma.ambientDevice.update).not.toHaveBeenCalled();
+    });
+
+    it('hands back a queued command and clears it so it is only delivered once', async () => {
+      prisma.ambientDevice.upsert.mockResolvedValue({ id: 'ambient-control-01', pendingCommand: 'TEST_BUZZER' });
+
+      const result = await service.recordHeartbeat({ deviceId: 'ambient-control-01', readings: [] });
+
+      expect(result).toEqual({ pendingCommand: 'TEST_BUZZER' });
+      expect(prisma.ambientDevice.update).toHaveBeenCalledWith({
+        where: { id: 'ambient-control-01' },
+        data: { pendingCommand: null },
+      });
+    });
+  });
+
+  describe('queueTestBuzzer', () => {
+    it('sets pendingCommand to TEST_BUZZER for an existing device', async () => {
+      prisma.ambientDevice.findUnique.mockResolvedValue({ id: 'ambient-control-01' });
+
+      await service.queueTestBuzzer('ambient-control-01');
+
+      expect(prisma.ambientDevice.update).toHaveBeenCalledWith({
+        where: { id: 'ambient-control-01' },
+        data: { pendingCommand: 'TEST_BUZZER' },
+      });
+    });
+
+    it('throws NotFoundException for a device that does not exist', async () => {
+      prisma.ambientDevice.findUnique.mockResolvedValue(null);
+
+      await expect(service.queueTestBuzzer('does-not-exist')).rejects.toThrow(NotFoundException);
+      expect(prisma.ambientDevice.update).not.toHaveBeenCalled();
     });
   });
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LogAmbientAlertDto } from './dto/log-ambient-alert.dto';
@@ -92,7 +92,38 @@ export class AmbientService {
   }
 
   async recordHeartbeat(dto: LogAmbientHeartbeatDto) {
-    return this.recordDeviceActivity(dto.deviceId, dto.deviceName, dto.readings);
+    const device = await this.recordDeviceActivity(dto.deviceId, dto.deviceName, dto.readings);
+
+    // Deliver any queued command (see queueTestBuzzer) by piggybacking it onto this response -
+    // the device has no other inbound channel. Cleared here, not in recordDeviceActivity (which
+    // recordAlert also calls), so a coincidental alert between now and the next heartbeat can't
+    // consume the command before the device ever sees it. Best-effort/at-most-once: if this
+    // response never reaches the device, the command is lost silently.
+    if (device.pendingCommand == null) {
+      return { pendingCommand: null };
+    }
+
+    const pendingCommand = device.pendingCommand;
+    await this.prisma.ambientDevice.update({
+      where: { id: dto.deviceId },
+      data: { pendingCommand: null },
+    });
+
+    return { pendingCommand };
+  }
+
+  // Queues a one-shot command for a device, delivered on its next heartbeat (see
+  // recordHeartbeat). "TEST_BUZZER" is the only command that exists today.
+  async queueTestBuzzer(deviceId: string) {
+    const device = await this.prisma.ambientDevice.findUnique({ where: { id: deviceId } });
+    if (!device) {
+      throw new NotFoundException(`Ambient device ${deviceId} not found`);
+    }
+
+    return this.prisma.ambientDevice.update({
+      where: { id: deviceId },
+      data: { pendingCommand: 'TEST_BUZZER' },
+    });
   }
 
   // Shared by recordAlert and recordHeartbeat - anything a device sends proves it's alive and

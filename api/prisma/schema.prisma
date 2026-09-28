@@ -300,6 +300,12 @@ model AmbientDevice {
   createdAt  DateTime               @default(now())
   updatedAt  DateTime               @updatedAt
   readings   AmbientDeviceReading[]
+
+  // A one-shot command queued for this device (e.g. "TEST_BUZZER"), delivered by piggybacking
+  // it onto the response of the device's next heartbeat POST - the device has no other inbound
+  // channel. Cleared by AmbientService.recordHeartbeat the moment it's handed back, so delivery
+  // is best-effort/at-most-once, not a durable queue.
+  pendingCommand String?
 }
 
 // The latest reading for one (device, sensor) pair - overwritten on every heartbeat/alert

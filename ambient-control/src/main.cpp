@@ -34,6 +34,10 @@ const int SMOKE_SENSOR_PIN = 32; // ADC1, input-only, distinct from GPIO34 (soun
 const int DHT_PIN = 27; // general-purpose digital pin, avoids strapping/flash pins
 DHT dht(DHT_PIN, DHT22);
 
+// Active buzzer (2-3 pin module with its own oscillator) - simple HIGH/LOW drive, no tone()/PWM
+// needed. Only sounds during a declared emergency (see updateBuzzer()), not for every alert.
+const int BUZZER_PIN = 26; // general-purpose digital output, avoids strapping/flash pins
+
 const unsigned long SAMPLE_INTERVAL_MS = 100;
 unsigned long lastSampleAt = 0;
 unsigned long bootAt = 0;
@@ -102,6 +106,15 @@ int lastSmokeValue = 0;
 bool wasSmokeHigh = false;
 unsigned long lastSmokeAlertAt = 0; // 0 means "never alerted yet"
 
+// Emergency tier (see checkSmokeEmergency/checkCoEmergency) - independent from the "since" state
+// above, since crossing the normal alert threshold and crossing the (higher) emergency threshold
+// are different events that don't necessarily start at the same moment.
+unsigned long smokeEmergencyHighSince = 0; // 0 means "not currently above the emergency threshold"
+bool smokeEmergencyActive = false;
+
+unsigned long coEmergencyHighSince = 0; // 0 means "not currently above the emergency threshold"
+bool coEmergencyActive = false;
+
 // No alerting/calibration for these - passive reporting only. Kept at their last known-good
 // value across a failed read (DHT22 occasionally times out or fails its checksum), rather than
 // reporting a wrong/zero value.
@@ -161,6 +174,9 @@ void setup() {
   pinMode(CO_SENSOR_PIN, INPUT);
   pinMode(SMOKE_SENSOR_PIN, INPUT);
   dht.begin();
+
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
 
   secureClient.setCACert(ROOT_CA_ISRG_X1);
 
@@ -276,6 +292,10 @@ void runSmokeCalibration() {
   wasSmokeHigh = false;
 }
 
+// Defined further down (after updateBuzzer(), which it calls) - forward-declared here so
+// checkSerialCommand() can dispatch to it despite appearing earlier in the file.
+void testBuzzer();
+
 void checkSerialCommand() {
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
@@ -286,6 +306,8 @@ void checkSerialCommand() {
       runCoCalibration();
     } else if (command == "CALIBRATE_SMOKE") {
       runSmokeCalibration();
+    } else if (command == "TEST_BUZZER") {
+      testBuzzer();
     }
   }
 }
@@ -343,6 +365,18 @@ void sendHeartbeat(int currentSoundLevel, int currentCoLevel, int currentSmokeLe
   Serial.print(url);
   Serial.print(" -> ");
   Serial.println(statusCode);
+
+  // The heartbeat response carries any command the admin page queued for this device (see
+  // AmbientService.recordHeartbeat on the API side) - "TEST_BUZZER" is the only one that
+  // exists today, so a plain substring check is enough; a real JSON parser would only be
+  // worth adding once there's more than one possible command.
+  if (statusCode == 200) {
+    String response = http.getString();
+    if (response.indexOf("TEST_BUZZER") >= 0) {
+      testBuzzer();
+    }
+  }
+
   http.end();
 }
 
@@ -450,6 +484,96 @@ void checkSmokeAlert(unsigned long now, int smokeValue) {
   lastSmokeAlertAt = now;
 }
 
+// "Emergency" tier on top of the normal smoke alert above: requires a much higher reading
+// (smokeAlertThreshold * EMERGENCY_THRESHOLD_MULTIPLIER) sustained for EMERGENCY_SUSTAINED_MS,
+// not just an instantaneous crossing. Drives the physical buzzer (see updateBuzzer()) and fires
+// its own API alert once, on the rising edge into the emergency state - the existing immediate
+// smoke alert above already keeps staff informed while it stays elevated, so this only needs to
+// announce the emergency starting, not repeat it every loop.
+void checkSmokeEmergency(unsigned long now, int smokeValue) {
+  int emergencyThreshold = smokeAlertThreshold * EMERGENCY_THRESHOLD_MULTIPLIER;
+  bool isEmergencyHigh = smokeValue >= emergencyThreshold;
+
+  if (!isEmergencyHigh) {
+    smokeEmergencyHighSince = 0;
+    smokeEmergencyActive = false;
+    return;
+  }
+
+  if (smokeEmergencyHighSince == 0) {
+    smokeEmergencyHighSince = now;
+  }
+
+  unsigned long highDuration = now - smokeEmergencyHighSince;
+  bool wasActive = smokeEmergencyActive;
+  smokeEmergencyActive = highDuration >= EMERGENCY_SUSTAINED_MS;
+
+  if (smokeEmergencyActive && !wasActive) {
+    String detail = "EMERGENCIA: smoke level sustained at/above " + String(emergencyThreshold) + " for " +
+                    String(highDuration) + "ms (current: " + String(smokeValue) + ")";
+
+    Serial.print("SMOKE_EMERGENCY,");
+    Serial.print(now);
+    Serial.print(",");
+    Serial.println(detail);
+
+    sendAmbientAlert("smoke", smokeValue, detail);
+  }
+}
+
+// Same shape as checkSmokeEmergency, for CO - independent from checkCoAlert's own "since" state
+// (coHighSince), since the normal alert threshold and the (higher) emergency threshold are
+// crossed at different moments.
+void checkCoEmergency(unsigned long now, int coValue) {
+  int emergencyThreshold = coAlertThreshold * EMERGENCY_THRESHOLD_MULTIPLIER;
+  bool isEmergencyHigh = coValue >= emergencyThreshold;
+
+  if (!isEmergencyHigh) {
+    coEmergencyHighSince = 0;
+    coEmergencyActive = false;
+    return;
+  }
+
+  if (coEmergencyHighSince == 0) {
+    coEmergencyHighSince = now;
+  }
+
+  unsigned long highDuration = now - coEmergencyHighSince;
+  bool wasActive = coEmergencyActive;
+  coEmergencyActive = highDuration >= EMERGENCY_SUSTAINED_MS;
+
+  if (coEmergencyActive && !wasActive) {
+    String detail = "EMERGENCIA: CO level sustained at/above " + String(emergencyThreshold) + " for " +
+                    String(highDuration) + "ms (current: " + String(coValue) + ")";
+
+    Serial.print("CO_EMERGENCY,");
+    Serial.print(now);
+    Serial.print(",");
+    Serial.println(detail);
+
+    sendAmbientAlert("co", coValue, detail);
+  }
+}
+
+// Sounds the physical buzzer for as long as either gas sensor is in its emergency state -
+// auto-clears the instant both drop back below their emergency thresholds, no separate
+// acknowledgment/reset mechanism needed.
+void updateBuzzer() {
+  digitalWrite(BUZZER_PIN, (smokeEmergencyActive || coEmergencyActive) ? HIGH : LOW);
+}
+
+// Triggered by sending "TEST_BUZZER" over Serial, or remotely from the admin page (delivered
+// through the next heartbeat response - see sendHeartbeat). Beeps for exactly one second so
+// staff can confirm the buzzer itself works without needing a real smoke/CO emergency. Restores
+// the pin via updateBuzzer() afterward, rather than forcing it LOW, so testing during an actual
+// emergency doesn't silence the real alarm.
+void testBuzzer() {
+  Serial.println("TEST_BUZZER: beeping for 1 second.");
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(1000);
+  updateBuzzer();
+}
+
 // Passive reporting only, no alerting - the DHT22 gets its own slower, independent sample
 // timer (DHT_SAMPLE_INTERVAL_MS) rather than the 100ms loop the analog sensors use, since the
 // sensor's datasheet requires at least 2s between reads. A failed read (occasional timing
@@ -527,6 +651,7 @@ void loop() {
 
   if (now - bootAt >= CO_WARMUP_MS) {
     checkCoAlert(now, coValue);
+    checkCoEmergency(now, coValue);
   }
 
   int smokeValue = analogRead(SMOKE_SENSOR_PIN);
@@ -539,5 +664,8 @@ void loop() {
 
   if (now - bootAt >= SMOKE_WARMUP_MS) {
     checkSmokeAlert(now, smokeValue);
+    checkSmokeEmergency(now, smokeValue);
   }
+
+  updateBuzzer();
 }
