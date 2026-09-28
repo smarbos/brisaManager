@@ -13,6 +13,7 @@ If no port is given, auto-detects the first USB serial device that looks
 like an ESP32 dev board's USB-UART bridge (CP210x/CH340/FTDI).
 """
 import argparse
+import os
 import re
 import sys
 import time
@@ -21,7 +22,19 @@ try:
     import serial
     from serial.tools import list_ports
 except ImportError:
-    sys.exit("pyserial is required: pip install pyserial")
+    # This host may have no pip at all (common on minimal/managed Linux setups), but
+    # PlatformIO bundles pyserial for esptool's own use - and anyone running this script
+    # already has PlatformIO installed, to flash the firmware in the first place. Re-exec
+    # with its Python before giving up.
+    # Compare by path, not by realpath() - PlatformIO's venv identifies itself by the
+    # directory its interpreter is invoked FROM (a pyvenv.cfg next to it), not by what that
+    # interpreter binary resolves to; a venv built on a symlinked system Python resolves to
+    # the exact same realpath as the system Python itself, which would make this comparison
+    # always look "equal" and never re-exec.
+    platformio_python = os.path.expanduser("~/.platformio/penv/bin/python3")
+    if os.path.exists(platformio_python) and os.path.abspath(sys.executable) != os.path.abspath(platformio_python):
+        os.execv(platformio_python, [platformio_python, __file__, *sys.argv[1:]])
+    sys.exit("pyserial is required: pip install pyserial (or install PlatformIO, which bundles it)")
 
 # Printed once loop() is actively running (see main.cpp's per-sample CSV
 # line) - used to detect that the firmware is ready for a Serial command,
