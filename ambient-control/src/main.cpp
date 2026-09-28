@@ -314,8 +314,12 @@ void checkSerialCommand() {
 
 // Only called for an actual ALERT (repeated loud noise, sustained elevated CO, or a smoke
 // threshold crossing), not every raw sample - keeps server/notification traffic to genuine
-// incidents.
-void sendAmbientAlert(const String& sensor, int level, const String& detail) {
+// incidents. `threshold` is this sensor's own calibrated alert threshold (loudThreshold,
+// coAlertThreshold, or smokeAlertThreshold) at the moment of the alert - reported alongside
+// the raw level so the Sensors page can show the reading relative to what actually triggered
+// it, instead of a bare uncalibrated number. Always the sensor's normal alert threshold, even
+// for an emergency-tier alert, so "threshold" means the same thing everywhere it's shown.
+void sendAmbientAlert(const String& sensor, int level, int threshold, const String& detail) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("Skipping alert POST: WiFi not connected.");
     return;
@@ -328,7 +332,7 @@ void sendAmbientAlert(const String& sensor, int level, const String& detail) {
   http.addHeader("Authorization", String("Bearer ") + AMBIENT_API_KEY);
 
   String body = String("{\"deviceId\":\"") + DEVICE_ID + "\",\"sensor\":\"" + sensor + "\",\"level\":" + level +
-                ",\"detail\":\"" + detail + "\"}";
+                ",\"threshold\":" + threshold + ",\"detail\":\"" + detail + "\"}";
 
   int statusCode = http.POST(body);
   Serial.print("POST ");
@@ -353,10 +357,18 @@ void sendHeartbeat(int currentSoundLevel, int currentCoLevel, int currentSmokeLe
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", String("Bearer ") + AMBIENT_API_KEY);
 
+  // sound/co/smoke each report their own current calibrated alert threshold (loudThreshold,
+  // coAlertThreshold, smokeAlertThreshold - all globals, read directly rather than threaded
+  // through as parameters) alongside the raw level - see sendAmbientAlert's comment for why.
+  // temperature/humidity have no threshold concept, so that key is simply omitted for them;
+  // AmbientReadingDto treats it as optional either way.
   String body = String("{\"deviceId\":\"") + DEVICE_ID + "\",\"deviceName\":\"" + DEVICE_NAME +
                 "\",\"readings\":[{\"sensor\":\"sound\",\"level\":" + currentSoundLevel +
+                ",\"threshold\":" + loudThreshold +
                 "},{\"sensor\":\"co\",\"level\":" + currentCoLevel +
+                ",\"threshold\":" + coAlertThreshold +
                 "},{\"sensor\":\"smoke\",\"level\":" + currentSmokeLevel +
+                ",\"threshold\":" + smokeAlertThreshold +
                 "},{\"sensor\":\"temperature\",\"level\":" + currentTemperature +
                 "},{\"sensor\":\"humidity\",\"level\":" + currentHumidity + "}]}";
 
@@ -404,7 +416,7 @@ void recordLoudEvent(unsigned long now, int analogValue) {
       Serial.print(",");
       Serial.println(detail);
 
-      sendAmbientAlert("sound", analogValue, detail);
+      sendAmbientAlert("sound", analogValue, loudThreshold, detail);
     }
   }
 }
@@ -449,7 +461,7 @@ void checkCoAlert(unsigned long now, int coValue) {
   Serial.print(",");
   Serial.println(detail);
 
-  sendAmbientAlert("co", coValue, detail);
+  sendAmbientAlert("co", coValue, coAlertThreshold, detail);
   lastCoAlertAt = now;
 }
 
@@ -480,7 +492,7 @@ void checkSmokeAlert(unsigned long now, int smokeValue) {
   Serial.print(",");
   Serial.println(detail);
 
-  sendAmbientAlert("smoke", smokeValue, detail);
+  sendAmbientAlert("smoke", smokeValue, smokeAlertThreshold, detail);
   lastSmokeAlertAt = now;
 }
 
@@ -517,7 +529,7 @@ void checkSmokeEmergency(unsigned long now, int smokeValue) {
     Serial.print(",");
     Serial.println(detail);
 
-    sendAmbientAlert("smoke", smokeValue, detail);
+    sendAmbientAlert("smoke", smokeValue, smokeAlertThreshold, detail);
   }
 }
 
@@ -551,7 +563,7 @@ void checkCoEmergency(unsigned long now, int coValue) {
     Serial.print(",");
     Serial.println(detail);
 
-    sendAmbientAlert("co", coValue, detail);
+    sendAmbientAlert("co", coValue, coAlertThreshold, detail);
   }
 }
 

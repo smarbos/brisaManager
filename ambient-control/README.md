@@ -221,6 +221,14 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
   `HEARTBEAT_INTERVAL_MS` (5 minutes) to actually beep, and delivery is
   best-effort (if the response never reaches the device, the command is
   silently lost; just click the button again).
+- Every heartbeat and alert also reports the sensor's own current calibrated
+  threshold (`loudThreshold`/`coAlertThreshold`/`smokeAlertThreshold`)
+  alongside its raw reading - temperature/humidity have none, so that field
+  is simply omitted for them. Raw readings are uncalibrated ADC counts
+  (0-4095) with no real-world unit (see "Note on MQ-7/MQ-2 accuracy"
+  above), so the Sensors page shows the reading against this threshold
+  instead - e.g. "1242 / 2500 (50%)" - rather than a bare number with
+  nothing to compare it to.
 
 ### Heartbeat / device offline detection
 
