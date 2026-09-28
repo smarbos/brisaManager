@@ -101,7 +101,7 @@ function ReadingTile({ reading, online }: { reading: AmbientDeviceReadingEntry; 
   );
 }
 
-function TestBuzzerButton({ deviceId, testing, onTest }: { deviceId: string; testing: boolean; onTest: () => void }) {
+function TestBuzzerButton({ testing, onTest }: { testing: boolean; onTest: () => void }) {
   const { armed, armedLabel, handleClick } = useTwoStepConfirm(onTest, { armedLabel: '¿Activar la sirena?' });
   return (
     <Button type="button" variant="outline" loading={testing} onClick={handleClick}>
@@ -175,7 +175,7 @@ function DeviceCard({
             ? 'Los umbrales se calibran desde el propio dispositivo (ver Serial/README de ambient-control).'
             : 'La sirena puede no sonar si el dispositivo está sin conexión.'}
         </p>
-        <TestBuzzerButton deviceId={device.id} testing={testing} onTest={() => onTest(device.id)} />
+        <TestBuzzerButton testing={testing} onTest={() => onTest(device.id)} />
       </div>
     </Card>
   );
