@@ -17,10 +17,22 @@ import {
   Table,
   tableThClass as thClass,
   tableTdClass as tdClass,
+  useTwoStepConfirm,
 } from '../ui';
 import { formatDate } from '../lib/date';
 import { shortId } from '../lib/id';
 import { sourceLabel, statusLabel, statusBadgeTone, getReservationWarnings } from '../lib/labels';
+
+// One useTwoStepConfirm() instance per row — a hook can't be called conditionally/in a loop
+// directly inside the table body's .map(), so this is its own small component instead.
+function CancelRowButton({ loading, onCancel }: { loading: boolean; onCancel: () => void }) {
+  const { armed, armedLabel, handleClick } = useTwoStepConfirm(onCancel);
+  return (
+    <Button type="button" variant="danger" loading={loading} onClick={handleClick}>
+      {armed ? armedLabel : 'Cancelar'}
+    </Button>
+  );
+}
 
 export function ReservationListPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -57,9 +69,6 @@ export function ReservationListPage() {
   }, [reservations, search]);
 
   async function handleCancel(reservation: Reservation) {
-    if (!window.confirm(`¿Cancelar la reserva de ${reservation.guestName}?`)) {
-      return;
-    }
     setCancellingId(reservation.id);
     setError(null);
     try {
@@ -111,6 +120,11 @@ export function ReservationListPage() {
           </Link>
         </div>
         {error && <Alert>{error}</Alert>}
+        {!loading && filteredReservations.length > 0 && (
+          <p className="mb-3 -mt-1 text-xs text-text-muted">
+            {filteredReservations.length} {filteredReservations.length === 1 ? 'reserva' : 'reservas'}
+          </p>
+        )}
         {loading ? (
           <LoadingState />
         ) : reservations.length === 0 ? (
@@ -183,14 +197,7 @@ export function ReservationListPage() {
                 </td>
                 <td className={tdClass}>
                   {r.status !== 'CANCELLED' && r.status !== 'COMPLETED' && (
-                    <Button
-                      type="button"
-                      variant="danger"
-                      loading={cancellingId === r.id}
-                      onClick={() => handleCancel(r)}
-                    >
-                      Cancelar
-                    </Button>
+                    <CancelRowButton loading={cancellingId === r.id} onCancel={() => handleCancel(r)} />
                   )}
                 </td>
               </tr>

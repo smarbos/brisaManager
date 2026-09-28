@@ -1,23 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #ece4d6;
+  /* "La Brisa" coastal palette: warm linen backgrounds, a deep sea-teal accent, driftwood
+     for sparing decorative use (event-history dots, etc.) — replaces the earlier neutral
+     theme. Token *names* are unchanged so every component using them (bg-bg, text-text,
+     border-border, bg-accent, ...) picks up the new look with no per-component edits. */
+  --color-bg: #f1ede3;
   --color-surface: #ffffff;
-  --color-border: #e0d5bf;
-  --color-text: #2b3b38;
-  --color-text-muted: #6b6152;
-  --color-heading: #1f3330;
-  --color-accent: #2c4a45;
-  --color-accent-hover: #21403b;
+  --color-border: #dfd8c6;
+  --color-text: #1c2b30;
+  --color-text-muted: #5b6b6f;
+  --color-heading: #1c2b30;
+  --color-accent: #2c4e52;
+  --color-accent-hover: #23393c;
   --color-accent-fg: #ffffff;
-  --color-danger: #c0392b;
-  --color-danger-bg: #fdecea;
-  --color-success: #2f6b4f;
-  --color-success-bg: #dceedf;
-  --color-warning: #734519;
-  --color-warning-bg: #f0dec0;
-  --font-sans: "Inter", sans-serif;
-  --font-heading: "Playfair Display", serif;
+  --color-danger: #a6503c;
+  --color-danger-bg: #f3e4df;
+  --color-success: #3f6b44;
+  --color-success-bg: #e7efe3;
+  --color-warning: #93672a;
+  --color-warning-bg: #f6ebd9;
+  --color-driftwood: #b0824f;
+  --color-zone: #d6e6e3;
+  --font-sans: "Work Sans", sans-serif;
+  --font-heading: "Fraunces", serif;
 }
 
 body {
