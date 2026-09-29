@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
+import { EmailService } from '../src/email/email.service';
 
 describe('Full guest onboarding flow (e2e)', () => {
   let app: INestApplication;
@@ -12,7 +13,21 @@ describe('Full guest onboarding flow (e2e)', () => {
   let accessToken: string;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // This flow's auto-confirm step sends a real final-confirmation email — the reservation
+    // uses a fake @example.com address, which Resend genuinely rejects, and that rejection
+    // used to trigger a REAL alert email to whoever ALERT_EMAIL points at in this
+    // environment. Stubbed here so the flow exercises confirmation logic without depending
+    // on (or spamming) a real email provider.
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(EmailService)
+      .useValue({
+        sendInitialConfirmationEmail: jest.fn().mockResolvedValue(undefined),
+        sendFinalConfirmationEmail: jest.fn().mockResolvedValue(undefined),
+        sendCancellationEmail: jest.fn().mockResolvedValue(undefined),
+        sendMarketingEmail: jest.fn().mockResolvedValue(undefined),
+        sendAlert: jest.fn().mockResolvedValue(undefined),
+      })
+      .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
