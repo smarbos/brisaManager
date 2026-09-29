@@ -299,6 +299,7 @@ describe('ChannelImportService', () => {
         'checkIn',
         '2026-01-10',
         '2026-01-12',
+        'Extensión de Chrome',
       );
       expect(eventsService.record).toHaveBeenCalledWith(
         'res-existing',
@@ -307,6 +308,7 @@ describe('ChannelImportService', () => {
         'checkOut',
         '2026-01-15',
         '2026-01-17',
+        'Extensión de Chrome',
       );
       expect(eventsService.record).toHaveBeenCalledWith(
         'res-existing',
@@ -315,6 +317,7 @@ describe('ChannelImportService', () => {
         'totalAmount',
         '40000',
         '45000',
+        'Extensión de Chrome',
       );
     });
 
@@ -362,6 +365,7 @@ describe('ChannelImportService', () => {
         email: null,
         name: 'María Laura',
         phone: '+591 75278095',
+        actor: 'Extensión de Chrome',
       },
     );
   });
@@ -452,6 +456,7 @@ describe('ChannelImportService', () => {
       email: 'znoemi@guest.booking.com',
       name: 'Weber Clara',
       phone: null,
+      actor: 'Extensión de Chrome',
     });
     // The confirmation email invites the guest into the same flow a manual reservation
     // uses, where whatever's still missing gets sorted out — it doesn't wait for the
@@ -653,6 +658,7 @@ describe('ChannelImportService', () => {
         email: null,
         name: 'María Laura',
         phone: '+59175278095',
+        actor: 'Extensión de Chrome',
       },
     );
   });
@@ -701,6 +707,7 @@ describe('ChannelImportService', () => {
         email: 'gioconda@example.com',
         name: 'María Laura',
         phone: '+59175278095',
+        actor: 'Extensión de Chrome',
       },
     );
   });

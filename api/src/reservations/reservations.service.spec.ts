@@ -199,6 +199,24 @@ describe('ReservationsService', () => {
         'guestName',
         'Jane Doe',
         'Updated Name',
+        undefined,
+      );
+    });
+
+    it('passes the given actor through to the recorded event', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto });
+      prisma.reservation.update.mockResolvedValue({ id: '1', ...validDto, guestName: 'Updated Name' });
+
+      await service.update('1', { guestName: 'Updated Name' }, 'staff@labrisa.com.ar');
+
+      expect(eventsService.record).toHaveBeenCalledWith(
+        '1',
+        'FIELD_CHANGED',
+        'Nombre del huésped: "Jane Doe" → "Updated Name"',
+        'guestName',
+        'Jane Doe',
+        'Updated Name',
+        'staff@labrisa.com.ar',
       );
     });
 
@@ -208,8 +226,8 @@ describe('ReservationsService', () => {
 
       await service.update('1', { totalAmount: 150000, paxCount: 4 });
 
-      expect(eventsService.record).toHaveBeenCalledWith('1', 'FIELD_CHANGED', expect.stringContaining('Cantidad de pasajeros'), 'paxCount', '2', '4');
-      expect(eventsService.record).toHaveBeenCalledWith('1', 'FIELD_CHANGED', expect.stringContaining('Monto total'), 'totalAmount', '100000', '150000');
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'FIELD_CHANGED', expect.stringContaining('Cantidad de pasajeros'), 'paxCount', '2', '4', undefined);
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'FIELD_CHANGED', expect.stringContaining('Monto total'), 'totalAmount', '100000', '150000', undefined);
     });
 
     it('records a changed check-in date against its stored ISO date', async () => {
@@ -230,6 +248,7 @@ describe('ReservationsService', () => {
         'checkIn',
         '2026-01-10',
         '2026-01-12',
+        undefined,
       );
     });
 

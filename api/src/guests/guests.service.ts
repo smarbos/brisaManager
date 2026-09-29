@@ -13,6 +13,10 @@ interface SyncInput {
   // plain email/phone lookup would find nothing under the new value and create a duplicate
   // Guest instead of updating the one already on file.
   guestId?: string | null;
+  // Who submitted this data — the staff member's email, "Huésped", or "Extensión de
+  // Chrome" — carried onto any NAME_CHANGED/PHONE_CHANGED/EMAIL_CHANGED event this sync
+  // produces.
+  actor?: string | null;
 }
 
 interface GuestSnapshot {
@@ -91,7 +95,7 @@ export class GuestsService {
       });
 
       if (existing) {
-        await this.recordFieldChanges(guest.id, existing, { name, phone, email });
+        await this.recordFieldChanges(guest.id, existing, { name, phone, email }, input.actor);
       }
     } catch (error) {
       this.logger.error(`Guest sync failed for reservation ${reservationId}: ${(error as Error).message}`);
@@ -106,6 +110,7 @@ export class GuestsService {
     guestId: string,
     existing: GuestSnapshot,
     next: { name: string; phone: string | null; email: string | null },
+    actor?: string | null,
   ): Promise<void> {
     if (existing.name !== next.name) {
       await this.guestEventsService.record(
@@ -115,6 +120,7 @@ export class GuestsService {
         'name',
         existing.name,
         next.name,
+        actor,
       );
     }
     if (next.phone !== null && existing.phone !== next.phone) {
@@ -125,6 +131,7 @@ export class GuestsService {
         'phone',
         existing.phone,
         next.phone,
+        actor,
       );
     }
     if (next.email !== null && existing.email !== next.email) {
@@ -135,6 +142,7 @@ export class GuestsService {
         'email',
         existing.email,
         next.email,
+        actor,
       );
     }
   }

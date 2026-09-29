@@ -148,6 +148,7 @@ export function GuestDetailPage() {
                 <th className={thClass}>Cuándo</th>
                 <th className={thClass}>Cambio</th>
                 <th className={thClass}>Detalle</th>
+                <th className={thClass}>Quién</th>
               </tr>
             </thead>
             <tbody>
@@ -156,6 +157,7 @@ export function GuestDetailPage() {
                   <td className={tdClass}>{formatDateTime(event.createdAt)}</td>
                   <td className={tdClass}>{guestEventTypeLabel(event.type)}</td>
                   <td className={tdClass}>{event.detail ?? '—'}</td>
+                  <td className={tdClass}>{event.actor ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

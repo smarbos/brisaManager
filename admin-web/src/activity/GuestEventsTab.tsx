@@ -34,6 +34,7 @@ export function GuestEventsTab() {
                 <th className={thClass}>Huésped</th>
                 <th className={thClass}>Cambio</th>
                 <th className={thClass}>Detalle</th>
+                <th className={thClass}>Quién</th>
               </tr>
             </thead>
             <tbody>
@@ -43,6 +44,7 @@ export function GuestEventsTab() {
                   <td className={tdClass}>{entry.guest.name}</td>
                   <td className={tdClass}>{guestEventTypeLabel(entry.type)}</td>
                   <td className={tdClass}>{entry.detail ?? '—'}</td>
+                  <td className={tdClass}>{entry.actor ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

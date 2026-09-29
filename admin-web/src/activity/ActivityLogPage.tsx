@@ -134,6 +134,7 @@ export function ActivityLogPage() {
                   <th className={thClass}>Reserva</th>
                   <th className={thClass}>Evento</th>
                   <th className={thClass}>Detalle</th>
+                  <th className={thClass}>Quién</th>
                 </tr>
               </thead>
               <tbody>
@@ -147,6 +148,7 @@ export function ActivityLogPage() {
                     </td>
                     <td className={tdClass}>{eventTypeLabel(entry.type)}</td>
                     <td className={tdClass}>{entry.detail ?? '—'}</td>
+                    <td className={tdClass}>{entry.actor ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -15,6 +15,10 @@ import { AmbientService } from '../ambient/ambient.service';
 import { parsePercentage, resolveFeeAmount } from '../settings/fee-value';
 import { diffReservationFields, reservationFieldLabel } from '../reservations/reservation-field-changes';
 
+// This controller has no auth guard at all — the confirmationToken in the URL is the only
+// gate — so every write here is, by definition, the guest acting on their own reservation.
+const GUEST_ACTOR = 'Huésped';
+
 @Injectable()
 export class PublicReservationsService {
   constructor(
@@ -126,6 +130,7 @@ export class PublicReservationsService {
         change.field,
         change.oldValue,
         change.newValue,
+        GUEST_ACTOR,
       );
     }
 
@@ -136,6 +141,7 @@ export class PublicReservationsService {
       name: fullName,
       phone,
       guestId: updated.guestId,
+      actor: GUEST_ACTOR,
     });
 
     return { datesConfirmedAt: updated.datesConfirmedAt };

@@ -247,6 +247,7 @@ describe('PublicReservationsService', () => {
       'guestName',
       'Placeholder Name',
       'Jane Doe',
+      'Huésped',
     );
     expect(eventsService.record).toHaveBeenCalledWith(
       'res-1',
@@ -255,6 +256,7 @@ describe('PublicReservationsService', () => {
       'guestPhone',
       '(vacío)',
       '+54911',
+      'Huésped',
     );
     expect(eventsService.record).toHaveBeenCalledWith(
       'res-1',
@@ -263,6 +265,7 @@ describe('PublicReservationsService', () => {
       'guestEmail',
       '(vacío)',
       'jane@example.com',
+      'Huésped',
     );
   });
 
@@ -306,6 +309,7 @@ describe('PublicReservationsService', () => {
       email: 'jane@example.com',
       name: 'Jane Q. Doe',
       phone: '+54911',
+      actor: 'Huésped',
     });
   });
 

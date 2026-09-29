@@ -31,6 +31,7 @@ export interface GuestEvent {
   field?: string | null;
   oldValue?: string | null;
   newValue?: string | null;
+  actor?: string | null;
   createdAt: string;
 }
 

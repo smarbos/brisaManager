@@ -660,6 +660,7 @@ export function ReservationFormPage() {
                   <span className="h-1.5 w-1.5 flex-none rounded-full bg-accent" />
                   <span>
                     {eventTypeLabel(event.type)} — {formatDateTime(event.createdAt)}
+                    {event.actor ? ` (${event.actor})` : ''}
                     {event.detail ? `: ${event.detail}` : ''}
                   </span>
                 </li>

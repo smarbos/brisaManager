@@ -8,6 +8,7 @@ export interface GuestEventEntry {
   field?: string | null;
   oldValue?: string | null;
   newValue?: string | null;
+  actor?: string | null;
   createdAt: string;
   guest: {
     name: string;

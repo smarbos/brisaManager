@@ -164,6 +164,10 @@ model ReservationEvent {
   field         String?
   oldValue      String?
   newValue      String?
+  // Who made the change: the staff member's email (admin app), "Huésped" (guest check-in),
+  // or "Extensión de Chrome" (Booking.com/Airbnb re-scan — the extension has no per-operator
+  // identity, just a shared API key). Null for event types that don't carry one.
+  actor         String?
   createdAt     DateTime             @default(now())
 }
 
@@ -209,6 +213,10 @@ model GuestEvent {
   field     String?
   oldValue  String?
   newValue  String?
+  // Who made the change: the staff member's email (admin app), "Huésped" (guest check-in),
+  // or "Extensión de Chrome" (Booking.com/Airbnb re-scan). Null for event types that don't
+  // carry one.
+  actor     String?
   createdAt DateTime       @default(now())
 }
 
