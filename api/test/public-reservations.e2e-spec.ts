@@ -3,15 +3,29 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { EmailService } from '../src/email/email.service';
 
 describe('PublicReservationsController (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 
   beforeAll(async () => {
+    // Some of these flows complete every auto-confirm condition and trigger a real final
+    // confirmation email — the fake @example.com recipient makes Resend genuinely reject it,
+    // which used to fire a real alert email to whoever ALERT_EMAIL points at in this
+    // environment. Stubbed here so this suite never depends on (or spams) a real provider.
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(EmailService)
+      .useValue({
+        sendInitialConfirmationEmail: jest.fn().mockResolvedValue(undefined),
+        sendFinalConfirmationEmail: jest.fn().mockResolvedValue(undefined),
+        sendCancellationEmail: jest.fn().mockResolvedValue(undefined),
+        sendMarketingEmail: jest.fn().mockResolvedValue(undefined),
+        sendAlert: jest.fn().mockResolvedValue(undefined),
+      })
+      .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, transform: true }),
