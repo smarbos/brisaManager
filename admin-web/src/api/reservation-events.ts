@@ -5,6 +5,7 @@ export interface ActivityLogEntry {
   reservationId: string;
   type: string;
   detail: string | null;
+  actor?: string | null;
   createdAt: string;
   reservation: {
     guestName: string;

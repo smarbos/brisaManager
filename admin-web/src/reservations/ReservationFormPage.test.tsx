@@ -150,6 +150,53 @@ describe('ReservationFormPage', () => {
     await waitFor(() => expect(markSpy).toHaveBeenCalledWith('1'));
   });
 
+  it('shows who made a change alongside the event, when known', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([
+      {
+        id: 'ev-1',
+        type: 'FIELD_CHANGED',
+        detail: 'Email del huésped: "a@example.com" → "b@example.com"',
+        field: 'guestEmail',
+        oldValue: 'a@example.com',
+        newValue: 'b@example.com',
+        actor: 'Huésped',
+        createdAt: '2026-01-02T00:00:00.000Z',
+      },
+      {
+        id: 'ev-2',
+        type: 'RESERVATION_CREATED',
+        detail: 'Creada manualmente por el personal',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    ] as never);
+    vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/\(Huésped\)/)).toBeInTheDocument();
+    // An event with no actor (e.g. a pre-existing event from before this field existed)
+    // shows no parenthetical at all, rather than "(null)" or an empty "()".
+    expect(screen.getByText(/creada manualmente por el personal/i).textContent).not.toMatch(/\(/);
+  });
+
   it('shows uploaded receipt images and marks payment/deposit received from that section', async () => {
     vi.stubGlobal('URL', {
       ...URL,

@@ -26,6 +26,10 @@ export interface ImportStatusResult {
   status?: ReservationStatus;
 }
 
+// ApiKeyGuard authenticates the extension with a single shared key, not a per-operator
+// login, so there's no real identity to attribute a change to beyond "it came from a scrape".
+const CHANNEL_IMPORT_ACTOR = 'Extensión de Chrome';
+
 const SOURCE_MAP: Record<ImportReservationDto['source'], ReservationSource> = {
   'booking.com': 'BOOKING',
   airbnb: 'AIRBNB',
@@ -212,6 +216,7 @@ export class ChannelImportService {
         name: reservation.guestName,
         phone: guestPhone,
         guestId: reservation.guestId,
+        actor: CHANNEL_IMPORT_ACTOR,
       });
     }
 
@@ -299,6 +304,7 @@ export class ChannelImportService {
         change.field,
         change.oldValue,
         change.newValue,
+        CHANNEL_IMPORT_ACTOR,
       );
     }
 
@@ -308,6 +314,7 @@ export class ChannelImportService {
         name: updated.guestName,
         phone: updated.guestPhone,
         guestId: updated.guestId,
+        actor: CHANNEL_IMPORT_ACTOR,
       });
     }
 

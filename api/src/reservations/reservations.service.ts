@@ -28,7 +28,7 @@ export class ReservationsService {
     }
   }
 
-  async create(dto: CreateReservationDto) {
+  async create(dto: CreateReservationDto, actor?: string | null) {
     this.validateDates(dto.checkIn, dto.checkOut);
 
     const reservation = await this.prisma.reservation.create({
@@ -57,6 +57,7 @@ export class ReservationsService {
         name: reservation.guestName,
         phone: reservation.guestPhone,
         guestId: reservation.guestId,
+        actor,
       });
     }
 
@@ -124,7 +125,7 @@ export class ReservationsService {
     return reservation;
   }
 
-  async update(id: string, dto: UpdateReservationDto) {
+  async update(id: string, dto: UpdateReservationDto, actor?: string | null) {
     const existing = await this.findOne(id);
 
     if (dto.checkIn && dto.checkOut) {
@@ -160,6 +161,7 @@ export class ReservationsService {
         change.field,
         change.oldValue,
         change.newValue,
+        actor,
       );
     }
 
@@ -172,6 +174,7 @@ export class ReservationsService {
         name: updated.guestName,
         phone: updated.guestPhone,
         guestId: updated.guestId,
+        actor,
       });
     }
 

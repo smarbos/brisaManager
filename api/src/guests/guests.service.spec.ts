@@ -122,6 +122,7 @@ describe('GuestsService', () => {
         'name',
         'Jane',
         'Jane Doe',
+        undefined,
       );
     });
 
@@ -139,6 +140,7 @@ describe('GuestsService', () => {
         'phone',
         '+5491100000000',
         '+5492200000000',
+        undefined,
       );
     });
 
@@ -156,6 +158,7 @@ describe('GuestsService', () => {
         'phone',
         null,
         '+5492200000000',
+        undefined,
       );
     });
 
@@ -250,6 +253,7 @@ describe('GuestsService', () => {
           name: 'Jane Doe',
           phone: '+54911',
           guestId: 'guest-1',
+          actor: 'staff@labrisa.com.ar',
         });
 
         expect(guestEventsService.record).toHaveBeenCalledWith(
@@ -259,6 +263,7 @@ describe('GuestsService', () => {
           'email',
           'old-email@example.com',
           'new-email@example.com',
+          'staff@labrisa.com.ar',
         );
       });
 
@@ -290,6 +295,7 @@ describe('GuestsService', () => {
           'phone',
           '+5491100000000',
           '+5492200000000',
+          undefined,
         );
       });
 

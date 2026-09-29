@@ -13,9 +13,10 @@ export class GuestEventsService {
     field?: string,
     oldValue?: string | null,
     newValue?: string | null,
+    actor?: string | null,
   ) {
     return this.prisma.guestEvent.create({
-      data: { guestId, type, detail, field, oldValue, newValue },
+      data: { guestId, type, detail, field, oldValue, newValue, actor },
     });
   }
 

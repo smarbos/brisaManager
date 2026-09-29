@@ -95,6 +95,42 @@ describe('GuestDetailPage', () => {
     expect(screen.getByText('Nombre: "Jane" → "Jane Doe"')).toBeInTheDocument();
   });
 
+  it('shows who made the change, and a dash when that is not known', async () => {
+    vi.spyOn(guestsApi, 'getGuest').mockResolvedValue({
+      id: 'guest-1',
+      email: 'jane@example.com',
+      name: 'Jane Doe',
+      phone: '+54911',
+      totalStays: 1,
+      lastStayAt: null,
+      unsubscribedAt: null,
+      reservations: [],
+    });
+    vi.spyOn(guestsApi, 'listGuestEvents').mockResolvedValue([
+      {
+        id: 'evt-1',
+        guestId: 'guest-1',
+        type: 'EMAIL_CHANGED',
+        detail: 'Email: "a@example.com" → "b@example.com"',
+        actor: 'Huésped',
+        createdAt: '2026-09-20T12:00:00.000Z',
+      },
+      {
+        id: 'evt-2',
+        guestId: 'guest-1',
+        type: 'UNSUBSCRIBED',
+        detail: null,
+        createdAt: '2026-09-19T12:00:00.000Z',
+      },
+    ]);
+
+    renderAt('guest-1');
+
+    expect(await screen.findByText('Huésped')).toBeInTheDocument();
+    // The older event was recorded before actor tracking existed, so it has none.
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1);
+  });
+
   it('shows an empty state when the guest has no change history', async () => {
     vi.spyOn(guestsApi, 'getGuest').mockResolvedValue({
       id: 'guest-1',

@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { CurrentUserPayload } from '../auth/current-user.decorator';
 import { ReservationsService } from './reservations.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -16,8 +18,8 @@ export class ReservationsController {
   ) {}
 
   @Post()
-  create(@Body() dto: CreateReservationDto) {
-    return this.reservationsService.create(dto);
+  create(@Body() dto: CreateReservationDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.reservationsService.create(dto, user.email);
   }
 
   @Get()
@@ -36,8 +38,8 @@ export class ReservationsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateReservationDto) {
-    return this.reservationsService.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: UpdateReservationDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.reservationsService.update(id, dto, user.email);
   }
 
   @Post(':id/mark-payment-received')
