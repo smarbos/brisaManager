@@ -263,6 +263,76 @@ describe('ChannelImportService', () => {
     );
   });
 
+  describe('field change tracking on rescan', () => {
+    const existing = {
+      id: 'res-existing',
+      guestName: 'Jane Doe',
+      guestPhone: null,
+      guestEmail: null,
+      checkIn: new Date('2026-01-10'),
+      checkOut: new Date('2026-01-15'),
+      totalAmount: 40000,
+      currency: 'ARS',
+      status: 'PENDING',
+    };
+
+    it('records FIELD_CHANGED for a re-scraped price and dates', async () => {
+      prisma.reservation.findUnique.mockResolvedValue(existing);
+      prisma.reservation.update.mockResolvedValue({
+        ...existing,
+        checkIn: new Date('2026-01-12'),
+        checkOut: new Date('2026-01-17'),
+        totalAmount: 45000,
+      });
+
+      await service.import({
+        ...baseDto,
+        check_in: '2026-01-12',
+        check_out: '2026-01-17',
+        total_price: '$ 45.000',
+      });
+
+      expect(eventsService.record).toHaveBeenCalledWith(
+        'res-existing',
+        'FIELD_CHANGED',
+        'Check-in: "2026-01-10" → "2026-01-12"',
+        'checkIn',
+        '2026-01-10',
+        '2026-01-12',
+      );
+      expect(eventsService.record).toHaveBeenCalledWith(
+        'res-existing',
+        'FIELD_CHANGED',
+        'Check-out: "2026-01-15" → "2026-01-17"',
+        'checkOut',
+        '2026-01-15',
+        '2026-01-17',
+      );
+      expect(eventsService.record).toHaveBeenCalledWith(
+        'res-existing',
+        'FIELD_CHANGED',
+        'Monto total: "40000" → "45000"',
+        'totalAmount',
+        '40000',
+        '45000',
+      );
+    });
+
+    it('records nothing when the rescan finds the exact same values already on file', async () => {
+      prisma.reservation.findUnique.mockResolvedValue(existing);
+      prisma.reservation.update.mockResolvedValue(existing);
+
+      await service.import({
+        ...baseDto,
+        check_in: '2026-01-10',
+        check_out: '2026-01-15',
+        total_price: '$ 40.000',
+      });
+
+      expect(eventsService.record).not.toHaveBeenCalled();
+    });
+  });
+
   it('re-syncs the guest record when a rescan brings in a phone for an already-loaded reservation', async () => {
     const existing = {
       id: 'res-existing',

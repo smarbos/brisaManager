@@ -6,9 +6,16 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ReservationEventsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  record(reservationId: string, type: ReservationEventType, detail?: string) {
+  record(
+    reservationId: string,
+    type: ReservationEventType,
+    detail?: string,
+    field?: string,
+    oldValue?: string | null,
+    newValue?: string | null,
+  ) {
     return this.prisma.reservationEvent.create({
-      data: { reservationId, type, detail },
+      data: { reservationId, type, detail, field, oldValue, newValue },
     });
   }
 

@@ -5,6 +5,7 @@ import { EmailService } from '../email/email.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 import { GuestsService } from '../guests/guests.service';
+import { diffReservationFields, reservationFieldLabel } from './reservation-field-changes';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { QueryReservationDto } from './dto/query-reservation.dto';
@@ -55,6 +56,7 @@ export class ReservationsService {
         email: reservation.guestEmail,
         name: reservation.guestName,
         phone: reservation.guestPhone,
+        guestId: reservation.guestId,
       });
     }
 
@@ -123,11 +125,18 @@ export class ReservationsService {
   }
 
   async update(id: string, dto: UpdateReservationDto) {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
 
     if (dto.checkIn && dto.checkOut) {
       this.validateDates(dto.checkIn, dto.checkOut);
     }
+
+    const normalizedExternalReference =
+      dto.externalReference !== undefined
+        ? dto.externalReference?.trim()
+          ? dto.externalReference.trim()
+          : null
+        : undefined;
 
     const updated = await this.prisma.reservation.update({
       where: { id },
@@ -135,14 +144,24 @@ export class ReservationsService {
         ...dto,
         checkIn: dto.checkIn ? new Date(dto.checkIn) : undefined,
         checkOut: dto.checkOut ? new Date(dto.checkOut) : undefined,
-        externalReference:
-          dto.externalReference !== undefined
-            ? dto.externalReference?.trim()
-              ? dto.externalReference.trim()
-              : null
-            : undefined,
+        externalReference: normalizedExternalReference,
       },
     });
+
+    // Diff against the exact same normalized values just written, not the raw dto, so a
+    // no-op edit (e.g. re-submitting the same externalReference with different whitespace)
+    // is never recorded as a change.
+    const changes = diffReservationFields(existing, { ...dto, externalReference: normalizedExternalReference });
+    for (const change of changes) {
+      await this.eventsService.record(
+        id,
+        'FIELD_CHANGED',
+        `${reservationFieldLabel(change.field)}: "${change.oldValue}" → "${change.newValue}"`,
+        change.field,
+        change.oldValue,
+        change.newValue,
+      );
+    }
 
     // Fire-and-forget: see the comment in create() above.
     void this.googleCalendarPushService.pushReservation(updated);
@@ -152,6 +171,7 @@ export class ReservationsService {
         email: updated.guestEmail,
         name: updated.guestName,
         phone: updated.guestPhone,
+        guestId: updated.guestId,
       });
     }
 

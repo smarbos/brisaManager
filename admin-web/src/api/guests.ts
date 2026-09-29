@@ -28,6 +28,9 @@ export interface GuestEvent {
   guestId: string;
   type: string;
   detail: string | null;
+  field: string | null;
+  oldValue: string | null;
+  newValue: string | null;
   createdAt: string;
 }
 

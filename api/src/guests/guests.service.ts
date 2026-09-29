@@ -7,6 +7,12 @@ interface SyncInput {
   email?: string | null;
   name: string;
   phone?: string | null;
+  // The reservation's own guestId, when it already has one. Preferred over re-deriving
+  // identity from email/phone: those can legitimately change on an existing reservation
+  // (a staff correction, or a guest providing different contact info at check-in), and a
+  // plain email/phone lookup would find nothing under the new value and create a duplicate
+  // Guest instead of updating the one already on file.
+  guestId?: string | null;
 }
 
 interface GuestSnapshot {
@@ -37,23 +43,36 @@ export class GuestsService {
         return;
       }
 
-      // Airbnb's hosting messages page never exposes the guest's email, only their phone —
-      // key the upsert on whichever identifier is actually present.
-      const existing = email
-        ? await this.prisma.guest.findUnique({ where: { email } })
-        : await this.prisma.guest.findUnique({ where: { phone: phone as string } });
+      // Prefer the guest already linked to this reservation — only fall back to an
+      // email/phone lookup (and possibly creating a new guest) when this reservation has
+      // never been synced before.
+      let existing = input.guestId ? await this.prisma.guest.findUnique({ where: { id: input.guestId } }) : null;
 
-      const guest = email
-        ? await this.prisma.guest.upsert({
-            where: { email },
-            create: { email, name, phone: phone ?? undefined },
-            update: { name, phone: phone ?? undefined },
-          })
-        : await this.prisma.guest.upsert({
-            where: { phone: phone as string },
-            create: { phone: phone as string, name },
-            update: { name },
-          });
+      let guest;
+      if (existing) {
+        guest = await this.prisma.guest.update({
+          where: { id: existing.id },
+          data: { name, phone: phone ?? undefined, email: email ?? undefined },
+        });
+      } else {
+        // Airbnb's hosting messages page never exposes the guest's email, only their phone —
+        // key the upsert on whichever identifier is actually present.
+        existing = email
+          ? await this.prisma.guest.findUnique({ where: { email } })
+          : await this.prisma.guest.findUnique({ where: { phone: phone as string } });
+
+        guest = email
+          ? await this.prisma.guest.upsert({
+              where: { email },
+              create: { email, name, phone: phone ?? undefined },
+              update: { name, phone: phone ?? undefined },
+            })
+          : await this.prisma.guest.upsert({
+              where: { phone: phone as string },
+              create: { phone: phone as string, name },
+              update: { name },
+            });
+      }
 
       await this.prisma.reservation.update({
         where: { id: reservationId },
@@ -93,6 +112,9 @@ export class GuestsService {
         guestId,
         'NAME_CHANGED',
         `Nombre: "${existing.name}" → "${next.name}"`,
+        'name',
+        existing.name,
+        next.name,
       );
     }
     if (next.phone !== null && existing.phone !== next.phone) {
@@ -100,6 +122,9 @@ export class GuestsService {
         guestId,
         'PHONE_CHANGED',
         `Teléfono: ${formatPreviousValue(existing.phone)} → "${next.phone}"`,
+        'phone',
+        existing.phone,
+        next.phone,
       );
     }
     if (next.email !== null && existing.email !== next.email) {
@@ -107,6 +132,9 @@ export class GuestsService {
         guestId,
         'EMAIL_CHANGED',
         `Email: ${formatPreviousValue(existing.email)} → "${next.email}"`,
+        'email',
+        existing.email,
+        next.email,
       );
     }
   }

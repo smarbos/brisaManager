@@ -223,6 +223,49 @@ describe('PublicReservationsService', () => {
     expect(confirmationService.maybeAutoConfirm).toHaveBeenCalledWith('res-1');
   });
 
+  it('records FIELD_CHANGED events for the guest info the guest corrects during check-in', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({
+      ...baseReservation,
+      guestName: 'Placeholder Name',
+      guestPhone: null,
+      guestEmail: null,
+    });
+    prisma.reservation.update.mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: new Date(),
+      guestName: 'Jane Doe',
+      guestPhone: '+54911',
+      guestEmail: 'jane@example.com',
+    });
+
+    await service.confirmDates('tok-1', 'Jane Doe', '+54911', 'jane@example.com');
+
+    expect(eventsService.record).toHaveBeenCalledWith(
+      'res-1',
+      'FIELD_CHANGED',
+      'Nombre del huésped: "Placeholder Name" → "Jane Doe"',
+      'guestName',
+      'Placeholder Name',
+      'Jane Doe',
+    );
+    expect(eventsService.record).toHaveBeenCalledWith(
+      'res-1',
+      'FIELD_CHANGED',
+      'Teléfono del huésped: "(vacío)" → "+54911"',
+      'guestPhone',
+      '(vacío)',
+      '+54911',
+    );
+    expect(eventsService.record).toHaveBeenCalledWith(
+      'res-1',
+      'FIELD_CHANGED',
+      'Email del huésped: "(vacío)" → "jane@example.com"',
+      'guestEmail',
+      '(vacío)',
+      'jane@example.com',
+    );
+  });
+
   it('does not re-update or re-record an event when dates are already confirmed', async () => {
     const alreadyConfirmedAt = new Date('2026-01-01T00:00:00.000Z');
     prisma.reservation.findUnique.mockResolvedValue({

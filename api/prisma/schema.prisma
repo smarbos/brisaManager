@@ -36,6 +36,7 @@ enum ReservationEventType {
   FINAL_EMAIL_FAILED
   CANCELLATION_EMAIL_SENT
   CANCELLATION_EMAIL_FAILED
+  FIELD_CHANGED
 }
 
 enum GuestEventType {
@@ -158,6 +159,11 @@ model ReservationEvent {
   reservation   Reservation          @relation(fields: [reservationId], references: [id])
   type          ReservationEventType
   detail        String?
+  // Populated only for FIELD_CHANGED events — the field's own name plus its before/after
+  // values, alongside the human-readable `detail` string the UI already renders.
+  field         String?
+  oldValue      String?
+  newValue      String?
   createdAt     DateTime             @default(now())
 }
 
@@ -198,6 +204,11 @@ model GuestEvent {
   guest     Guest          @relation(fields: [guestId], references: [id])
   type      GuestEventType
   detail    String?
+  // Populated for NAME_CHANGED/PHONE_CHANGED/EMAIL_CHANGED — the field's own name plus its
+  // before/after values, alongside the human-readable `detail` string the UI already renders.
+  field     String?
+  oldValue  String?
+  newValue  String?
   createdAt DateTime       @default(now())
 }
 

@@ -15,6 +15,7 @@ import { ReservationEventsService } from '../reservation-events/reservation-even
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 import { GuestsService } from '../guests/guests.service';
 import { ReservationsService } from '../reservations/reservations.service';
+import { diffReservationFields, reservationFieldLabel } from '../reservations/reservation-field-changes';
 import { ImportReservationDto } from './dto/import-reservation.dto';
 
 export interface ImportStatusResult {
@@ -210,6 +211,7 @@ export class ChannelImportService {
         email: guestEmail,
         name: reservation.guestName,
         phone: guestPhone,
+        guestId: reservation.guestId,
       });
     }
 
@@ -280,11 +282,32 @@ export class ChannelImportService {
       },
     });
 
+    const changes = diffReservationFields(existing, {
+      guestName,
+      guestPhone,
+      checkIn: checkIn ? checkIn.toISOString().slice(0, 10) : undefined,
+      checkOut: checkOut ? checkOut.toISOString().slice(0, 10) : undefined,
+      paxCount,
+      totalAmount,
+      currency,
+    });
+    for (const change of changes) {
+      await this.eventsService.record(
+        existing.id,
+        'FIELD_CHANGED',
+        `${reservationFieldLabel(change.field)}: "${change.oldValue}" → "${change.newValue}"`,
+        change.field,
+        change.oldValue,
+        change.newValue,
+      );
+    }
+
     if (updated.guestEmail || updated.guestPhone) {
       void this.guestsService.syncFromReservation(updated.id, {
         email: updated.guestEmail,
         name: updated.guestName,
         phone: updated.guestPhone,
+        guestId: updated.guestId,
       });
     }
 

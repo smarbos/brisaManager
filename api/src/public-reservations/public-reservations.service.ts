@@ -13,6 +13,7 @@ import { ReservationImagesService } from '../reservation-images/reservation-imag
 import { NotificationsService } from '../notifications/notifications.service';
 import { AmbientService } from '../ambient/ambient.service';
 import { parsePercentage, resolveFeeAmount } from '../settings/fee-value';
+import { diffReservationFields, reservationFieldLabel } from '../reservations/reservation-field-changes';
 
 @Injectable()
 export class PublicReservationsService {
@@ -111,12 +112,30 @@ export class PublicReservationsService {
     });
 
     await this.eventsService.record(reservation.id, 'DATES_CONFIRMED');
+
+    const changes = diffReservationFields(reservation, {
+      guestName: fullName,
+      guestPhone: phone,
+      guestEmail: normalizedEmail,
+    });
+    for (const change of changes) {
+      await this.eventsService.record(
+        reservation.id,
+        'FIELD_CHANGED',
+        `${reservationFieldLabel(change.field)}: "${change.oldValue}" → "${change.newValue}"`,
+        change.field,
+        change.oldValue,
+        change.newValue,
+      );
+    }
+
     await this.confirmationService.maybeAutoConfirm(reservation.id);
 
     void this.guestsService.syncFromReservation(updated.id, {
       email: normalizedEmail,
       name: fullName,
       phone,
+      guestId: updated.guestId,
     });
 
     return { datesConfirmedAt: updated.datesConfirmedAt };
