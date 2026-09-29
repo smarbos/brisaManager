@@ -32,5 +32,8 @@ export interface ReservationEvent {
   id: string;
   type: string;
   detail?: string | null;
+  field?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
   createdAt: string;
 }

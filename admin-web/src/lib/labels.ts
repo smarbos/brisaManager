@@ -46,6 +46,9 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   INITIAL_EMAIL_FAILED: 'Falló el email inicial',
   FINAL_EMAIL_SENT: 'Email final enviado',
   FINAL_EMAIL_FAILED: 'Falló el email final',
+  CANCELLATION_EMAIL_SENT: 'Email de cancelación enviado',
+  CANCELLATION_EMAIL_FAILED: 'Falló el email de cancelación',
+  FIELD_CHANGED: 'Dato modificado',
 };
 
 export function eventTypeLabel(type: string): string {

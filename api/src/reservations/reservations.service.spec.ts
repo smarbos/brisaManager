@@ -158,6 +158,7 @@ describe('ReservationsService', () => {
       email: 'jane@example.com',
       name: created.guestName,
       phone: '+54911',
+      guestId: undefined,
     });
   });
 
@@ -180,6 +181,74 @@ describe('ReservationsService', () => {
       email: 'jane@example.com',
       name: 'Updated Name',
       phone: null,
+      guestId: undefined,
+    });
+  });
+
+  describe('field change tracking on update', () => {
+    it('records a FIELD_CHANGED event with the field, old value, and new value', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto });
+      prisma.reservation.update.mockResolvedValue({ id: '1', ...validDto, guestName: 'Updated Name' });
+
+      await service.update('1', { guestName: 'Updated Name' });
+
+      expect(eventsService.record).toHaveBeenCalledWith(
+        '1',
+        'FIELD_CHANGED',
+        'Nombre del huésped: "Jane Doe" → "Updated Name"',
+        'guestName',
+        'Jane Doe',
+        'Updated Name',
+      );
+    });
+
+    it('records one FIELD_CHANGED event per changed field', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto });
+      prisma.reservation.update.mockResolvedValue({ id: '1', ...validDto, totalAmount: 150000, paxCount: 4 });
+
+      await service.update('1', { totalAmount: 150000, paxCount: 4 });
+
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'FIELD_CHANGED', expect.stringContaining('Cantidad de pasajeros'), 'paxCount', '2', '4');
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'FIELD_CHANGED', expect.stringContaining('Monto total'), 'totalAmount', '100000', '150000');
+    });
+
+    it('records a changed check-in date against its stored ISO date', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        id: '1',
+        ...validDto,
+        checkIn: new Date('2026-01-10T00:00:00.000Z'),
+        checkOut: new Date('2026-01-15T00:00:00.000Z'),
+      });
+      prisma.reservation.update.mockResolvedValue({ id: '1', ...validDto, checkIn: '2026-01-12' });
+
+      await service.update('1', { checkIn: '2026-01-12' });
+
+      expect(eventsService.record).toHaveBeenCalledWith(
+        '1',
+        'FIELD_CHANGED',
+        'Check-in: "2026-01-10" → "2026-01-12"',
+        'checkIn',
+        '2026-01-10',
+        '2026-01-12',
+      );
+    });
+
+    it('does not record a FIELD_CHANGED event when nothing actually changed', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto });
+      prisma.reservation.update.mockResolvedValue({ id: '1', ...validDto });
+
+      await service.update('1', { guestName: validDto.guestName });
+
+      expect(eventsService.record).not.toHaveBeenCalled();
+    });
+
+    it('does not record a FIELD_CHANGED event for a field the update omits entirely', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto });
+      prisma.reservation.update.mockResolvedValue({ id: '1', ...validDto, notes: 'unrelated update' });
+
+      await service.update('1', { notes: undefined });
+
+      expect(eventsService.record).not.toHaveBeenCalled();
     });
   });
 

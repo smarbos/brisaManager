@@ -119,6 +119,9 @@ describe('GuestsService', () => {
         'guest-1',
         'NAME_CHANGED',
         'Nombre: "Jane" → "Jane Doe"',
+        'name',
+        'Jane',
+        'Jane Doe',
       );
     });
 
@@ -133,6 +136,9 @@ describe('GuestsService', () => {
         'guest-1',
         'PHONE_CHANGED',
         'Teléfono: "+5491100000000" → "+5492200000000"',
+        'phone',
+        '+5491100000000',
+        '+5492200000000',
       );
     });
 
@@ -147,6 +153,9 @@ describe('GuestsService', () => {
         'guest-1',
         'PHONE_CHANGED',
         'Teléfono: (vacío) → "+5492200000000"',
+        'phone',
+        null,
+        '+5492200000000',
       );
     });
 
@@ -191,6 +200,119 @@ describe('GuestsService', () => {
       await service.syncFromReservation('res-1', { email: 'new@example.com', name: 'New Guest' });
 
       expect(guestEventsService.record).not.toHaveBeenCalled();
+    });
+
+    describe('when the reservation already has a guestId', () => {
+      it('updates the linked guest directly instead of creating a duplicate, even when the email differs from what is on file', async () => {
+        prisma.guest.findUnique.mockResolvedValue({
+          id: 'guest-1',
+          name: 'Jane Doe',
+          phone: '+54911',
+          email: 'old-email@example.com',
+        });
+        prisma.guest.update.mockResolvedValue({ id: 'guest-1' });
+        prisma.reservation.aggregate.mockResolvedValue({ _count: { _all: 1 }, _max: { checkOut: null } });
+
+        // A different email than what's on file for guest-1 — without the guestId-based
+        // lookup this would look up "new-email@example.com" via findUnique, find nothing,
+        // and create a brand-new guest instead of updating this one (the bug being fixed).
+        await service.syncFromReservation('res-1', {
+          email: 'new-email@example.com',
+          name: 'Jane Doe',
+          phone: '+54911',
+          guestId: 'guest-1',
+        });
+
+        expect(prisma.guest.findUnique).toHaveBeenCalledWith({ where: { id: 'guest-1' } });
+        expect(prisma.guest.update).toHaveBeenCalledWith({
+          where: { id: 'guest-1' },
+          data: { name: 'Jane Doe', phone: '+54911', email: 'new-email@example.com' },
+        });
+        expect(prisma.guest.upsert).not.toHaveBeenCalled();
+        expect(prisma.reservation.update).toHaveBeenCalledWith({
+          where: { id: 'res-1' },
+          data: { guestId: 'guest-1' },
+        });
+      });
+
+      it('records EMAIL_CHANGED when the guestId-linked guest gets a new email', async () => {
+        prisma.guest.findUnique.mockResolvedValue({
+          id: 'guest-1',
+          name: 'Jane Doe',
+          phone: '+54911',
+          email: 'old-email@example.com',
+        });
+        prisma.guest.update.mockResolvedValue({ id: 'guest-1' });
+        prisma.reservation.aggregate.mockResolvedValue({ _count: { _all: 1 }, _max: { checkOut: null } });
+
+        await service.syncFromReservation('res-1', {
+          email: 'new-email@example.com',
+          name: 'Jane Doe',
+          phone: '+54911',
+          guestId: 'guest-1',
+        });
+
+        expect(guestEventsService.record).toHaveBeenCalledWith(
+          'guest-1',
+          'EMAIL_CHANGED',
+          'Email: "old-email@example.com" → "new-email@example.com"',
+          'email',
+          'old-email@example.com',
+          'new-email@example.com',
+        );
+      });
+
+      it('updates the guest even when this sync also brings a new phone that already differs from the linked guest', async () => {
+        prisma.guest.findUnique.mockResolvedValue({
+          id: 'guest-1',
+          name: 'Jane Doe',
+          phone: '+5491100000000',
+          email: 'jane@example.com',
+        });
+        prisma.guest.update.mockResolvedValue({ id: 'guest-1' });
+        prisma.reservation.aggregate.mockResolvedValue({ _count: { _all: 1 }, _max: { checkOut: null } });
+
+        await service.syncFromReservation('res-1', {
+          email: 'jane@example.com',
+          name: 'Jane Doe',
+          phone: '+5492200000000',
+          guestId: 'guest-1',
+        });
+
+        expect(prisma.guest.update).toHaveBeenCalledWith({
+          where: { id: 'guest-1' },
+          data: { name: 'Jane Doe', phone: '+5492200000000', email: 'jane@example.com' },
+        });
+        expect(guestEventsService.record).toHaveBeenCalledWith(
+          'guest-1',
+          'PHONE_CHANGED',
+          'Teléfono: "+5491100000000" → "+5492200000000"',
+          'phone',
+          '+5491100000000',
+          '+5492200000000',
+        );
+      });
+
+      it('falls back to the email/phone lookup when the linked guestId no longer resolves to a guest', async () => {
+        prisma.guest.findUnique.mockResolvedValueOnce(null); // lookup by guestId finds nothing
+        prisma.guest.findUnique.mockResolvedValueOnce(null); // fallback lookup by email also finds nothing
+        prisma.guest.upsert.mockResolvedValue({ id: 'guest-new' });
+        prisma.reservation.aggregate.mockResolvedValue({ _count: { _all: 1 }, _max: { checkOut: null } });
+
+        await service.syncFromReservation('res-1', {
+          email: 'jane@example.com',
+          name: 'Jane Doe',
+          guestId: 'deleted-guest',
+        });
+
+        expect(prisma.guest.findUnique).toHaveBeenNthCalledWith(1, { where: { id: 'deleted-guest' } });
+        expect(prisma.guest.findUnique).toHaveBeenNthCalledWith(2, { where: { email: 'jane@example.com' } });
+        expect(prisma.guest.upsert).toHaveBeenCalledWith({
+          where: { email: 'jane@example.com' },
+          create: { email: 'jane@example.com', name: 'Jane Doe', phone: undefined },
+          update: { name: 'Jane Doe', phone: undefined },
+        });
+      });
     });
   });
 
