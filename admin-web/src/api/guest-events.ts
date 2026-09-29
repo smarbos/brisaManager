@@ -5,9 +5,9 @@ export interface GuestEventEntry {
   guestId: string;
   type: string;
   detail: string | null;
-  field: string | null;
-  oldValue: string | null;
-  newValue: string | null;
+  field?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
   createdAt: string;
   guest: {
     name: string;
