@@ -30,11 +30,11 @@ High-level backlog of everything requested so far. Each section will be broken d
 - [x] Staff/employees can view all reservations on the calendar
 
 ## 3b. Notifications system
-- [x] In-app notification center: `Notification` model, staff-only list/unread-count/mark-read endpoints, a bell-style "Notificaciones" nav link with an unread badge (polled every 60s), and a `/notifications` page. Currently raised by two sources: `CALENDAR_MISMATCH` (section 3 above) and `PAYMENT_RECEIPT_UPLOADED` (section 8 below).
+- [x] In-app notification center: `Notification` model, staff-only list/unread-count/mark-read endpoints, a bell-style "Notificaciones" nav link with an unread badge (polled every 60s), and a `/notifications` page. Raised by five sources now: `CALENDAR_MISMATCH` (section 3), `PAYMENT_RECEIPT_UPLOADED` and `GUEST_MESSAGE` (a guest's payment-update note with no receipt attached — section 8), and `AMBIENT_ALERT`/`DEVICE_OFFLINE` (section 9).
 
 ## 8. Payment receipt uploads (guest-facing)
 - [x] Guests can upload a payment/deposit receipt image from the check-in page (Step 3: Pago y garantía) — file picker or paste, same UX pattern the removed screenshot-OCR control used. Files are stored on local disk (a Docker volume, `receipts_data:/app/uploads`), served back only through an authenticated endpoint (JWT for staff, confirmationToken match for the guest re-viewing their own upload) since receipts are financial documents, never a public URL.
-- [x] Every upload raises a `PAYMENT_RECEIPT_UPLOADED` notification linking to the reservation.
+- [x] Every upload raises a `PAYMENT_RECEIPT_UPLOADED` notification linking to the reservation; a guest can also send a plain text note with no image attached, which raises a `GUEST_MESSAGE` notification instead.
 - [x] Admin's reservation detail page shows a thumbnail gallery of uploaded receipts with "Marcar pago del 30% como recibido" / "Marcar depósito como recibido" buttons right next to them (the same underlying actions already on the page, just surfaced next to the evidence) — staff decide from the image itself which payment(s) it covers, since receipts aren't tagged to a specific payment at upload time.
 
 ## 5. Marketing / CRM
@@ -55,6 +55,14 @@ High-level backlog of everything requested so far. Each section will be broken d
 
 ## 7. Staff notifications via WhatsApp (Twilio)
 - [ ] **Still entirely pending.** What exists today is guest-facing only: automatic WhatsApp reminders *to guests* (reservation reminder + deposit reminder, both on a daily schedule, templates configurable in Settings). There is no staff-group notification channel yet — nothing pings the team on Twilio WhatsApp for "reservation confirmed and paid", "guest checks out tomorrow", etc. Still needs its own brainstorming pass: which events trigger a message, Twilio WhatsApp Business template approval, where the group/recipient config lives.
+
+## 9. Ambient monitoring (ESP32 sensors)
+- [x] Firmware (`ambient-control/`) on an ESP32 reads sound, MQ-7 CO, MQ-2 smoke, and DHT22 temperature/humidity, and reports to the API over `/ambient-alerts` (on a threshold breach) and a heartbeat (`AmbientService.recordHeartbeat`)
+- [x] Per-sensor alert thresholds, with an "emergency" tier (sustained, much-higher-than-alert reading) that sounds the physical buzzer until it clears
+- [x] Admin web's Sensores page: per-device cards showing each sensor's last reading against its threshold, device online/offline status, and a remote "Probar sirena" (test buzzer) control
+- [x] `DEVICE_OFFLINE` notification when a device stops heartbeating
+- [x] Guests can see the same ambient readings on their own check-in confirmation page (Step 4, "Sensores" tab)
+- [x] Sound/CO/smoke are explicitly presented as raw uncalibrated ADC counts, not real ppm/dB units, since only the DHT22 (temperature/humidity) is a genuinely calibrated sensor
 
 ## 10. Security review (2026-09-29)
 Full-repo review of the API, admin-web, guest-web, Chrome extension, ambient-control firmware and deploy setup. Ordered by severity.
