@@ -1,6 +1,6 @@
 # Design: Guest Profile Takeover via Check-in Form
 
-Status: Approved (design), not yet implemented
+Status: Superseded by `2026-09-29-guest-identity-document-design.md` (its "fill blanks only" rule lives on there, in section 4). Not to be implemented on its own.
 Date: 2026-09-29
 
 ## Purpose

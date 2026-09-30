@@ -77,10 +77,20 @@ Full-repo review of the API, admin-web, guest-web, Chrome extension, ambient-con
 - [x] **No security headers anywhere** — no HSTS, CSP, `X-Frame-Options`, `nosniff`, `Referrer-Policy` from Traefik, either nginx, or the API (no `helmet`). Admin app is clickjackable and has no CSP backstop. **Done:** `helmet` on the API (CORP relaxed to same-site for guest-web's receipt `<img>`s); both nginx configs send CSP (API origin injected from `VITE_API_URL` at image build), HSTS, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` (`no-referrer` on guest-web, whose URLs carry the token), `Permissions-Policy`.
 - [x] **Guest confirmation tokens never expire** — `/r/:token` grants bank details (CBU/CUIL), the guest's own data and receipts, uploads, and a one-time contact-info overwrite, forever. The link travels through Airbnb messages and email. Fix: expire N days after check-out. **Done:** `TOKEN_VALID_DAYS_AFTER_CHECKOUT = 30`; an expired link gets the same 404 as an unknown one (guest-web already shows "link no válido").
 - [x] **HTML injection into outbound emails** — `guestName` (guest-controlled via confirm-dates, or scraped from Booking/Airbnb) was interpolated raw into the HTML email templates, staff alert emails and campaign emails — a phishing link inside a genuine La Brisa email to staff. Fix: HTML-escape interpolated values (templates themselves stay staff-authored HTML). **Done:** `common/escape-html.ts`, applied in `EmailService` (templates + alerts) and campaign bodies; `renderTemplate` itself untouched since it also renders plain-text WhatsApp/Airbnb messages.
-- [ ] **Guest identity takeover by email** — when a reservation has no `guestId` yet, confirm-dates upserts the `Guest` by email, so a token holder who types someone else's email links to (and overwrites name/phone on) that person's profile. Also: guests are enrolled in marketing with no explicit opt-in — check against Ley 25.326. **Design approved:** "link, fill blanks only" — see `docs/superpowers/specs/2026-09-29-guest-identity-takeover-design.md` (not yet implemented).
+- [ ] **Guest identity takeover by email** — when a reservation has no `guestId` yet, confirm-dates upserts the `Guest` by email, so a token holder who types someone else's email links to (and overwrites name/phone on) that person's profile. Also: guests are enrolled in marketing with no explicit opt-in — check against Ley 25.326. **Design approved:** folded into the guest identity document feature — see `docs/superpowers/specs/2026-09-29-guest-identity-document-design.md` (not yet implemented).
 - [ ] **Ambient device: physical tamper can silence life-safety alerts** — USB serial `CALIBRATE_CO`/`CALIBRATE_SMOKE` are unauthenticated and have no upper bound, so calibrating in contaminated air raises the threshold arbitrarily. Flash isn't encrypted, so a USB dump yields the WiFi password and `AMBIENT_API_KEY`. Fix: hard cap thresholds in firmware, alert server-side when a heartbeat-reported threshold changes, enable flash encryption/secure boot, tamper-resistant enclosure; keep a certified standalone CO detector regardless.
 - [ ] **CI host-key check is a no-op** — `ssh-keyscan` runs in the same job right before `StrictHostKeyChecking=yes` (`.github/workflows/deploy.yml`), so it trusts whatever answers. Fix: store the droplet's host key as a secret. Related: deploy user presumably in the `docker` group (root-equivalent) and Traefik mounts `docker.sock` — keep that SSH key tightly scoped.
-- [ ] **Plaintext production secrets in the local `.env`** — JWT secret, DB password, admin password, Twilio token in the commented reference block, file mode 644 (not committed). Fix: move to a password manager, `chmod 600`, rotate if this machine has been shared/backed up elsewhere.
+- [ ] **Plaintext production secrets in the local `.env`** (step-by-step in "Owner checklist" below) — JWT secret, DB password, admin password, Twilio token in the commented reference block, file mode 644 (not committed). Fix: move to a password manager, `chmod 600`, rotate if this machine has been shared/backed up elsewhere.
+
+**Personal-data protection (Ley 25.326 / AAIP Res. 47/2018)**
+- [ ] **No encryption at rest beyond the server disk** — names, emails, phones and receipt images sit in plain Postgres and on the uploads volume; a DB dump or backup exposes everything. Document numbers get app-level encryption in the guest-document feature; decide whether other fields/receipts need the same.
+- [ ] **Single shared admin account** — no per-staff users, no offboarding, no MFA, and the change-history "actor" is always the same email. Needs user management (and ideally MFA).
+- [ ] **Sessions can't be revoked** — JWT lives 8h in `localStorage`; logout only deletes the local copy. Consider short-lived tokens + refresh, or a server-side session/revocation list.
+- [ ] **No read/access audit** — changes are logged, reads aren't; nobody can answer "who viewed this guest's document".
+- [ ] **No visible backup strategy** — nothing in the repo backs up Postgres or the receipts volume (code comments assume droplet backups; verify). Backups must be encrypted and include a restore test.
+- [ ] **No retention policy or ARCO process** — guest data and receipts are kept forever; no way to handle access/rectification/deletion requests.
+- [ ] **No privacy notice or consent at collection** — check-in form doesn't inform the guest (Ley 25.326 art. 6), marketing enrollment has no opt-in, and the database likely needs registering with the AAIP's Registro Nacional de Bases de Datos.
+- [ ] **Third-party data sharing undisclosed** — guest names go to Google Calendar event titles; emails/phones to Resend and Twilio; hosting on DigitalOcean. Legitimate, but must be disclosed (and international transfers, art. 12, considered).
 
 **Low**
 - [ ] API-key guards compare with `!==` rather than a constant-time compare.
@@ -90,6 +100,28 @@ Full-repo review of the API, admin-web, guest-web, Chrome extension, ambient-con
 - [ ] Unsubscribe is a plain `GET`, so email-security link scanners can unsubscribe guests unintentionally.
 
 **Already solid:** OAuth `state` nonce; `@IsUrl` blocks `javascript:` in extension-error links; Postgres not exposed in prod; ESP32 validates TLS; UUIDv4 tokens; receipt images scoped to their reservation; extension has no `innerHTML`, no `externally_connectable`, HTTPS-only API URL; bcrypt; `ValidationPipe` whitelist; no secrets in git history; strong production secrets.
+
+## 11. Owner checklist (manual, not code)
+Things only Damian can do — nothing here goes in the repo. **Never paste secret values into this file**; names only.
+
+**Local `.env` cleanup** (`/home/smarbos/dev/brisaManager/.env`)
+- [ ] Save these to the password manager first, then **delete the whole commented `# PRODUCTION reference (droplet ...)` block** at the bottom of the file:
+  - Secrets: `JWT_SECRET`, `POSTGRES_PASSWORD`, `ADMIN_SEED_PASSWORD`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`
+  - Not secret, but part of the same block: `ADMIN_DOMAIN`, `GUEST_DOMAIN`, `API_DOMAIN`, `ACME_EMAIL`, `ADMIN_SEED_EMAIL`, `EMAIL_FROM`, `TWILIO_WHATSAPP_FROM`, and the stale `DEBUG_MODE=true` note (production actually reports `debugMode: false` as of 2026-09-29)
+- [ ] Save these **active** real values to the password manager too: `RESEND_API_KEY`, `GOOGLE_CLIENT_SECRET`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `EXTENSION_API_KEY`, `AMBIENT_API_KEY`. If any of them is the *production* credential, consider a separate dev/test credential for local use.
+- [ ] `chmod 600 .env` (currently 644 — readable by other users on this machine).
+- [ ] If this machine or its backups have ever been shared, rotate the secrets above.
+
+**Before deploying the guest identity document feature**
+- [ ] Generate two keys: `openssl rand -hex 32` (run it twice — one per key).
+- [ ] Add them to the **droplet's** `.env` as `DOCUMENT_ENCRYPTION_KEY` and `DOCUMENT_HASH_KEY` (the API won't start without them).
+- [ ] Save both in the password manager. **Losing `DOCUMENT_ENCRYPTION_KEY` makes every stored document number unreadable forever.**
+- [ ] Download any payment receipt still needed — the first retention run deletes receipts for stays that ended more than 30 days ago.
+
+**Legal / admin**
+- [ ] Have a lawyer review the check-in privacy notice (spec section 3), especially the AAIP legend wording.
+- [ ] Confirm the city/province for the notice's address ("Formosa 259, depto L").
+- [ ] Register the guest database with the AAIP's Registro Nacional de Bases de Datos.
 
 ## Planning order (proposed)
 1. Core reservation management + multi-channel source tracking + base infra skeleton (Docker, two-app structure, subdomain routing)
