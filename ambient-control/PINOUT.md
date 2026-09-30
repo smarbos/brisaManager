@@ -6,9 +6,11 @@ ESP32-WROOM-32 DevKit (38-pin). Pin choices avoid the boot-strapping pins
 
 | Sensor              | Sensor pin | ESP32 pin | Signal type            |
 |---------------------|------------|-----------|------------------------|
-| Sound sensor        | VCC        | 3V3       | Power                  |
+| Mic amp (MAX9814)   | VDD        | 3V3       | Power                  |
 |                     | GND        | GND       | Ground                 |
 |                     | OUT        | GPIO34    | Analog (ADC1, input-only) |
+|                     | GAIN       | not connected | Hardware select (floating = 60dB) |
+|                     | AR         | not connected | Hardware select (floating = default attack/release) |
 | MQ-7 (CO)           | VCC        | 3V3       | Power                  |
 |                     | GND        | GND       | Ground                 |
 |                     | AO         | GPIO35    | Analog (ADC1, input-only) |
@@ -27,11 +29,19 @@ ESP32-WROOM-32 DevKit (38-pin). Pin choices avoid the boot-strapping pins
 ## Notes
 
 - **MQ-7 and MQ-2's `DO` pins are unused.** Both are on-board threshold comparators with a
-  trimmer pot; only the raw analog (`AO`) signal is read, same as the sound sensor.
+  trimmer pot; only the raw analog (`AO`) signal is read, same as the mic amp's `OUT`.
 - **DHT22 is digital, not analog** — it doesn't need an ADC-capable pin like the other three.
-  GPIO27 is a general-purpose digital pin.
-- **3-pin sensor breakouts (sound, DHT22) need no external components.** The DHT22's 3-pin
-  breakout includes the required DATA pull-up resistor on-board.
+  GPIO27 is a general-purpose digital pin. Its 3-pin breakout includes the required DATA
+  pull-up resistor on-board, so it needs no external components either.
+- **The mic amp's `GAIN` and `AR` pins are hardware-only 3-state selects (float/GND/VDD),
+  not wired to the ESP32.** `GAIN` picks a fixed gain: floating = 60dB (the default here —
+  most sensitive), tied to GND = 50dB, tied to VDD = 40dB. `AR` picks the on-board AGC's
+  attack/release ratio: floating is the default (least aggressive); GND and VDD select faster
+  ratios. Reducing `GAIN` (tie to GND or VDD) is the fix if 60dB clips too easily in a small
+  room. `OUT` is a raw AC-coupled audio waveform (~1.25V DC bias, up to 2Vpp), not a
+  pre-detected envelope like the old 3-pin sound module — `readSoundLevel()` in `src/main.cpp`
+  derives a loudness value from it by sampling for a short window and taking the peak-to-peak
+  amplitude, same technique any MAX9814 sound-level project uses.
 - **4-pin gas sensor breakouts (MQ-7, MQ-2) run their heaters continuously at 5V**, wired
   internally on the breakout board — no external driver circuit needed, but also no
   datasheet-correct duty-cycled heating, so their readings are a relative trend rather than a
