@@ -6,22 +6,38 @@ reporting them to a server for storage and threshold notifications.
 ## Hardware
 
 - ESP32-WROOM-32 DevKit, 38-pin, USB-C
-- Sound sensor module (3-pin: OUT, VCC, GND)
+- MAX9814 electret mic amplifier module (5-pin: AR, OUT, GAIN, VDD, GND)
 - MQ-7 carbon monoxide sensor module (4-pin: VCC, GND, AO, DO)
 - MQ-2 smoke/combustible gas sensor module (4-pin: VCC, GND, AO, DO)
 - DHT22 temperature/humidity sensor module (3-pin: VCC, DATA, GND)
 - Active buzzer module (2-3 pin, has its own oscillator) - alert buzzer
 
-## Wiring (sound sensor)
+## Wiring (mic amp, MAX9814)
 
-| Sensor pin | ESP32 pin |
-|------------|-----------|
-| VCC        | 3V3       |
-| GND        | GND       |
-| OUT        | GPIO34    |
+| Sensor pin | ESP32 pin     |
+|------------|---------------|
+| VDD        | 3V3           |
+| GND        | GND           |
+| OUT        | GPIO34        |
+| GAIN       | not connected |
+| AR         | not connected |
 
 GPIO34 is an ADC1, input-only pin, chosen to avoid the boot-strapping pins
 (0/2/12/15) and the flash SPI pins (6-11).
+
+`GAIN` and `AR` are hardware-only 3-state pins (float/GND/VDD), not signals to read - they
+pick a fixed behavior on the chip itself rather than something the firmware controls. Per the
+module's datasheet:
+- `GAIN`: floating = 60dB (the default here, most sensitive), tied to GND = 50dB, tied to VDD
+  = 40dB. Tie to GND or VDD instead if 60dB clips too easily in a small/loud room.
+- `AR` (attack/release ratio for the chip's own automatic gain control): floating is the
+  default used here; GND and VDD select faster release ratios.
+
+`OUT` here is a raw AC-coupled audio waveform - datasheet-specified ~1.25V DC bias, up to 2Vpp
+swing - not a pre-detected loudness envelope like the 3-pin module this replaced. See
+`readSoundLevel()` in `src/main.cpp`: it samples continuously for a short window
+(`SOUND_WINDOW_MS`) and reports the peak-to-peak amplitude as the loudness value, the standard
+technique for turning this chip's raw output into a single "how loud" number.
 
 ## Wiring (MQ-7 carbon monoxide sensor)
 
@@ -32,9 +48,9 @@ GPIO34 is an ADC1, input-only pin, chosen to avoid the boot-strapping pins
 | AO         | GPIO35    |
 | DO         | not connected |
 
-Like the sound sensor, only the raw analog signal is used - DO is a
+Like the mic amp, only the raw analog signal is used - DO is a
 threshold comparator with an on-board trimmer, and isn't read. GPIO35 is
-another ADC1, input-only pin, distinct from the sound sensor's GPIO34.
+another ADC1, input-only pin, distinct from the mic amp's GPIO34.
 
 This is a simple breakout that runs the MQ-7's heater continuously at 5V
 with no firmware control. A datasheet-correct reading duty-cycles the
@@ -125,9 +141,11 @@ Sensores page (queued on the server, delivered on the device's next
 heartbeat - see the API's `AmbientService.recordHeartbeat` - so it can take
 up to `HEARTBEAT_INTERVAL_MS`, 5 minutes, to actually beep).
 
-The sound module is confirmed analog: OUT is a peak-detector envelope that
-spikes on a loud sound and decays back to ~0. It has no usable digital
-threshold output, so raw analog is the only signal used.
+The mic amp (MAX9814) has no built-in loudness detection: OUT is the raw AC-coupled audio
+waveform (~1.25V DC bias, up to 2Vpp swing). `readSoundLevel()` derives a loudness value from
+it in firmware - peak-to-peak amplitude over a short sampling window - which the rest of the
+sound-alerting logic below then treats exactly like the old 3-pin module's own hardware
+envelope output.
 
 Serial output (115200 baud):
 

@@ -14,9 +14,17 @@
 // call constructing (and needing to reconfigure) its own client.
 WiFiClientSecure secureClient;
 
-// 3-pin sound sensor module (OUT, VCC, GND). Confirmed analog: OUT gives a
-// peak-detector style envelope that spikes on a loud sound and decays back
-// to ~0. The module has no usable digital threshold output.
+// MAX9814 electret mic amplifier module (5-pin: AR, OUT, GAIN, VDD, GND).
+// Unlike the old 3-pin module, OUT is NOT a peak-detector envelope - it's the
+// raw AC-coupled audio waveform, biased around a ~1.25V DC offset with up to
+// 2Vpp swing, oscillating at actual audio frequencies. A single analogRead()
+// per loop would just catch a random instantaneous point on that waveform,
+// not "how loud" - see readSoundLevel() below, which derives a loudness
+// value (peak-to-peak amplitude over a short sampling window) the same way
+// every MAX9814 sound-level project does.
+// GAIN and AR are hardware-only 3-state pins (float/GND/VDD), not wired to
+// the ESP32 - see PINOUT.md for what each position does and the chosen
+// default.
 const int SOUND_SENSOR_PIN = 34; // ADC1, input-only, avoids strapping/flash pins
 
 // 4-pin MQ-7 (carbon monoxide) breakout module (VCC, GND, AO, DO). DO is left unconnected -
@@ -41,6 +49,28 @@ const int BUZZER_PIN = 26; // general-purpose digital output, avoids strapping/f
 const unsigned long SAMPLE_INTERVAL_MS = 100;
 unsigned long lastSampleAt = 0;
 unsigned long bootAt = 0;
+
+// How long readSoundLevel() spends sampling the raw MAX9814 waveform per call - long enough
+// to catch several cycles even of a low-pitched sound (~100Hz -> 10ms/cycle), short enough to
+// stay well inside SAMPLE_INTERVAL_MS's 100ms budget alongside the CO/smoke/DHT22 work.
+const unsigned long SOUND_WINDOW_MS = 20;
+
+// Derives a "loudness" value from the MAX9814's raw AC audio output: the peak-to-peak
+// amplitude (max - min ADC reading) seen while sampling continuously for SOUND_WINDOW_MS.
+// Silence stays near 0 (the waveform barely moves off its ~1.25V DC bias); louder sound widens
+// the swing. This replaces the old 3-pin module's own hardware envelope detection, which the
+// MAX9814 doesn't have - see the SOUND_SENSOR_PIN comment above.
+int readSoundLevel() {
+  int minValue = 4095;
+  int maxValue = 0;
+  unsigned long start = millis();
+  while (millis() - start < SOUND_WINDOW_MS) {
+    int sample = analogRead(SOUND_SENSOR_PIN);
+    if (sample < minValue) minValue = sample;
+    if (sample > maxValue) maxValue = sample;
+  }
+  return maxValue - minValue;
+}
 
 // A reading at or above this counts as "loud". Send "CALIBRATE" over Serial
 // to re-measure this for the room the device is actually installed in
@@ -212,11 +242,10 @@ void runCalibration() {
   int ambientPeak = 0;
   unsigned long start = millis();
   while (millis() - start < CALIBRATION_DURATION_MS) {
-    int value = analogRead(SOUND_SENSOR_PIN);
+    int value = readSoundLevel();
     if (value > ambientPeak) {
       ambientPeak = value;
     }
-    delay(10);
   }
 
   loudThreshold = ambientPeak + CALIBRATION_MARGIN;
@@ -227,8 +256,7 @@ void runCalibration() {
   Serial.print(",");
   Serial.println(ambientPeak);
 
-  // Avoid a spurious EVENT immediately after calibration if the sensor was
-  // mid-decay from a sound when the window ended.
+  // Reset in case ambient room noise right at calibration's end happened to read as loud.
   wasLoud = false;
 }
 
@@ -640,7 +668,7 @@ void loop() {
   }
   lastSampleAt = now;
 
-  int analogValue = analogRead(SOUND_SENSOR_PIN);
+  int analogValue = readSoundLevel();
   lastAnalogValue = analogValue;
 
   Serial.print(now);
