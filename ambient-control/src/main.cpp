@@ -299,6 +299,25 @@ void runCalibration() {
   loudSampleStreak = 0;
 }
 
+// Triggered by sending "SET_LOUD_THRESHOLD <value>" over Serial - sets loudThreshold to an
+// explicit value instead of measuring one, for when a calibrated threshold turns out to flag
+// the room's normal everyday volume as loud. Persisted the same way as a CALIBRATE result.
+void setLoudThreshold(int value) {
+  if (value <= 0) {
+    Serial.println("SET_LOUD_THRESHOLD needs a positive number, e.g. SET_LOUD_THRESHOLD 200");
+    return;
+  }
+
+  loudThreshold = value;
+  preferences.putInt(PREFS_KEY_LOUD_THRESHOLD, loudThreshold);
+
+  Serial.print("LOUD_THRESHOLD_SET,");
+  Serial.println(loudThreshold);
+
+  isLoud = false;
+  loudSampleStreak = 0;
+}
+
 // Triggered by sending "CALIBRATE_CO" over Serial - independent from the sound sensor's
 // CALIBRATE command, so recalibrating one sensor never disturbs the other's saved threshold.
 // Measures this specific MQ-7 unit's clean-air baseline (accounts for manufacturing variance
@@ -373,6 +392,8 @@ void checkSerialCommand() {
       runCoCalibration();
     } else if (command == "CALIBRATE_SMOKE") {
       runSmokeCalibration();
+    } else if (command.startsWith("SET_LOUD_THRESHOLD ")) {
+      setLoudThreshold(command.substring(strlen("SET_LOUD_THRESHOLD ")).toInt());
     } else if (command == "TEST_BUZZER") {
       testBuzzer();
     }

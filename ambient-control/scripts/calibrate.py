@@ -6,8 +6,12 @@ for: the firmware samples for ~5 seconds (keep the room quiet while it
 runs), sets loudThreshold to 3x the 99th-percentile quiet reading (at least
 +50), and persists it to flash (survives a reboot/power-off).
 
+With --threshold N, skips measuring and sets loudThreshold to N instead
+(the firmware's "SET_LOUD_THRESHOLD N" command) - for when the calibrated
+value flags the room's normal everyday volume as loud. Also saved to flash.
+
 Usage:
-    python3 scripts/calibrate.py [port] [--baud 115200]
+    python3 scripts/calibrate.py [port] [--baud 115200] [--threshold N]
 
 If no port is given, auto-detects the first USB serial device that looks
 like an ESP32 dev board's USB-UART bridge (CP210x/CH340/FTDI).
@@ -44,6 +48,7 @@ except ImportError:
 # loop() - and its Serial.available() polling - ever starts).
 SAMPLE_LINE = re.compile(r"^\d+,\d+$")
 CALIBRATED_LINE = re.compile(r"^CALIBRATED,(\d+),(\d+)$")
+THRESHOLD_SET_LINE = re.compile(r"^LOUD_THRESHOLD_SET,(\d+)$")
 
 READY_TIMEOUT_S = 20  # covers a worst-case WiFi connect timeout, plus margin
 CALIBRATION_TIMEOUT_S = 10  # firmware's own calibration window is 5s
@@ -104,10 +109,24 @@ def run_calibration(ser):
     return False
 
 
+def set_threshold(ser, threshold):
+    ser.write(f"SET_LOUD_THRESHOLD {threshold}\n".encode())
+
+    deadline = time.time() + CALIBRATION_TIMEOUT_S
+    while time.time() < deadline:
+        line = read_line(ser)
+        if line and THRESHOLD_SET_LINE.match(line):
+            print(f"\nSet: loudThreshold={threshold}")
+            print("Saved to flash - this survives a reboot/power-off.")
+            return True
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("port", nargs="?", help="Serial device, e.g. /dev/ttyUSB0 (auto-detected if omitted)")
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate (default: matches Serial.begin(115200) in main.cpp)")
+    parser.add_argument("--threshold", type=int, help="Set loudThreshold to this value instead of calibrating")
     args = parser.parse_args()
 
     port = args.port or autodetect_port()
@@ -126,6 +145,11 @@ def main():
 
             if not wait_until_ready(ser):
                 sys.exit(f"\nFirmware never looked ready within {READY_TIMEOUT_S}s - check it's flashed and running.")
+
+            if args.threshold is not None:
+                if not set_threshold(ser, args.threshold):
+                    sys.exit(f"\nNo LOUD_THRESHOLD_SET line seen within {CALIBRATION_TIMEOUT_S}s - check the firmware has the SET_LOUD_THRESHOLD command.")
+                return
 
             if not run_calibration(ser):
                 sys.exit(f"\nNo CALIBRATED line seen within {CALIBRATION_TIMEOUT_S}s - check the sketch is the version with checkSerialCommand().")

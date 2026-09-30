@@ -179,6 +179,11 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
   when the install location, its background noise, or the `GAIN` wiring
   changes. The saved key changed along with the switch from peak-to-peak to
   RMS, so a threshold calibrated before that is ignored.
+- If the calibrated threshold flags the room's normal everyday volume as
+  loud, set it explicitly instead: `scripts/calibrate.py --threshold 200` (or
+  send `SET_LOUD_THRESHOLD 200`). Prints `LOUD_THRESHOLD_SET,value` and saves
+  it to flash the same way. For reference, party-level music measured ~150-300
+  (median ~230) on the living-room unit, and a quiet room ~20-30.
 - A sound counts as loud only after 3 consecutive readings (~250ms) at/above
   the threshold - single spikes and one-off claps or bangs don't count - and
   stays loud until a reading drops below 75% of the threshold, so a level
