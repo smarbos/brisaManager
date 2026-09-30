@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <algorithm>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -20,11 +21,12 @@ WiFiClientSecure secureClient;
 // 2Vpp swing, oscillating at actual audio frequencies. A single analogRead()
 // per loop would just catch a random instantaneous point on that waveform,
 // not "how loud" - see readSoundLevel() below, which derives a loudness
-// value (peak-to-peak amplitude over a short sampling window) the same way
-// every MAX9814 sound-level project does.
-// GAIN and AR are hardware-only 3-state pins (float/GND/VDD), not wired to
-// the ESP32 - see PINOUT.md for what each position does and the chosen
-// default.
+// value (RMS amplitude over a short sampling window) from it.
+// GAIN and AR are hardware-only 3-state pins (float/GND/VDD), not ESP32
+// signals. GAIN is tied to VDD (40dB, the least sensitive setting): at the
+// floating 60dB default the chip's AGC turned a quiet room's background noise
+// up until it filled most of the ADC range, leaving little room between
+// "quiet" and "loud" - see PINOUT.md.
 const int SOUND_SENSOR_PIN = 34; // ADC1, input-only, avoids strapping/flash pins
 
 // 4-pin MQ-7 (carbon monoxide) breakout module (VCC, GND, AO, DO). DO is left unconnected -
@@ -50,57 +52,91 @@ const unsigned long SAMPLE_INTERVAL_MS = 100;
 unsigned long lastSampleAt = 0;
 unsigned long bootAt = 0;
 
-// How long readSoundLevel() spends sampling the raw MAX9814 waveform per call - long enough
-// to catch several cycles even of a low-pitched sound (~100Hz -> 10ms/cycle), short enough to
-// stay well inside SAMPLE_INTERVAL_MS's 100ms budget alongside the CO/smoke/DHT22 work.
-const unsigned long SOUND_WINDOW_MS = 20;
+// How long readSoundLevel() spends sampling the raw MAX9814 waveform per call - several cycles
+// even of a low-pitched sound (~100Hz -> 10ms/cycle), and long enough for the RMS to average
+// out single-sample ADC spikes, while staying inside SAMPLE_INTERVAL_MS's 100ms budget alongside
+// the CO/smoke/DHT22 work.
+const unsigned long SOUND_WINDOW_MS = 50;
 
-// Derives a "loudness" value from the MAX9814's raw AC audio output: the peak-to-peak
-// amplitude (max - min ADC reading) seen while sampling continuously for SOUND_WINDOW_MS.
-// Silence stays near 0 (the waveform barely moves off its ~1.25V DC bias); louder sound widens
-// the swing. This replaces the old 3-pin module's own hardware envelope detection, which the
-// MAX9814 doesn't have - see the SOUND_SENSOR_PIN comment above.
+// Derives a "loudness" value from the MAX9814's raw AC audio output: the RMS amplitude of the
+// waveform around its own mean (the ~1.25V DC bias) while sampling continuously for
+// SOUND_WINDOW_MS. Silence stays near the ADC's own noise floor; louder sound raises it. RMS
+// rather than peak-to-peak (max - min) because max - min is set by the two most extreme samples
+// in the window, so a single ADC spike reads as loud - it made a quiet room read anywhere from
+// ~550 to ~1900. With the chip's output capped at ~2Vpp, the highest this reaches is ~850.
 int readSoundLevel() {
-  int minValue = 4095;
-  int maxValue = 0;
+  int64_t sum = 0;
+  int64_t sumOfSquares = 0;
+  int32_t count = 0;
   unsigned long start = millis();
   while (millis() - start < SOUND_WINDOW_MS) {
-    int sample = analogRead(SOUND_SENSOR_PIN);
-    if (sample < minValue) minValue = sample;
-    if (sample > maxValue) maxValue = sample;
+    int32_t sample = analogRead(SOUND_SENSOR_PIN);
+    sum += sample;
+    sumOfSquares += sample * sample;
+    count++;
   }
-  return maxValue - minValue;
+  // Variance = mean of squares - square of mean; a tiny negative from rounding clamps to 0.
+  double mean = (double)sum / count;
+  double variance = (double)sumOfSquares / count - mean * mean;
+  return variance > 0 ? (int)lround(sqrt(variance)) : 0;
 }
 
 // A reading at or above this counts as "loud". Send "CALIBRATE" over Serial
 // to re-measure this for the room the device is actually installed in
 // (see runCalibration) - this fallback only applies on a fresh device or
-// after NVS is erased.
-const int DEFAULT_LOUD_THRESHOLD = 800;
+// after NVS is erased. A rough placeholder for GAIN at 40dB, not a measured value.
+const int DEFAULT_LOUD_THRESHOLD = 150;
 int loudThreshold = DEFAULT_LOUD_THRESHOLD;
 
-// How long a CALIBRATE run samples for, and how much headroom it adds above
-// the loudest thing it saw during that window.
+// How long a CALIBRATE run samples for, and how the threshold is derived from it: the 99th
+// percentile of the quiet-room readings (not the single highest one, so one stray spike during
+// the run can't inflate it), times CALIBRATION_FACTOR (3x amplitude, ~+10dB), but at least
+// CALIBRATION_MIN_MARGIN above it - a proportional margin alone would sit right on top of the
+// ADC's own noise if the room is very quiet.
 const unsigned long CALIBRATION_DURATION_MS = 5000;
-const int CALIBRATION_MARGIN = 400;
+const int CALIBRATION_PERCENTILE = 99;
+const int CALIBRATION_FACTOR = 3;
+const int CALIBRATION_MIN_MARGIN = 50;
+// Enough room for every readSoundLevel() call CALIBRATION_DURATION_MS can fit.
+const int CALIBRATION_MAX_READINGS = CALIBRATION_DURATION_MS / SOUND_WINDOW_MS + 1;
 
 // Persists loudThreshold across power cycles (ESP32 NVS flash) so a
-// calibration done once survives a reboot/power-off.
+// calibration done once survives a reboot/power-off. The key changed along with the reading's
+// units (peak-to-peak -> RMS), so a threshold calibrated for the old measurement is ignored
+// instead of loaded as if it still meant the same thing.
 Preferences preferences;
 const char* PREFS_NAMESPACE = "ambient";
-const char* PREFS_KEY_LOUD_THRESHOLD = "loudThresh";
+const char* PREFS_KEY_LOUD_THRESHOLD = "loudRms";
+
+// A sound only counts as loud after LOUD_SUSTAIN_SAMPLES consecutive readings at/above
+// loudThreshold (~250ms at SAMPLE_INTERVAL_MS), so one noisy reading can't start an event.
+// Once loud, it stays loud until a reading drops below LOUD_RELEASE_PERCENT of the threshold -
+// the gap keeps a level hovering right at the threshold from counting as many separate events.
+const int LOUD_SUSTAIN_SAMPLES = 3;
+const int LOUD_RELEASE_PERCENT = 75;
+
+// A sound that stays loud continuously (music, a party) counts as another loud event every
+// LOUD_REPEAT_MS - otherwise it would be a single event however long it lasted, and never reach
+// the repeated-loud-noise rule below.
+const unsigned long LOUD_REPEAT_MS = 5000;
 
 // Repeated-loud-noise rule: alert when this many loud events happen within
 // this time window.
 const int REPEAT_COUNT = 5;
 const unsigned long REPEAT_WINDOW_MS = 30000;
 
-bool wasLoud = false;
+bool isLoud = false;
+int loudSampleStreak = 0;
+unsigned long lastLoudEventAt = 0;
 unsigned long loudEventTimes[REPEAT_COUNT] = {0};
 int loudEventIndex = 0;
 int loudEventsRecorded = 0;
 
 int lastAnalogValue = 0;
+// Running total of every sound reading since the last heartbeat, so the heartbeat reports the
+// average level over its whole interval rather than one arbitrary 50ms reading.
+uint32_t soundLevelSum = 0;
+uint32_t soundLevelCount = 0;
 unsigned long lastHeartbeatAt = 0;
 bool wifiWasConnected = false;
 
@@ -232,32 +268,35 @@ void setup() {
 }
 
 // Triggered by sending the line "CALIBRATE" over Serial. Pauses normal
-// sampling for CALIBRATION_DURATION_MS, measures the loudest reading seen
-// during that window (the room should be quiet), and sets loudThreshold to
-// that peak plus a safety margin. Persisted immediately, so it survives a
-// power-off - no need to recalibrate after every reboot.
+// sampling for CALIBRATION_DURATION_MS, records every reading during that
+// window (the room should be quiet), and sets loudThreshold from their
+// CALIBRATION_PERCENTILE - see CALIBRATION_FACTOR for the margin on top.
+// Persisted immediately, so it survives a power-off - no need to recalibrate
+// after every reboot.
 void runCalibration() {
   Serial.println("CALIBRATING... keep the room quiet for 5 seconds.");
 
-  int ambientPeak = 0;
+  static int readings[CALIBRATION_MAX_READINGS];
+  int readingCount = 0;
   unsigned long start = millis();
-  while (millis() - start < CALIBRATION_DURATION_MS) {
-    int value = readSoundLevel();
-    if (value > ambientPeak) {
-      ambientPeak = value;
-    }
+  while (millis() - start < CALIBRATION_DURATION_MS && readingCount < CALIBRATION_MAX_READINGS) {
+    readings[readingCount++] = readSoundLevel();
   }
 
-  loudThreshold = ambientPeak + CALIBRATION_MARGIN;
+  std::sort(readings, readings + readingCount);
+  int ambientLevel = readings[(readingCount - 1) * CALIBRATION_PERCENTILE / 100];
+
+  loudThreshold = max(ambientLevel * CALIBRATION_FACTOR, ambientLevel + CALIBRATION_MIN_MARGIN);
   preferences.putInt(PREFS_KEY_LOUD_THRESHOLD, loudThreshold);
 
   Serial.print("CALIBRATED,");
   Serial.print(loudThreshold);
   Serial.print(",");
-  Serial.println(ambientPeak);
+  Serial.println(ambientLevel);
 
   // Reset in case ambient room noise right at calibration's end happened to read as loud.
-  wasLoud = false;
+  isLoud = false;
+  loudSampleStreak = 0;
 }
 
 // Triggered by sending "CALIBRATE_CO" over Serial - independent from the sound sensor's
@@ -372,7 +411,8 @@ void sendAmbientAlert(const String& sensor, int level, int threshold, const Stri
 
 // Sent once right after WiFi connects, then every HEARTBEAT_INTERVAL_MS - proves the device
 // is alive even when nothing is currently alert-worthy, and reports each sensor's latest
-// reading so the Sensors page has something to show.
+// reading so the Sensors page has something to show (for sound, the average level since the
+// previous heartbeat - see takeAverageSoundLevel()).
 void sendHeartbeat(int currentSoundLevel, int currentCoLevel, int currentSmokeLevel, int currentTemperature, int currentHumidity) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("Skipping heartbeat POST: WiFi not connected.");
@@ -449,7 +489,40 @@ void recordLoudEvent(unsigned long now, int analogValue) {
   }
 }
 
-// Unlike the sound sensor's spike detection, CO danger comes from a sustained elevated
+// Called with every sound reading. Enters the loud state (and records an event) after
+// LOUD_SUSTAIN_SAMPLES consecutive readings at/above loudThreshold, records another event every
+// LOUD_REPEAT_MS it stays loud, and leaves it once a reading drops below LOUD_RELEASE_PERCENT of
+// the threshold.
+void updateLoudState(unsigned long now, int analogValue) {
+  if (!isLoud) {
+    loudSampleStreak = analogValue >= loudThreshold ? loudSampleStreak + 1 : 0;
+    if (loudSampleStreak >= LOUD_SUSTAIN_SAMPLES) {
+      isLoud = true;
+      lastLoudEventAt = now;
+      recordLoudEvent(now, analogValue);
+    }
+    return;
+  }
+
+  if (analogValue * 100 < loudThreshold * LOUD_RELEASE_PERCENT) {
+    isLoud = false;
+    loudSampleStreak = 0;
+  } else if (now - lastLoudEventAt >= LOUD_REPEAT_MS) {
+    lastLoudEventAt = now;
+    recordLoudEvent(now, analogValue);
+  }
+}
+
+// Average sound level since the last call (i.e. since the last heartbeat), then starts a new
+// interval. Falls back to the latest reading if none were taken in between.
+int takeAverageSoundLevel() {
+  int average = soundLevelCount > 0 ? soundLevelSum / soundLevelCount : lastAnalogValue;
+  soundLevelSum = 0;
+  soundLevelCount = 0;
+  return average;
+}
+
+// Unlike the sound sensor's ~250ms loud detection, CO danger comes from a sustained elevated
 // reading, not a brief crossing - a single noisy ADC sample shouldn't trigger an alert. Tracks
 // how long the reading has stayed at/above coAlertThreshold, and only alerts once that's held
 // for CO_SUSTAINED_MS. While it remains elevated, re-sends at most every CO_REALERT_INTERVAL_MS
@@ -494,8 +567,8 @@ void checkCoAlert(unsigned long now, int coValue) {
 }
 
 // Smoke is urgent, unlike CO's sustained-exposure model - alerts on the rising edge (crossing
-// from below to at/above threshold), same shape as the sound sensor's EVENT detection, so a
-// real smoke event gets reported within one sample instead of waiting a minute. While it stays
+// from below to at/above threshold), so a real smoke event gets reported within one sample
+// instead of waiting a minute. While it stays
 // elevated, re-sends at most every SMOKE_REALERT_INTERVAL_MS - avoids spamming the API from
 // ADC noise bouncing right at the threshold, while still re-confirming reasonably often.
 void checkSmokeAlert(unsigned long now, int smokeValue) {
@@ -647,10 +720,10 @@ void loop() {
     // Just connected - either the very first time, or a reconnect after a drop. Report in
     // right away rather than waiting for the next scheduled heartbeat, so the server (and
     // anyone who got a DEVICE_OFFLINE alert) finds out we're back as soon as possible.
-    sendHeartbeat(lastAnalogValue, lastCoValue, lastSmokeValue, lastTemperature, lastHumidity);
+    sendHeartbeat(takeAverageSoundLevel(), lastCoValue, lastSmokeValue, lastTemperature, lastHumidity);
     lastHeartbeatAt = now;
   } else if (wifiConnected && now - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
-    sendHeartbeat(lastAnalogValue, lastCoValue, lastSmokeValue, lastTemperature, lastHumidity);
+    sendHeartbeat(takeAverageSoundLevel(), lastCoValue, lastSmokeValue, lastTemperature, lastHumidity);
     lastHeartbeatAt = now;
   }
   wifiWasConnected = wifiConnected;
@@ -670,16 +743,14 @@ void loop() {
 
   int analogValue = readSoundLevel();
   lastAnalogValue = analogValue;
+  soundLevelSum += analogValue;
+  soundLevelCount++;
 
   Serial.print(now);
   Serial.print(",");
   Serial.println(analogValue);
 
-  bool isLoud = analogValue >= loudThreshold;
-  if (isLoud && !wasLoud) {
-    recordLoudEvent(now, analogValue);
-  }
-  wasLoud = isLoud;
+  updateLoudState(now, analogValue);
 
   int coValue = analogRead(CO_SENSOR_PIN);
   lastCoValue = coValue;
