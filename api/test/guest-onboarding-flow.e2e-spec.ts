@@ -64,8 +64,8 @@ describe('Full guest onboarding flow (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         guestName: 'Onboarding E2E Guest',
-        checkIn: '2026-05-01',
-        checkOut: '2026-05-05',
+        checkIn: '2099-05-01',
+        checkOut: '2099-05-05',
         paxCount: 2,
         source: 'DIRECT',
         totalAmount: 150000,
@@ -121,8 +121,8 @@ describe('Full guest onboarding flow (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         guestName: 'Onboarding E2E Guest',
-        checkIn: '2026-06-01',
-        checkOut: '2026-06-05',
+        checkIn: '2099-06-01',
+        checkOut: '2099-06-05',
         paxCount: 2,
         source: 'DIRECT',
         totalAmount: 150000,

@@ -1,10 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileStorageService } from '../storage/file-storage.service';
+import { detectImageType, isServableMimeType } from './image-type';
 
 const RECEIPTS_SUBDIR = 'receipts';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+// Sent on every receipt file response (staff and guest routes alike): if one were ever
+// opened directly as a page, no script in it could run.
+export const RECEIPT_FILE_CSP = "default-src 'none'; img-src 'self'; sandbox";
 
 @Injectable()
 export class ReservationImagesService {
@@ -21,6 +30,13 @@ export class ReservationImagesService {
     file: Express.Multer.File,
     message?: string,
   ) {
+    const detected = detectImageType(file.buffer);
+    if (!detected) {
+      throw new BadRequestException(
+        'Only JPEG, PNG, GIF, WebP or HEIC images are allowed',
+      );
+    }
+
     const reservation = await this.prisma.reservation.findUnique({
       where: { id: reservationId },
     });
@@ -31,7 +47,8 @@ export class ReservationImagesService {
     const filename = await this.fileStorage.save(
       RECEIPTS_SUBDIR,
       file.buffer,
-      file.originalname,
+      // The stored extension comes from the detected type, not the client's filename.
+      `receipt${detected.extension}`,
     );
 
     return this.prisma.reservationImage.create({
@@ -39,7 +56,7 @@ export class ReservationImagesService {
         reservationId,
         filename,
         originalName: file.originalname || null,
-        mimeType: file.mimetype,
+        mimeType: detected.mimeType,
         sizeBytes: file.size,
         message: message || null,
       },
@@ -67,6 +84,30 @@ export class ReservationImagesService {
       );
     }
     return image;
+  }
+
+  // Checks every file before any is saved, so a multi-file submission with one bad file is
+  // rejected outright rather than half-stored.
+  assertAllowedImages(files: Express.Multer.File[]): void {
+    for (const file of files) {
+      if (!detectImageType(file.buffer)) {
+        throw new BadRequestException(
+          'Only JPEG, PNG, GIF, WebP or HEIC images are allowed',
+        );
+      }
+    }
+  }
+
+  // Response options for streaming a stored image back. Anything whose stored type isn't one
+  // this service would itself have detected (legacy rows from before magic-byte checks)
+  // goes out as an opaque attachment, never as something a browser renders.
+  streamOptions(image: { mimeType: string }): {
+    type: string;
+    disposition?: string;
+  } {
+    return isServableMimeType(image.mimeType)
+      ? { type: image.mimeType }
+      : { type: 'application/octet-stream', disposition: 'attachment' };
   }
 
   readFile(image: { filename: string }): Promise<Buffer> {

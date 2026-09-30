@@ -1,12 +1,16 @@
 import {
   Controller,
   Get,
+  Header,
   Param,
   StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ReservationImagesService } from './reservation-images.service';
+import {
+  RECEIPT_FILE_CSP,
+  ReservationImagesService,
+} from './reservation-images.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('reservations/:reservationId/images')
@@ -20,7 +24,9 @@ export class ReservationImagesController {
     return this.reservationImagesService.listForReservation(reservationId);
   }
 
+  // Even a genuine image is never a document: sandboxed, no subresources, no sniffing.
   @Get(':imageId/file')
+  @Header('Content-Security-Policy', RECEIPT_FILE_CSP)
   async getFile(
     @Param('reservationId') reservationId: string,
     @Param('imageId') imageId: string,
@@ -30,6 +36,9 @@ export class ReservationImagesController {
       imageId,
     );
     const buffer = await this.reservationImagesService.readFile(image);
-    return new StreamableFile(buffer, { type: image.mimeType });
+    return new StreamableFile(
+      buffer,
+      this.reservationImagesService.streamOptions(image),
+    );
   }
 }

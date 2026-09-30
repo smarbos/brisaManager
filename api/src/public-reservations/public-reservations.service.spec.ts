@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { PublicReservationsService } from './public-reservations.service';
+import { PublicReservationsService, TOKEN_VALID_DAYS_AFTER_CHECKOUT } from './public-reservations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
@@ -22,16 +22,22 @@ describe('PublicReservationsService', () => {
     listForReservation: jest.Mock;
     getOne: jest.Mock;
     readFile: jest.Mock;
+    assertAllowedImages: jest.Mock;
+    streamOptions: jest.Mock;
   };
   let notificationsService: { create: jest.Mock };
   let ambientService: { listDevices: jest.Mock };
+
+  // Relative to today, not fixed dates: a stay that ended more than
+  // TOKEN_VALID_DAYS_AFTER_CHECKOUT ago makes the token itself stop working.
+  const inDays = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
   const baseReservation = {
     id: 'res-1',
     confirmationToken: 'tok-1',
     guestName: 'Jane Doe',
-    checkIn: new Date('2026-03-01'),
-    checkOut: new Date('2026-03-05'),
+    checkIn: inDays(10),
+    checkOut: inDays(14),
     paxCount: 2,
     totalAmount: 100000,
     currency: 'ARS',
@@ -59,6 +65,8 @@ describe('PublicReservationsService', () => {
       listForReservation: jest.fn(),
       getOne: jest.fn(),
       readFile: jest.fn(),
+      assertAllowedImages: jest.fn(),
+      streamOptions: jest.fn(),
     };
     notificationsService = { create: jest.fn() };
     ambientService = { listDevices: jest.fn() };
@@ -480,12 +488,28 @@ describe('PublicReservationsService', () => {
     });
   });
 
+  describe('submitPaymentUpdate file validation', () => {
+    it('rejects the whole submission, uploading nothing, if any file is not an allowed image', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+      reservationImagesService.assertAllowedImages.mockImplementation(() => {
+        throw new BadRequestException('Only JPEG, PNG, GIF, WebP or HEIC images are allowed');
+      });
+
+      await expect(
+        service.submitPaymentUpdate('tok-1', [{ buffer: Buffer.from('<svg/>') } as Express.Multer.File]),
+      ).rejects.toThrow(BadRequestException);
+      expect(reservationImagesService.upload).not.toHaveBeenCalled();
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getImageFile', () => {
     it('resolves the token, then the image scoped to that reservation, then reads the file', async () => {
       prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
       const image = { id: 'img-1', mimeType: 'image/jpeg', filename: 'x.jpg' };
       reservationImagesService.getOne.mockResolvedValue(image);
       reservationImagesService.readFile.mockResolvedValue(Buffer.from('bytes'));
+      reservationImagesService.streamOptions.mockReturnValue({ type: 'image/jpeg' });
 
       const result = await service.getImageFile('tok-1', 'img-1');
 
@@ -494,7 +518,43 @@ describe('PublicReservationsService', () => {
         'img-1',
       );
       expect(reservationImagesService.readFile).toHaveBeenCalledWith(image);
-      expect(result).toEqual({ image, buffer: Buffer.from('bytes') });
+      expect(result).toEqual({
+        image,
+        buffer: Buffer.from('bytes'),
+        streamOptions: { type: 'image/jpeg' },
+      });
+    });
+  });
+
+  describe('findByToken (link expiry)', () => {
+    it('accepts a token up to TOKEN_VALID_DAYS_AFTER_CHECKOUT days after check-out', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        checkIn: inDays(-TOKEN_VALID_DAYS_AFTER_CHECKOUT - 4),
+        checkOut: inDays(-TOKEN_VALID_DAYS_AFTER_CHECKOUT + 1),
+      });
+
+      await expect(service.findByToken('tok-1')).resolves.toMatchObject({ id: 'res-1' });
+    });
+
+    it('rejects a token once TOKEN_VALID_DAYS_AFTER_CHECKOUT days have passed since check-out', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        checkIn: inDays(-TOKEN_VALID_DAYS_AFTER_CHECKOUT - 5),
+        checkOut: inDays(-TOKEN_VALID_DAYS_AFTER_CHECKOUT - 1),
+      });
+
+      await expect(service.findByToken('tok-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects an expired token on write endpoints too, without touching the reservation', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({
+        ...baseReservation,
+        checkOut: inDays(-TOKEN_VALID_DAYS_AFTER_CHECKOUT - 1),
+      });
+
+      await expect(service.acceptContract('tok-1')).rejects.toThrow(NotFoundException);
+      expect(prisma.reservation.update).not.toHaveBeenCalled();
     });
   });
 
@@ -603,8 +663,8 @@ describe('PublicReservationsService', () => {
       process.env.DEBUG_MODE = 'true';
       prisma.reservation.findUnique.mockResolvedValue({
         ...baseReservation,
-        checkIn: new Date('2020-01-01'),
-        checkOut: new Date('2020-01-05'),
+        checkIn: inDays(20),
+        checkOut: inDays(25),
         confirmationPaymentReceivedAt: null,
         depositReceivedAt: null,
       });

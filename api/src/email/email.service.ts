@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 import { SettingsService } from '../settings/settings.service';
 import { renderTemplate } from '../common/render-template';
+import { escapeHtml, escapeHtmlVars } from '../common/escape-html';
 
 function formatDateOnly(date: Date): string {
   return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC' }).format(date);
@@ -45,7 +46,7 @@ export class EmailService {
   // guestName/confirmationUrl are the only variables this template supports.
   async sendInitialConfirmationEmail(to: string, guestName: string, confirmationUrl: string): Promise<void> {
     const settings = await this.settingsService.get();
-    const html = renderTemplate(settings.initialEmailTemplate, { guestName, confirmationUrl });
+    const html = renderTemplate(settings.initialEmailTemplate, escapeHtmlVars({ guestName, confirmationUrl }));
 
     const { error } = await this.resend.emails.send({
       from: this.from,
@@ -65,12 +66,15 @@ export class EmailService {
   // one used in the initial email, so they can get back to it after the stay is confirmed.
   async sendFinalConfirmationEmail(to: string, guestName: string, confirmationUrl: string): Promise<void> {
     const settings = await this.settingsService.get();
-    const html = renderTemplate(settings.finalEmailTemplate, {
-      guestName,
-      propertyAddress: settings.propertyAddress,
-      googleMapsUrl: settings.googleMapsUrl,
-      confirmationUrl,
-    });
+    const html = renderTemplate(
+      settings.finalEmailTemplate,
+      escapeHtmlVars({
+        guestName,
+        propertyAddress: settings.propertyAddress,
+        googleMapsUrl: settings.googleMapsUrl,
+        confirmationUrl,
+      }),
+    );
 
     const { error } = await this.resend.emails.send({
       from: this.from,
@@ -90,11 +94,14 @@ export class EmailService {
   // real time-of-day component.
   async sendCancellationEmail(to: string, guestName: string, checkIn: Date, checkOut: Date): Promise<void> {
     const settings = await this.settingsService.get();
-    const html = renderTemplate(settings.cancellationEmailTemplate, {
-      guestName,
-      checkIn: formatDateOnly(checkIn),
-      checkOut: formatDateOnly(checkOut),
-    });
+    const html = renderTemplate(
+      settings.cancellationEmailTemplate,
+      escapeHtmlVars({
+        guestName,
+        checkIn: formatDateOnly(checkIn),
+        checkOut: formatDateOnly(checkOut),
+      }),
+    );
 
     const { error } = await this.resend.emails.send({
       from: this.from,
@@ -131,7 +138,9 @@ export class EmailService {
         from: this.from,
         to: this.resolveRecipient(this.alertEmail),
         subject: this.subjectForDebug(`[Alert] ${subject}`, this.alertEmail),
-        html: `<p>${message}</p>`,
+        // message routinely embeds a guest's name and upstream error text — escaped so neither
+        // can inject markup (e.g. a phishing link) into an email that goes to staff.
+        html: `<p>${escapeHtml(message)}</p>`,
       });
     } catch (error) {
       this.logger.error(`Failed to send alert email: ${(error as Error).message}`);

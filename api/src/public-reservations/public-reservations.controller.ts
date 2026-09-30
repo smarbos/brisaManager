@@ -3,25 +3,34 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   Post,
   StreamableFile,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { PublicReservationsService } from './public-reservations.service';
 import { ConfirmDatesDto } from './dto/confirm-dates.dto';
 import { UploadReceiptDto } from './dto/upload-receipt.dto';
-import { MAX_UPLOAD_BYTES } from '../reservation-images/reservation-images.service';
+import {
+  MAX_UPLOAD_BYTES,
+  RECEIPT_FILE_CSP,
+} from '../reservation-images/reservation-images.service';
+import { PublicReservationTokenGuard } from './public-reservation-token.guard';
 
 // A guest realistically attaches a handful of receipts per submission, never more — this
 // just bounds worst-case request size/processing, not a real product constraint.
 const MAX_FILES_PER_SUBMISSION = 10;
 
+// ThrottlerGuard runs first so that guessing tokens counts against the per-IP limit too.
+@UseGuards(ThrottlerGuard, PublicReservationTokenGuard)
 @Controller('public/reservations')
 export class PublicReservationsController {
   constructor(private readonly service: PublicReservationsService) {}
@@ -47,13 +56,19 @@ export class PublicReservationsController {
   }
 
   @Post(':token/images')
+  @Throttle({ public: { ttl: 60_000, limit: 10 } })
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(
     FilesInterceptor('files', MAX_FILES_PER_SUBMISSION, {
       storage: memoryStorage(),
       limits: { fileSize: MAX_UPLOAD_BYTES },
+      // A cheap early reject only — the client-sent mimetype can't be trusted, so the real
+      // check is ReservationImagesService's magic-byte detection once the bytes are in.
       fileFilter: (_req, file, callback) => {
-        if (!file.mimetype.startsWith('image/')) {
+        if (
+          !file.mimetype.startsWith('image/') ||
+          file.mimetype === 'image/svg+xml'
+        ) {
           callback(
             new BadRequestException('Only image files are allowed'),
             false,
@@ -78,11 +93,15 @@ export class PublicReservationsController {
   }
 
   @Get(':token/images/:imageId/file')
+  @Header('Content-Security-Policy', RECEIPT_FILE_CSP)
   async getImageFile(
     @Param('token') token: string,
     @Param('imageId') imageId: string,
   ): Promise<StreamableFile> {
-    const { image, buffer } = await this.service.getImageFile(token, imageId);
-    return new StreamableFile(buffer, { type: image.mimeType });
+    const { buffer, streamOptions } = await this.service.getImageFile(
+      token,
+      imageId,
+    );
+    return new StreamableFile(buffer, streamOptions);
   }
 }

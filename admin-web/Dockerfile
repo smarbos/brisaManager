@@ -19,3 +19,6 @@ RUN npm run build
 FROM nginx:alpine AS prod
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+# The CSP's connect-src must name the API origin this bundle was built to call.
+ARG VITE_API_URL
+RUN test -n "$VITE_API_URL" && sed -i "s#__API_URL__#${VITE_API_URL}#g" /etc/nginx/conf.d/default.conf

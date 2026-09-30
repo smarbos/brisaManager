@@ -72,8 +72,8 @@ describe('GuestsController (e2e)', () => {
     const reservationA = await prisma.reservation.create({
       data: {
         guestName: 'Placeholder',
-        checkIn: new Date('2026-03-01'),
-        checkOut: new Date('2026-03-05'),
+        checkIn: new Date('2099-03-01'),
+        checkOut: new Date('2099-03-05'),
         paxCount: 1,
         source: 'DIRECT',
         totalAmount: 50000,
@@ -83,8 +83,8 @@ describe('GuestsController (e2e)', () => {
     const reservationB = await prisma.reservation.create({
       data: {
         guestName: 'Placeholder',
-        checkIn: new Date('2026-04-01'),
-        checkOut: new Date('2026-04-05'),
+        checkIn: new Date('2099-04-01'),
+        checkOut: new Date('2099-04-05'),
         paxCount: 1,
         source: 'DIRECT',
         totalAmount: 50000,

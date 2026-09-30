@@ -19,6 +19,12 @@ import { diffReservationFields, reservationFieldLabel } from '../reservations/re
 // gate — so every write here is, by definition, the guest acting on their own reservation.
 const GUEST_ACTOR = 'Huésped';
 
+// A guest's link is only a credential for as long as they plausibly need it: it grants the
+// property's bank details, their own contact info and receipts, and uploads. Long enough after
+// check-out to settle the security-deposit return, then it stops working for good.
+export const TOKEN_VALID_DAYS_AFTER_CHECKOUT = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class PublicReservationsService {
   constructor(
@@ -32,11 +38,19 @@ export class PublicReservationsService {
     private readonly ambientService: AmbientService,
   ) {}
 
-  private async findByToken(token: string) {
+  // Also used by PublicReservationTokenGuard, so an unknown or expired token is rejected
+  // before any request body (e.g. a multipart upload) is even read. An expired link gets the
+  // same 404 as an unknown one — guest-web already shows "link no válido" for that.
+  async findByToken(token: string) {
     const reservation = await this.prisma.reservation.findUnique({
       where: { confirmationToken: token },
     });
     if (!reservation) {
+      throw new NotFoundException('Reservation not found');
+    }
+    const expiresAt =
+      reservation.checkOut.getTime() + TOKEN_VALID_DAYS_AFTER_CHECKOUT * DAY_MS;
+    if (Date.now() > expiresAt) {
       throw new NotFoundException('Reservation not found');
     }
     return reservation;
@@ -185,6 +199,8 @@ export class PublicReservationsService {
       throw new BadRequestException('Either a file or a message is required');
     }
 
+    this.reservationImagesService.assertAllowedImages(files);
+
     const reservation = await this.findByToken(token);
     const images = await Promise.all(
       files.map((file) =>
@@ -223,7 +239,11 @@ export class PublicReservationsService {
       imageId,
     );
     const buffer = await this.reservationImagesService.readFile(image);
-    return { image, buffer };
+    return {
+      image,
+      buffer,
+      streamOptions: this.reservationImagesService.streamOptions(image),
+    };
   }
 
   // A guest sees the property's current ambient sensor readings only once they're fully

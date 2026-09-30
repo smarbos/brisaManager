@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ReservationImagesService } from './reservation-images.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileStorageService } from '../storage/file-storage.service';
@@ -40,7 +40,7 @@ describe('ReservationImagesService', () => {
 
   describe('upload', () => {
     const file = {
-      buffer: Buffer.from('fake image'),
+      buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]),
       originalname: 'comprobante.jpg',
       mimetype: 'image/jpeg',
       size: 12345,
@@ -62,7 +62,7 @@ describe('ReservationImagesService', () => {
       expect(fileStorage.save).toHaveBeenCalledWith(
         'receipts',
         file.buffer,
-        'comprobante.jpg',
+        'receipt.jpg',
       );
       expect(prisma.reservationImage.create).toHaveBeenCalledWith({
         data: {
@@ -93,6 +93,47 @@ describe('ReservationImagesService', () => {
       expect(prisma.reservationImage.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ message: 'es la seña' }),
       });
+    });
+
+    it('stores the type detected from the bytes, not the client-claimed mimetype', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: 'res-1' });
+      fileStorage.save.mockResolvedValue('generated-uuid.png');
+      prisma.reservationImage.create.mockResolvedValue({ id: 'img-1' });
+
+      await service.upload('res-1', {
+        ...file,
+        buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        originalname: 'recibo.html',
+        mimetype: 'image/jpeg',
+      } as Express.Multer.File);
+
+      expect(fileStorage.save).toHaveBeenCalledWith(
+        'receipts',
+        expect.any(Buffer),
+        'receipt.png',
+      );
+      expect(prisma.reservationImage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ mimeType: 'image/png' }),
+      });
+    });
+
+    it('rejects an SVG claiming to be an image and never saves it', async () => {
+      const svg = {
+        ...file,
+        buffer: Buffer.from(
+          '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+        ),
+        originalname: 'recibo.svg',
+        mimetype: 'image/svg+xml',
+      } as Express.Multer.File;
+
+      await expect(service.upload('res-1', svg)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(() => service.assertAllowedImages([file, svg])).toThrow(
+        BadRequestException,
+      );
+      expect(fileStorage.save).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException for an unknown reservation and never saves the file', async () => {
@@ -134,6 +175,21 @@ describe('ReservationImagesService', () => {
       await expect(service.getOne('res-1', 'img-1')).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+  });
+
+  describe('streamOptions', () => {
+    it('serves a detected raster type as itself', () => {
+      expect(service.streamOptions({ mimeType: 'image/png' })).toEqual({
+        type: 'image/png',
+      });
+    });
+
+    it('serves a legacy SVG row as an opaque attachment', () => {
+      expect(service.streamOptions({ mimeType: 'image/svg+xml' })).toEqual({
+        type: 'application/octet-stream',
+        disposition: 'attachment',
+      });
     });
   });
 
