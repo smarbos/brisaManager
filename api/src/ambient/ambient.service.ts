@@ -1,6 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
+import { isWithinSoundAlertWindow, parseSoundAlertWindows } from './sound-alert-windows';
 import { LogAmbientAlertDto } from './dto/log-ambient-alert.dto';
 import { LogAmbientHeartbeatDto } from './dto/log-ambient-heartbeat.dto';
 import { AmbientReadingDto } from './dto/ambient-reading.dto';
@@ -57,6 +59,7 @@ export class AmbientService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async recordAlert(dto: LogAmbientAlertDto) {
@@ -75,6 +78,17 @@ export class AmbientService {
     // Sensors page reflects it too even between heartbeats.
     const readings = dto.level != null ? [{ sensor: dto.sensor, level: dto.level, threshold: dto.threshold }] : [];
     await this.recordDeviceActivity(dto.deviceId, undefined, readings);
+
+    // Repeated-loud-noise alerts are complaint-style, not safety-critical (unlike smoke/CO,
+    // which always notify) - staff only wants to be paged about them during configured quiet
+    // hours. The event above is still logged either way, so the raw history stays complete.
+    if (dto.sensor === 'sound') {
+      const settings = await this.settingsService.get();
+      const windows = parseSoundAlertWindows(settings.soundAlertWindows);
+      if (!isWithinSoundAlertWindow(windows, new Date())) {
+        return event;
+      }
+    }
 
     // Deduped the same way CALENDAR_MISMATCH is (see NotificationsService.hasOpen): while an
     // unread alert for this device+sensor is still open, repeated reports keep landing in the

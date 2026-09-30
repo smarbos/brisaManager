@@ -9,6 +9,7 @@ import {
 } from '../api/google-calendar';
 import { PageContainer, PageHeader, Alert, Button, Card, FormField, Input, Tabs, Textarea } from '../ui';
 import { formatDateTime } from '../lib/date';
+import { parseSoundAlertWindows, serializeSoundAlertWindows, SoundAlertWindowRow } from '../lib/sound-alert-windows';
 
 type SettingsTab = 'checkin' | 'alojamiento' | 'mensajes';
 
@@ -44,6 +45,7 @@ export function SettingsPage() {
   const [airbnbMessageTemplate, setAirbnbMessageTemplate] = useState('');
   const [bookingIcalUrl, setBookingIcalUrl] = useState('');
   const [airbnbIcalUrl, setAirbnbIcalUrl] = useState('');
+  const [soundAlertWindows, setSoundAlertWindows] = useState<SoundAlertWindowRow[]>([]);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -90,6 +92,7 @@ export function SettingsPage() {
         setAirbnbMessageTemplate(settings.airbnbMessageTemplate);
         setBookingIcalUrl(settings.bookingIcalUrl ?? '');
         setAirbnbIcalUrl(settings.airbnbIcalUrl ?? '');
+        setSoundAlertWindows(parseSoundAlertWindows(settings.soundAlertWindows));
         setLastSyncAt(settings.lastChannelSyncAt);
         setLastSyncError(settings.lastChannelSyncError);
       })
@@ -119,6 +122,18 @@ export function SettingsPage() {
         // section below simply won't have anything to show.
       });
   }, []);
+
+  function addSoundAlertWindow() {
+    setSoundAlertWindows((rows) => [...rows, { start: '22:00', end: '08:00' }]);
+  }
+
+  function updateSoundAlertWindow(index: number, field: 'start' | 'end', value: string) {
+    setSoundAlertWindows((rows) => rows.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  }
+
+  function removeSoundAlertWindow(index: number) {
+    setSoundAlertWindows((rows) => rows.filter((_, i) => i !== index));
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -151,6 +166,7 @@ export function SettingsPage() {
         airbnbMessageTemplate,
         bookingIcalUrl,
         airbnbIcalUrl,
+        soundAlertWindows: serializeSoundAlertWindows(soundAlertWindows),
         lastChannelSyncAt: lastSyncAt,
         lastChannelSyncError: lastSyncError,
       });
@@ -354,6 +370,49 @@ export function SettingsPage() {
               <Input value={airbnbIcalUrl} onChange={(e) => setAirbnbIcalUrl(e.target.value)} />
             </FormField>
           </div>
+        </Card>
+        )}
+
+        {activeTab === 'alojamiento' && (
+        <Card>
+          <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Alertas de ruido</h2>
+          <p className="mb-4 text-sm text-text-muted">
+            Un aviso de ruido repetido solo le llega al personal dentro de estos horarios (formato 24hs; un
+            horario puede cruzar la medianoche, por ejemplo 22:00 a 08:00). El evento siempre queda registrado en
+            el historial del dispositivo, tenga o no un horario configurado — esto solo controla el aviso al
+            personal.
+          </p>
+          {soundAlertWindows.length === 0 && (
+            <p className="mb-4 text-sm text-text-muted">
+              No hay horarios configurados — nunca se va a avisar al personal de ruido repetido.
+            </p>
+          )}
+          <div className="flex flex-col gap-3">
+            {soundAlertWindows.map((window, index) => (
+              <div key={index} className="flex flex-wrap items-end gap-3">
+                <FormField label="Desde">
+                  <Input
+                    type="time"
+                    value={window.start}
+                    onChange={(e) => updateSoundAlertWindow(index, 'start', e.target.value)}
+                  />
+                </FormField>
+                <FormField label="Hasta">
+                  <Input
+                    type="time"
+                    value={window.end}
+                    onChange={(e) => updateSoundAlertWindow(index, 'end', e.target.value)}
+                  />
+                </FormField>
+                <Button type="button" variant="danger-outline" onClick={() => removeSoundAlertWindow(index)}>
+                  Eliminar
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button type="button" variant="secondary" className="mt-3" onClick={addSoundAlertWindow}>
+            Agregar horario
+          </Button>
         </Card>
         )}
 

@@ -4,6 +4,11 @@ import { IsInt, IsOptional, IsString, Matches, Min, MinLength } from 'class-vali
 // api/src/settings/fee-value.ts for how this is parsed and resolved.
 const FEE_VALUE_PATTERN = /^\d+(\.\d+)?%?$/;
 
+// Empty, or one or more comma-separated "HH:MM-HH:MM" 24h ranges — see
+// api/src/ambient/sound-alert-windows.ts for how this is parsed and matched.
+const SOUND_ALERT_WINDOWS_PATTERN =
+  /^$|^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d(,([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d)*$/;
+
 export class UpdateSettingsDto {
   @IsString()
   @MinLength(1)
@@ -104,4 +109,10 @@ export class UpdateSettingsDto {
   @IsString()
   @MinLength(1)
   airbnbMessageTemplate: string;
+
+  @IsString()
+  @Matches(SOUND_ALERT_WINDOWS_PATTERN, {
+    message: 'soundAlertWindows must be empty, or comma-separated "HH:MM-HH:MM" 24h ranges (e.g. "22:00-08:00,13:00-15:00")',
+  })
+  soundAlertWindows: string;
 }

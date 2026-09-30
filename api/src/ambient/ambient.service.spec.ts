@@ -8,6 +8,7 @@ import {
 } from './ambient.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
 
 describe('AmbientService', () => {
   let service: AmbientService;
@@ -17,6 +18,7 @@ describe('AmbientService', () => {
     ambientDeviceReading: { upsert: jest.Mock };
   };
   let notificationsService: { hasOpen: jest.Mock; create: jest.Mock; resolveOpen: jest.Mock };
+  let settingsService: { get: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -34,12 +36,19 @@ describe('AmbientService', () => {
       create: jest.fn(),
       resolveOpen: jest.fn(),
     };
+    // Covers every sound-alert test below that isn't specifically exercising the time-window
+    // gate itself: a window covering all but one minute of any day, so those tests keep
+    // observing today's "sound always notifies" behavior without needing real-time control or
+    // to know about this feature. The dedicated "sound alert time windows" tests below need
+    // precise control over the current time, so they freeze it locally instead.
+    settingsService = { get: jest.fn().mockResolvedValue({ soundAlertWindows: '00:00-23:59' }) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         AmbientService,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsService, useValue: notificationsService },
+        { provide: SettingsService, useValue: settingsService },
       ],
     }).compile();
 
@@ -171,6 +180,67 @@ describe('AmbientService', () => {
       await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'smoke' });
 
       expect(prisma.ambientDeviceReading.upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('recordAlert - sound alert time windows', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('does not create a notification for a sound alert outside the configured windows, but still logs the event', async () => {
+      settingsService.get.mockResolvedValue({ soundAlertWindows: '22:00-08:00' });
+      jest.setSystemTime(new Date('2026-01-15T15:00:00.000Z')); // Buenos Aires 12:00 - outside 22:00-08:00
+      prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
+
+      const event = await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'sound', level: 1935 });
+
+      expect(prisma.ambientEvent.create).toHaveBeenCalled();
+      expect(notificationsService.create).not.toHaveBeenCalled();
+      expect(event).toEqual({ id: '1' });
+    });
+
+    it('creates a notification for a sound alert inside a configured window', async () => {
+      settingsService.get.mockResolvedValue({ soundAlertWindows: '22:00-08:00' });
+      jest.setSystemTime(new Date('2026-01-15T02:00:00.000Z')); // Buenos Aires 23:00 - inside 22:00-08:00
+      prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
+
+      await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'sound', level: 1935 });
+
+      expect(notificationsService.create).toHaveBeenCalled();
+    });
+
+    it('never notifies for a sound alert when no windows are configured at all', async () => {
+      settingsService.get.mockResolvedValue({ soundAlertWindows: '' });
+      prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
+
+      await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'sound', level: 1935 });
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('still respects the open-notification dedupe when inside a configured window', async () => {
+      settingsService.get.mockResolvedValue({ soundAlertWindows: '00:00-23:59' });
+      notificationsService.hasOpen.mockResolvedValue(true);
+      prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
+
+      await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'sound', level: 1935 });
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('always notifies for smoke and co regardless of sound window configuration, without even consulting it', async () => {
+      settingsService.get.mockResolvedValue({ soundAlertWindows: '' }); // would block sound entirely
+      prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
+
+      await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'smoke', level: 3000 });
+
+      expect(notificationsService.create).toHaveBeenCalled();
+      expect(settingsService.get).not.toHaveBeenCalled();
     });
   });
 

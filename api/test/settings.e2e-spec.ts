@@ -25,6 +25,7 @@ describe('SettingsController (e2e)', () => {
     depositReminderDaysAfter: number;
     reservationReminderWhatsappTemplate: string;
     depositReminderWhatsappTemplate: string;
+    soundAlertWindows: string;
   } | null;
 
   beforeAll(async () => {
@@ -86,6 +87,7 @@ describe('SettingsController (e2e)', () => {
         securityDepositValue: '15%',
         bookingIcalUrl: 'https://booking.example/e2e-cal.ics',
         airbnbIcalUrl: 'https://airbnb.example/e2e-cal.ics',
+        soundAlertWindows: '',
       })
       .expect(200);
 
@@ -122,6 +124,7 @@ describe('SettingsController (e2e)', () => {
         airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',
         securityDepositValue: '15%',
+        soundAlertWindows: '',
       })
       .expect(200);
 
@@ -160,6 +163,7 @@ describe('SettingsController (e2e)', () => {
         airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',
         securityDepositValue: '150000',
+        soundAlertWindows: '',
       })
       .expect(200);
 
@@ -196,6 +200,68 @@ describe('SettingsController (e2e)', () => {
         airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: 'not a valid value',
         securityDepositValue: '15%',
+        soundAlertWindows: '',
+      })
+      .expect(400);
+  });
+
+  it('persists soundAlertWindows through PUT /settings', async () => {
+    const response = await request(app.getHttpServer())
+      .put('/settings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        houseRulesText: 'E2E house rules',
+        paymentInstructions: 'E2E payment instructions',
+        depositInstructions: 'E2E deposit instructions',
+        propertyAddress: 'E2E property address',
+        googleMapsUrl: 'https://maps.example/e2e',
+        initialEmailTemplate: 'E2E initial template {{guestName}}',
+        finalEmailTemplate: 'E2E final template {{guestName}}',
+        cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
+        reservationReminderDaysBefore: 3,
+        depositReminderDaysAfter: 3,
+        reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
+        depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
+        confirmationStepText: 'E2E confirmation step text',
+        airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
+        confirmationPaymentValue: '30%',
+        securityDepositValue: '15%',
+        soundAlertWindows: '22:00-08:00,13:00-15:00',
+      })
+      .expect(200);
+
+    expect(response.body.soundAlertWindows).toBe('22:00-08:00,13:00-15:00');
+
+    const getResponse = await request(app.getHttpServer())
+      .get('/settings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    expect(getResponse.body.soundAlertWindows).toBe('22:00-08:00,13:00-15:00');
+  });
+
+  it('rejects a malformed soundAlertWindows value', async () => {
+    await request(app.getHttpServer())
+      .put('/settings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        houseRulesText: 'E2E house rules',
+        paymentInstructions: 'E2E payment instructions',
+        depositInstructions: 'E2E deposit instructions',
+        propertyAddress: 'E2E property address',
+        googleMapsUrl: 'https://maps.example/e2e',
+        initialEmailTemplate: 'E2E initial template {{guestName}}',
+        finalEmailTemplate: 'E2E final template {{guestName}}',
+        cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
+        reservationReminderDaysBefore: 3,
+        depositReminderDaysAfter: 3,
+        reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
+        depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
+        confirmationStepText: 'E2E confirmation step text',
+        airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
+        confirmationPaymentValue: '30%',
+        securityDepositValue: '15%',
+        soundAlertWindows: '25:00-08:00',
       })
       .expect(400);
   });
