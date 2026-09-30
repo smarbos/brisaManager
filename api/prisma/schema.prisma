@@ -143,6 +143,12 @@ model Settings {
   confirmationStepText          String @default("¡Todo listo! Completaste todos los pasos necesarios para tu estadía en La Brisa de Mar del Plata.")
   bookingIcalUrl            String?
   airbnbIcalUrl             String?
+  // Comma-separated "HH:MM-HH:MM" ranges (24h, Buenos Aires local time, may cross midnight) -
+  // a repeated-loud-noise alert only notifies staff when the current time falls inside one of
+  // these. Empty means never notify (quiet hours must be explicitly configured) - see
+  // api/src/ambient/sound-alert-windows.ts. Smoke/CO alerts are unaffected by this - they're
+  // always-on regardless of time.
+  soundAlertWindows         String    @default("")
   lastChannelSyncAt         DateTime?
   lastChannelSyncError      String?
   googleRefreshToken        String?

@@ -27,6 +27,7 @@ export interface Settings {
   airbnbIcalUrl: string | null;
   lastChannelSyncAt: string | null;
   lastChannelSyncError: string | null;
+  soundAlertWindows: string;
 }
 
 export function getSettings(): Promise<Settings> {

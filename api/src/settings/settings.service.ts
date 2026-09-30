@@ -75,6 +75,7 @@ export class SettingsService {
         securityDepositValue: '15%',
         confirmationStepText: DEFAULT_CONFIRMATION_STEP_TEXT,
         airbnbMessageTemplate: DEFAULT_AIRBNB_MESSAGE_TEMPLATE,
+        soundAlertWindows: '',
       },
     });
   }

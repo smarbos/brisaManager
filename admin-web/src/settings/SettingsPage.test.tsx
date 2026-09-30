@@ -31,6 +31,7 @@ const baseSettings: settingsApi.Settings = {
   airbnbMessageTemplate: 'Hi {{guestName}}, {{confirmationUrl}}',
   bookingIcalUrl: null,
   airbnbIcalUrl: null,
+  soundAlertWindows: '',
   lastChannelSyncAt: null,
   lastChannelSyncError: null,
 };
@@ -109,6 +110,53 @@ describe('SettingsPage', () => {
       expect(updateSpy).toHaveBeenCalledWith(
         expect.objectContaining({ cancellationEmailTemplate: 'Updated cancellation copy' }),
       ),
+    );
+  });
+
+  it('shows no sound alert windows by default, adds one, and saves it', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue(baseSettings);
+    const updateSpy = vi.spyOn(settingsApi, 'updateSettings').mockResolvedValue(baseSettings);
+
+    render(<SettingsPage />);
+
+    fireEvent.click(await screen.findByRole('tab', { name: /alojamiento/i }));
+    expect(screen.getByText(/nunca se va a avisar al personal/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /agregar horario/i }));
+    expect(screen.queryByText(/nunca se va a avisar al personal/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/desde/i)).toHaveValue('22:00');
+    expect(screen.getByLabelText(/hasta/i)).toHaveValue('08:00');
+
+    fireEvent.change(screen.getByLabelText(/desde/i), { target: { value: '23:00' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() =>
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ soundAlertWindows: '23:00-08:00' })),
+    );
+  });
+
+  it('loads existing sound alert windows as rows, removes one, and saves the rest', async () => {
+    vi.spyOn(settingsApi, 'getSettings').mockResolvedValue({
+      ...baseSettings,
+      soundAlertWindows: '22:00-08:00,13:00-15:00',
+    });
+    const updateSpy = vi.spyOn(settingsApi, 'updateSettings').mockResolvedValue(baseSettings);
+
+    render(<SettingsPage />);
+
+    fireEvent.click(await screen.findByRole('tab', { name: /alojamiento/i }));
+    const startInputs = await screen.findAllByLabelText(/desde/i);
+    expect(startInputs).toHaveLength(2);
+    expect(startInputs[0]).toHaveValue('22:00');
+    expect(startInputs[1]).toHaveValue('13:00');
+
+    fireEvent.click(screen.getAllByRole('button', { name: /eliminar/i })[0]);
+    expect(screen.getAllByLabelText(/desde/i)).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() =>
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ soundAlertWindows: '13:00-15:00' })),
     );
   });
 
