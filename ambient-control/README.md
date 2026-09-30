@@ -19,7 +19,7 @@ reporting them to a server for storage and threshold notifications.
 | VDD        | 3V3           |
 | GND        | GND           |
 | OUT        | GPIO34        |
-| GAIN       | not connected |
+| GAIN       | 3V3           |
 | AR         | not connected |
 
 GPIO34 is an ADC1, input-only pin, chosen to avoid the boot-strapping pins
@@ -28,16 +28,19 @@ GPIO34 is an ADC1, input-only pin, chosen to avoid the boot-strapping pins
 `GAIN` and `AR` are hardware-only 3-state pins (float/GND/VDD), not signals to read - they
 pick a fixed behavior on the chip itself rather than something the firmware controls. Per the
 module's datasheet:
-- `GAIN`: floating = 60dB (the default here, most sensitive), tied to GND = 50dB, tied to VDD
-  = 40dB. Tie to GND or VDD instead if 60dB clips too easily in a small/loud room.
+- `GAIN`: floating = 60dB (most sensitive), tied to GND = 50dB, tied to VDD = 40dB. Tied to
+  VDD (3V3) here: at 60dB the chip's automatic gain control raised a quiet room's background
+  noise until it filled most of the ADC range, so quiet and loud read almost the same.
+  Recalibrate after changing it.
 - `AR` (attack/release ratio for the chip's own automatic gain control): floating is the
   default used here; GND and VDD select faster release ratios.
 
 `OUT` here is a raw AC-coupled audio waveform - datasheet-specified ~1.25V DC bias, up to 2Vpp
 swing - not a pre-detected loudness envelope like the 3-pin module this replaced. See
 `readSoundLevel()` in `src/main.cpp`: it samples continuously for a short window
-(`SOUND_WINDOW_MS`) and reports the peak-to-peak amplitude as the loudness value, the standard
-technique for turning this chip's raw output into a single "how loud" number.
+(`SOUND_WINDOW_MS`, 50ms) and reports the RMS amplitude as the loudness value. RMS rather than
+peak-to-peak, because peak-to-peak is set by the two most extreme samples in the window, so a
+single ADC spike reads as loud.
 
 ## Wiring (MQ-7 carbon monoxide sensor)
 
@@ -143,15 +146,14 @@ up to `HEARTBEAT_INTERVAL_MS`, 5 minutes, to actually beep).
 
 The mic amp (MAX9814) has no built-in loudness detection: OUT is the raw AC-coupled audio
 waveform (~1.25V DC bias, up to 2Vpp swing). `readSoundLevel()` derives a loudness value from
-it in firmware - peak-to-peak amplitude over a short sampling window - which the rest of the
-sound-alerting logic below then treats exactly like the old 3-pin module's own hardware
-envelope output.
+it in firmware - RMS amplitude over a short sampling window - which the sound-alerting logic
+below then compares against `loudThreshold`.
 
 Serial output (115200 baud):
 
 ```
 millis,analog                        <- sound sample, every 100ms
-EVENT,millis,analog                  <- a sound reading crossed LOUD_THRESHOLD
+EVENT,millis,analog                  <- a loud event: sustained loud sound, or another 5s of it
 ALERT,millis,5 loud events within 30000ms   <- repeat-noise rule triggered, POSTed to the API
 CO,millis,analog                     <- CO sample, every 100ms
 CO_HIGH,millis,analog                <- CO reading just crossed coAlertThreshold
@@ -166,15 +168,25 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
 ```
 
 - `loudThreshold` marks a sample as "loud" - starts at `DEFAULT_LOUD_THRESHOLD`
-  (800) on a fresh device, but should be calibrated for wherever it's
-  actually installed: open the Serial Monitor, make sure the room is quiet,
-  and send the line `CALIBRATE`. The firmware samples for 5 seconds, sets
-  the threshold to the loudest thing it saw plus a safety margin, prints
-  `CALIBRATED,threshold,ambientPeak`, and saves it to flash (ESP32 NVS) so
+  (150, a rough placeholder for 40dB gain) on a fresh device, but should be
+  calibrated for wherever it's actually installed: make sure the room is
+  quiet and run `scripts/calibrate.py` (or send the line `CALIBRATE` from the
+  Serial Monitor). The firmware samples for 5 seconds, takes the 99th
+  percentile of those quiet readings (so one stray spike can't inflate it),
+  sets the threshold to 3x that (at least +50), prints
+  `CALIBRATED,threshold,ambientLevel`, and saves it to flash (ESP32 NVS) so
   it survives a power-off - no need to recalibrate after every reboot, only
-  when the install location or its background noise changes.
-- An `EVENT` is logged on the rising edge only (crossing from below to at/above
-  threshold), so one clap's decay tail isn't counted as multiple events.
+  when the install location, its background noise, or the `GAIN` wiring
+  changes. The saved key changed along with the switch from peak-to-peak to
+  RMS, so a threshold calibrated before that is ignored.
+- A sound counts as loud only after 3 consecutive readings (~250ms) at/above
+  the threshold - single spikes and one-off claps or bangs don't count - and
+  stays loud until a reading drops below 75% of the threshold, so a level
+  hovering right at the threshold isn't counted as many events. An `EVENT` is
+  logged when it becomes loud, and again every 5s it stays loud, so
+  continuous noise (music, a party) still reaches the repeat rule below.
+- The heartbeat reports the average sound level since the previous
+  heartbeat, not a single reading.
 - An `ALERT` fires when `REPEAT_COUNT` (5) loud events occur within
   `REPEAT_WINDOW_MS` (30000ms), and can re-fire if the pattern continues -
   the server itself dedupes repeat alerts into a single open notification

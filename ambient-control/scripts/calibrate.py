@@ -3,8 +3,8 @@
 
 Sends the "CALIBRATE" command that main.cpp's checkSerialCommand() listens
 for: the firmware samples for ~5 seconds (keep the room quiet while it
-runs), sets loudThreshold to the loudest reading it saw plus a safety
-margin, and persists it to flash (survives a reboot/power-off).
+runs), sets loudThreshold to 3x the 99th-percentile quiet reading (at least
++50), and persists it to flash (survives a reboot/power-off).
 
 Usage:
     python3 scripts/calibrate.py [port] [--baud 115200]
@@ -97,8 +97,8 @@ def run_calibration(ser):
             continue
         match = CALIBRATED_LINE.match(line)
         if match:
-            threshold, ambient_peak = match.groups()
-            print(f"\nCalibrated: loudThreshold={threshold} (ambient peak was {ambient_peak})")
+            threshold, ambient_level = match.groups()
+            print(f"\nCalibrated: loudThreshold={threshold} (quiet-room 99th percentile was {ambient_level})")
             print("Saved to flash - this survives a reboot/power-off.")
             return True
     return False

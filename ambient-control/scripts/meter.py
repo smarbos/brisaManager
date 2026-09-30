@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Live sound-level meter over USB serial - no calibration, just raw values.
 
-Streams the sensor's raw analog readings (already printed by main.cpp every
-100ms) as a live bar, plus prints any EVENT/ALERT/POST lines inline so you
+Streams the sensor's sound level readings (RMS amplitude, already printed by
+main.cpp every 100ms) as a live bar, plus prints any EVENT/ALERT/POST lines inline so you
 can see exactly what value crossed the current threshold. Make different
 sounds near the sensor - claps, talking, background noise - and watch what
 numbers they produce to help pick a good threshold, then set it with
@@ -41,7 +41,7 @@ except ImportError:
     sys.exit("pyserial is required: pip install pyserial (or install PlatformIO, which bundles it)")
 
 SAMPLE_LINE = re.compile(r"^\d+,(\d+)$")
-ADC_MAX = 4095  # ESP32 analogRead() range
+BAR_MAX = 900  # readSoundLevel()'s RMS tops out around ~850 (MAX9814 output caps at ~2Vpp)
 BAR_WIDTH = 50
 
 LIKELY_DESCRIPTIONS = ("cp210", "ch340", "ch910", "ftdi", "usb-serial", "usb2serial")
@@ -63,7 +63,7 @@ def autodetect_port():
 
 
 def render_bar(value):
-    filled = min(BAR_WIDTH, int(value / ADC_MAX * BAR_WIDTH))
+    filled = min(BAR_WIDTH, int(value / BAR_MAX * BAR_WIDTH))
     return "#" * filled + "-" * (BAR_WIDTH - filled)
 
 
