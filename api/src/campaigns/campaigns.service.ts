@@ -3,6 +3,7 @@ import { CampaignFilterType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GuestsService } from '../guests/guests.service';
 import { EmailService } from '../email/email.service';
+import { escapeHtml } from '../common/escape-html';
 
 @Injectable()
 export class CampaignsService {
@@ -31,7 +32,9 @@ export class CampaignsService {
       const guest = guests[i];
       const unsubscribeUrl = `${process.env.API_ORIGIN}/public/guests/${guest.unsubscribeToken}/unsubscribe`;
       const subject = template.subject.replaceAll('{{guestName}}', guest.name);
-      const html = `${template.bodyHtml.replaceAll('{{guestName}}', guest.name)}<p><a href="${unsubscribeUrl}">Unsubscribe</a></p>`;
+      // The subject is plain text, but the body is HTML: guest.name is whatever the guest typed
+      // on the check-in page, so it's escaped here.
+      const html = `${template.bodyHtml.replaceAll('{{guestName}}', escapeHtml(guest.name))}<p><a href="${unsubscribeUrl}">Unsubscribe</a></p>`;
 
       try {
         // findEligibleForCampaign() filters to guests with a non-null email.

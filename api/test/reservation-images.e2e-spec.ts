@@ -6,6 +6,14 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
 
+// Uploads are identified by their magic bytes, so fixtures need a real PNG signature; the
+// trailing label keeps each fixture distinguishable when streamed back.
+const pngBytes = (label: string) =>
+  Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from(label),
+  ]);
+
 describe('ReservationImagesController (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -59,8 +67,8 @@ describe('ReservationImagesController (e2e)', () => {
     return prisma.reservation.create({
       data: {
         guestName: 'Admin Images E2E Guest',
-        checkIn: new Date('2026-03-01'),
-        checkOut: new Date('2026-03-05'),
+        checkIn: new Date('2099-03-01'),
+        checkOut: new Date('2099-03-05'),
         paxCount: 2,
         source: 'DIRECT',
         totalAmount: 100000,
@@ -85,7 +93,7 @@ describe('ReservationImagesController (e2e)', () => {
 
     const uploadResponse = await request(app.getHttpServer())
       .post(`/public/reservations/${reservation.confirmationToken}/images`)
-      .attach('files', Buffer.from('fake png bytes'), {
+      .attach('files', pngBytes('fake png bytes'), {
         filename: 'comprobante.png',
         contentType: 'image/png',
       })
@@ -104,7 +112,7 @@ describe('ReservationImagesController (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
     expect(fileResponse.headers['content-type']).toContain('image/png');
-    expect(fileResponse.body.toString()).toBe('fake png bytes');
+    expect(Buffer.from(fileResponse.body)).toEqual(pngBytes('fake png bytes'));
   });
 
   it('returns 404 for an image requested through the wrong reservation id', async () => {
@@ -113,7 +121,7 @@ describe('ReservationImagesController (e2e)', () => {
 
     const uploadResponse = await request(app.getHttpServer())
       .post(`/public/reservations/${reservationA.confirmationToken}/images`)
-      .attach('files', Buffer.from('fake png bytes'), {
+      .attach('files', pngBytes('fake png bytes'), {
         filename: 'a.png',
         contentType: 'image/png',
       })

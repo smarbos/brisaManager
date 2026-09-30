@@ -5,6 +5,14 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { EmailService } from '../src/email/email.service';
 
+// Uploads are identified by their magic bytes, so fixtures need a real PNG signature; the
+// trailing label keeps each fixture distinguishable when streamed back.
+const pngBytes = (label: string) =>
+  Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from(label),
+  ]);
+
 describe('PublicReservationsController (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -63,8 +71,8 @@ describe('PublicReservationsController (e2e)', () => {
     const reservation = await prisma.reservation.create({
       data: {
         guestName: 'Public E2E Guest',
-        checkIn: new Date('2026-03-01'),
-        checkOut: new Date('2026-03-05'),
+        checkIn: new Date('2099-03-01'),
+        checkOut: new Date('2099-03-05'),
         paxCount: 2,
         source: 'DIRECT',
         totalAmount: 100000,
@@ -124,8 +132,8 @@ describe('PublicReservationsController (e2e)', () => {
     const reservation = await prisma.reservation.create({
       data: {
         guestName: 'Public E2E Guest',
-        checkIn: new Date('2026-03-01'),
-        checkOut: new Date('2026-03-05'),
+        checkIn: new Date('2099-03-01'),
+        checkOut: new Date('2099-03-05'),
         paxCount: 2,
         source: 'DIRECT',
         totalAmount: 100000,
@@ -145,8 +153,8 @@ describe('PublicReservationsController (e2e)', () => {
     const reservation = await prisma.reservation.create({
       data: {
         guestName: 'Public E2E Guest',
-        checkIn: new Date('2026-03-01'),
-        checkOut: new Date('2026-03-05'),
+        checkIn: new Date('2099-03-01'),
+        checkOut: new Date('2099-03-05'),
         paxCount: 2,
         source: 'DIRECT',
         totalAmount: 100000,
@@ -171,8 +179,8 @@ describe('PublicReservationsController (e2e)', () => {
       const reservation = await prisma.reservation.create({
         data: {
           guestName: 'Public E2E Guest',
-          checkIn: new Date('2026-03-01'),
-          checkOut: new Date('2026-03-05'),
+          checkIn: new Date('2099-03-01'),
+          checkOut: new Date('2099-03-05'),
           paxCount: 2,
           source: 'DIRECT',
           totalAmount: 100000,
@@ -183,7 +191,7 @@ describe('PublicReservationsController (e2e)', () => {
       const uploadResponse = await request(app.getHttpServer())
         .post(`/public/reservations/${reservation.confirmationToken}/images`)
         .field('message', 'es la seña')
-        .attach('files', Buffer.from('fake png bytes'), {
+        .attach('files', pngBytes('fake png bytes'), {
           filename: 'comprobante.png',
           contentType: 'image/png',
         })
@@ -207,7 +215,7 @@ describe('PublicReservationsController (e2e)', () => {
         )
         .expect(200);
       expect(fileResponse.headers['content-type']).toContain('image/png');
-      expect(fileResponse.body.toString()).toBe('fake png bytes');
+      expect(Buffer.from(fileResponse.body)).toEqual(pngBytes('fake png bytes'));
 
       const notification = await prisma.notification.findFirst({
         where: {
@@ -224,8 +232,8 @@ describe('PublicReservationsController (e2e)', () => {
       const reservation = await prisma.reservation.create({
         data: {
           guestName: 'Public E2E Guest',
-          checkIn: new Date('2026-03-01'),
-          checkOut: new Date('2026-03-05'),
+          checkIn: new Date('2099-03-01'),
+          checkOut: new Date('2099-03-05'),
           paxCount: 2,
           source: 'DIRECT',
           totalAmount: 100000,
@@ -235,11 +243,11 @@ describe('PublicReservationsController (e2e)', () => {
 
       const uploadResponse = await request(app.getHttpServer())
         .post(`/public/reservations/${reservation.confirmationToken}/images`)
-        .attach('files', Buffer.from('fake png bytes 1'), {
+        .attach('files', pngBytes('fake png bytes 1'), {
           filename: 'a.png',
           contentType: 'image/png',
         })
-        .attach('files', Buffer.from('fake png bytes 2'), {
+        .attach('files', pngBytes('fake png bytes 2'), {
           filename: 'b.png',
           contentType: 'image/png',
         })
@@ -261,8 +269,8 @@ describe('PublicReservationsController (e2e)', () => {
       const reservation = await prisma.reservation.create({
         data: {
           guestName: 'Public E2E Guest',
-          checkIn: new Date('2026-03-01'),
-          checkOut: new Date('2026-03-05'),
+          checkIn: new Date('2099-03-01'),
+          checkOut: new Date('2099-03-05'),
           paxCount: 2,
           source: 'DIRECT',
           totalAmount: 100000,
@@ -288,8 +296,8 @@ describe('PublicReservationsController (e2e)', () => {
       const reservation = await prisma.reservation.create({
         data: {
           guestName: 'Public E2E Guest',
-          checkIn: new Date('2026-03-01'),
-          checkOut: new Date('2026-03-05'),
+          checkIn: new Date('2099-03-01'),
+          checkOut: new Date('2099-03-05'),
           paxCount: 2,
           source: 'DIRECT',
           totalAmount: 100000,
@@ -306,8 +314,8 @@ describe('PublicReservationsController (e2e)', () => {
       const reservation = await prisma.reservation.create({
         data: {
           guestName: 'Public E2E Guest',
-          checkIn: new Date('2026-03-01'),
-          checkOut: new Date('2026-03-05'),
+          checkIn: new Date('2099-03-01'),
+          checkOut: new Date('2099-03-05'),
           paxCount: 2,
           source: 'DIRECT',
           totalAmount: 100000,
@@ -328,8 +336,8 @@ describe('PublicReservationsController (e2e)', () => {
       const reservationA = await prisma.reservation.create({
         data: {
           guestName: 'Public E2E Guest',
-          checkIn: new Date('2026-03-01'),
-          checkOut: new Date('2026-03-05'),
+          checkIn: new Date('2099-03-01'),
+          checkOut: new Date('2099-03-05'),
           paxCount: 2,
           source: 'DIRECT',
           totalAmount: 100000,
@@ -339,8 +347,8 @@ describe('PublicReservationsController (e2e)', () => {
       const reservationB = await prisma.reservation.create({
         data: {
           guestName: 'Public E2E Guest',
-          checkIn: new Date('2026-04-01'),
-          checkOut: new Date('2026-04-05'),
+          checkIn: new Date('2099-04-01'),
+          checkOut: new Date('2099-04-05'),
           paxCount: 2,
           source: 'DIRECT',
           totalAmount: 100000,
@@ -350,7 +358,7 @@ describe('PublicReservationsController (e2e)', () => {
 
       const uploadResponse = await request(app.getHttpServer())
         .post(`/public/reservations/${reservationA.confirmationToken}/images`)
-        .attach('files', Buffer.from('fake png bytes'), {
+        .attach('files', pngBytes('fake png bytes'), {
           filename: 'a.png',
           contentType: 'image/png',
         })
@@ -407,8 +415,8 @@ describe('PublicReservationsController (e2e)', () => {
       const reservation = await prisma.reservation.create({
         data: {
           guestName: 'Public E2E Guest',
-          checkIn: new Date('2020-01-01'),
-          checkOut: new Date('2020-01-05'),
+          checkIn: new Date('2099-01-01'),
+          checkOut: new Date('2099-01-05'),
           paxCount: 2,
           source: 'DIRECT',
           totalAmount: 100000,
@@ -461,8 +469,8 @@ describe('PublicReservationsController (e2e)', () => {
       const reservation = await prisma.reservation.create({
         data: {
           guestName: 'Public E2E Guest',
-          checkIn: new Date('2020-01-01'),
-          checkOut: new Date('2020-01-05'),
+          checkIn: new Date('2099-01-01'),
+          checkOut: new Date('2099-01-05'),
           paxCount: 2,
           source: 'DIRECT',
           totalAmount: 100000,

@@ -189,4 +189,29 @@ describe('EmailService', () => {
       expect(debugSendMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'real-guest@example.com' }));
     });
   });
+  it('HTML-escapes the guest name before inserting it into an email template', async () => {
+    sendMock.mockResolvedValue({ error: null });
+
+    await service.sendInitialConfirmationEmail(
+      'guest@example.com',
+      '<a href="https://evil.example">Jane</a>',
+      'https://reservas.labrisa.com.ar/r/abc',
+    );
+
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: 'Hola &lt;a href=&quot;https://evil.example&quot;&gt;Jane&lt;/a&gt;, confirmá acá: https://reservas.labrisa.com.ar/r/abc',
+      }),
+    );
+  });
+
+  it('HTML-escapes the alert message', async () => {
+    sendMock.mockResolvedValue({ error: null });
+
+    await service.sendAlert('Falló algo', 'Reserva para <img src=x onerror=alert(1)>');
+
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({ html: '<p>Reserva para &lt;img src=x onerror=alert(1)&gt;</p>' }),
+    );
+  });
 });
