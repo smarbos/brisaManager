@@ -11,7 +11,7 @@ const DEFAULT_PAYMENT_INSTRUCTIONS =
   'Bank transfer details pending setup — please contact us directly for payment instructions.';
 
 const DEFAULT_DEPOSIT_INSTRUCTIONS =
-  'El depósito de garantía se cobra al check-in y se devuelve al finalizar la estadía, una vez verificado que no haya daños.';
+  'El depósito de garantía se transfiere a la misma cuenta bancaria que el pago de la reserva. Te lo devolvemos por transferencia, a la cuenta desde la que lo enviaste, 48 horas antes de tu salida.';
 
 const DEFAULT_PROPERTY_ADDRESS = 'Dirección pendiente de configurar — completala en Configuración.';
 
