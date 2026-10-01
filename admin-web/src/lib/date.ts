@@ -37,3 +37,8 @@ export function formatRelativeTime(value: string | Date): string {
   const { unit, ms } = RELATIVE_TIME_UNITS.find(({ ms }) => Math.abs(diffMs) >= ms) ?? RELATIVE_TIME_UNITS[RELATIVE_TIME_UNITS.length - 1];
   return RELATIVE_TIME_FORMATTER.format(Math.round(diffMs / ms), unit);
 }
+
+// "14:05" — for "Programado para las HH:MM" on emails waiting in the outbox.
+export function formatTime(value: string | Date): string {
+  return new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(value));
+}

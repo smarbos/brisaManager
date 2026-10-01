@@ -85,7 +85,7 @@ describe('EmailSenderService', () => {
         subject: 'Confirmá tu reserva',
         html: '<p>Hola</p>',
         replyTo: 'reservas@inbound.labrisa.com.ar',
-      });
+      }, { idempotencyKey: 'outbound-email-e1-0' });
       expect(prisma.outboundEmail.update).toHaveBeenCalledWith({
         where: { id: 'e1' },
         data: {
@@ -127,6 +127,23 @@ describe('EmailSenderService', () => {
       expect(result.lastError).toBe('network down');
     });
 
+    it('leaves the entry SENDING, not FAILED, when Resend accepted it but recording that fails', async () => {
+      prisma.outboundEmail.update.mockRejectedValueOnce(new Error('db connection lost'));
+
+      const result = await sendEntry(base);
+
+      expect(prisma.outboundEmail.update).toHaveBeenCalledTimes(1); // the SENT write; never a FAILED one
+      expect(result.status).toBe('SENDING');
+      expect(eventsService.record).not.toHaveBeenCalled();
+      expect(prisma.outboundEmail.create).not.toHaveBeenCalled(); // no "failed" alert for a sent email
+    });
+
+    it('passes an idempotency key so Resend drops a repeated attempt', async () => {
+      await sendEntry({ ...(base as object), attempts: 2 } as never);
+
+      expect(sendMock).toHaveBeenCalledWith(expect.anything(), { idempotencyKey: 'outbound-email-e1-2' });
+    });
+
     it('redirects to damian.mantuano@gmail.com in debug mode and marks the real recipient in the subject', async () => {
       process.env.DEBUG_MODE = 'true';
 
@@ -137,6 +154,7 @@ describe('EmailSenderService', () => {
           to: 'damian.mantuano@gmail.com',
           subject: '[DEBUG → guest@example.com] Confirmá tu reserva',
         }),
+        expect.anything(),
       );
       expect(prisma.outboundEmail.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ sentTo: 'damian.mantuano@gmail.com' }) }),
@@ -149,7 +167,7 @@ describe('EmailSenderService', () => {
 
       await sendEntry(base);
 
-      expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'other@example.com' }));
+      expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'other@example.com' }), expect.anything());
     });
 
     it('forwards an inbound email through Resend’s receiving API, debug mode included', async () => {
@@ -158,12 +176,10 @@ describe('EmailSenderService', () => {
 
       await sendEntry(forward);
 
-      expect(forwardMock).toHaveBeenCalledWith({
-        emailId: 'in-1',
-        to: 'damian.mantuano@gmail.com',
-        from: 'La Brisa <reservas@labrisa.com.ar>',
-        passthrough: true,
-      });
+      expect(forwardMock).toHaveBeenCalledWith(
+        { emailId: 'in-1', to: 'damian.mantuano@gmail.com', from: 'La Brisa <reservas@labrisa.com.ar>', passthrough: true },
+        { idempotencyKey: 'outbound-email-e1-0' },
+      );
       expect(sendMock).not.toHaveBeenCalled();
     });
   });

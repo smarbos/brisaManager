@@ -848,4 +848,55 @@ describe('ReservationFormPage', () => {
     expect(row).toHaveTextContent(/se envía en/i);
     expect(screen.getByRole('button', { name: /abortar/i })).toBeInTheDocument();
   });
+
+  it('shows a waiting confirmation email as scheduled and hides its resend button, so it is not queued twice', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      guestEmail: 'jane@example.com',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+      confirmationEmailSentAt: null,
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
+    vi.spyOn(outboundEmailsApi, 'listOutboundEmails').mockResolvedValue([
+      {
+        id: 'e1',
+        kind: 'INITIAL_CONFIRMATION',
+        status: 'SCHEDULED',
+        to: 'jane@example.com',
+        sentTo: null,
+        subject: 'Confirmá tu reserva en La Brisa de Mar del Plata',
+        html: '<p>Hola</p>',
+        replyTo: null,
+        sendAt: new Date(Date.now() + 120_000).toISOString(),
+        sentAt: null,
+        abortedAt: null,
+        attempts: 0,
+        lastError: null,
+        reservationId: '1',
+        resentFromId: null,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/programado para las \d{2}:\d{2}/i)).toBeInTheDocument();
+    expect(screen.queryByText('No enviado')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /reenviar email de confirmación$/i })).not.toBeInTheDocument();
+  });
 });

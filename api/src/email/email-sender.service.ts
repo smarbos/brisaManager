@@ -61,48 +61,68 @@ export class EmailSenderService {
     const sentTo = debugMode ? process.env.EMAIL_DEBUG_RECIPIENT || DEFAULT_DEBUG_RECIPIENT : entry.to;
     const from = process.env.EMAIL_FROM as string;
 
-    let updated: OutboundEmail;
+    // Same key for the same attempt, so if Resend got a request whose response we never saw, a
+    // repeat of that exact attempt is dropped on Resend's side instead of sent twice.
+    const requestOptions = { idempotencyKey: `outbound-email-${entry.id}-${entry.attempts}` };
+
+    // Only Resend's own answer decides SENT vs FAILED. A failure to *record* a successful send
+    // (e.g. the database blipped) must not be written as FAILED — that would invite a retry and a
+    // duplicate email — so the entry is left SENDING ("may already have gone out").
+    let resendId: string | null;
     try {
       const { data, error } =
         entry.kind === 'INBOUND_FORWARD'
-          ? await this.resend.emails.receiving.forward({
-              emailId: entry.inboundEmailId as string,
-              to: sentTo,
-              from,
-              passthrough: true,
-            })
-          : await this.resend.emails.send({
-              from,
-              to: sentTo,
-              subject: debugMode ? `[DEBUG → ${entry.to}] ${entry.subject}` : entry.subject,
-              html: entry.html,
-              ...(entry.replyTo ? { replyTo: entry.replyTo } : {}),
-            });
+          ? await this.resend.emails.receiving.forward(
+              { emailId: entry.inboundEmailId as string, to: sentTo, from, passthrough: true },
+              requestOptions,
+            )
+          : await this.resend.emails.send(
+              {
+                from,
+                to: sentTo,
+                subject: debugMode ? `[DEBUG → ${entry.to}] ${entry.subject}` : entry.subject,
+                html: entry.html,
+                ...(entry.replyTo ? { replyTo: entry.replyTo } : {}),
+              },
+              requestOptions,
+            );
       if (error) {
-        throw new Error(error.message);
+        return this.markFailed(entry, sentTo, error.message);
       }
-      updated = await this.prisma.outboundEmail.update({
+      resendId = data?.id ?? null;
+    } catch (error) {
+      return this.markFailed(entry, sentTo, (error as Error).message);
+    }
+
+    let sent: OutboundEmail;
+    try {
+      sent = await this.prisma.outboundEmail.update({
         where: { id: entry.id },
-        data: {
-          status: 'SENT',
-          sentAt: new Date(),
-          sentTo,
-          resendId: data?.id ?? null,
-          lastError: null,
-          attempts: { increment: 1 },
-        },
+        data: { status: 'SENT', sentAt: new Date(), sentTo, resendId, lastError: null, attempts: { increment: 1 } },
       });
     } catch (error) {
-      const message = (error as Error).message;
-      this.logger.error(`Email ${entry.id} (${entry.kind}) failed: ${message}`);
-      updated = await this.prisma.outboundEmail.update({
+      this.logger.error(
+        `Email ${entry.id} (${entry.kind}) was sent but recording it failed — left SENDING: ${(error as Error).message}`,
+      );
+      return entry;
+    }
+    await this.applyEffects(sent, 'SENT');
+    return sent;
+  }
+
+  private async markFailed(entry: OutboundEmail, sentTo: string, message: string): Promise<OutboundEmail> {
+    this.logger.error(`Email ${entry.id} (${entry.kind}) failed: ${message}`);
+    try {
+      const failed = await this.prisma.outboundEmail.update({
         where: { id: entry.id },
         data: { status: 'FAILED', sentTo, lastError: message, attempts: { increment: 1 } },
       });
+      await this.applyEffects(failed, 'FAILED');
+      return failed;
+    } catch (error) {
+      this.logger.error(`Recording the failure of email ${entry.id} failed: ${(error as Error).message}`);
+      return entry;
     }
-
-    await this.applyEffects(updated, updated.status === 'SENT' ? 'SENT' : 'FAILED');
-    return updated;
   }
 
   // Never throws: an effect failing (e.g. the reservation was deleted) is logged and doesn't
