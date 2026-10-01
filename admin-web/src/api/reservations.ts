@@ -55,6 +55,10 @@ export function resendInitialEmail(id: string): Promise<ResendEmailResult> {
   return apiClient.request(`/reservations/${id}/resend-initial-email`, { method: 'POST' });
 }
 
+export function sendInitialWhatsapp(id: string): Promise<ResendEmailResult> {
+  return apiClient.request(`/reservations/${id}/send-initial-whatsapp`, { method: 'POST' });
+}
+
 export function resendFinalEmail(id: string): Promise<ResendEmailResult> {
   return apiClient.request(`/reservations/${id}/resend-final-email`, { method: 'POST' });
 }

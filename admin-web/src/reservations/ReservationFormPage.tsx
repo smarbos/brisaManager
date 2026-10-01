@@ -13,6 +13,7 @@ import {
   resendCancellationEmail,
   resendFinalEmail,
   resendInitialEmail,
+  sendInitialWhatsapp,
   updateReservation,
 } from '../api/reservations';
 import { getReservationImageBlob, listReservationImages, ReservationImage } from '../api/reservation-images';
@@ -51,6 +52,7 @@ const emptyForm = {
 
 type ActionKey =
   | 'resendEmail'
+  | 'sendWhatsapp'
   | 'resendFinalEmail'
   | 'resendCancellationEmail'
   | 'markPayment'
@@ -234,6 +236,23 @@ export function ReservationFormPage() {
       }
     } catch {
       setActionError('No se pudo reenviar el email de confirmación. Por favor, intentá de nuevo.');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleSendInitialWhatsapp() {
+    if (!id) return;
+    setActionError(null);
+    setActionLoading('sendWhatsapp');
+    try {
+      const { sent } = await sendInitialWhatsapp(id);
+      loadReservation();
+      if (!sent) {
+        setActionError('El WhatsApp no pudo enviarse. Revisá el historial de eventos para más detalles.');
+      }
+    } catch {
+      setActionError('No se pudo enviar el link por WhatsApp. Por favor, intentá de nuevo.');
     } finally {
       setActionLoading(null);
     }
@@ -518,6 +537,31 @@ export function ReservationFormPage() {
                     onClick={handleResendInitialEmail}
                   >
                     Reenviar email de confirmación
+                  </Button>
+                )}
+              </li>
+              <li className="flex items-start justify-between gap-4 py-3">
+                <div className="flex items-start gap-3">
+                  <StepIcon done={Boolean(reservationRecord.confirmationWhatsappSentAt)} />
+                  <div>
+                    <p className="font-medium text-text">WhatsApp con el link</p>
+                    <p className="text-sm text-text-muted">
+                      {!reservationRecord.guestPhone
+                        ? 'La reserva no tiene un teléfono de huésped'
+                        : reservationRecord.confirmationWhatsappSentAt
+                          ? `Enviado el ${formatDateTime(reservationRecord.confirmationWhatsappSentAt)}`
+                          : 'No enviado'}
+                    </p>
+                  </div>
+                </div>
+                {reservationRecord.guestPhone && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={actionLoading === 'sendWhatsapp'}
+                    onClick={handleSendInitialWhatsapp}
+                  >
+                    Enviar link por WhatsApp
                   </Button>
                 )}
               </li>
