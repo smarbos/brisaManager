@@ -342,8 +342,14 @@ describe('ReservationsService', () => {
         'jane@example.com',
         'Jane Doe',
         expect.stringContaining('tok-1'),
+        '1',
       );
-      expect(eventsService.record).toHaveBeenCalledWith('1', 'INITIAL_EMAIL_SENT');
+      // Queued, not sent: "sent" (confirmationEmailSentAt, INITIAL_EMAIL_SENT) is recorded by
+      // EmailSenderService once the 5-minute wait is over and it actually goes out.
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'INITIAL_EMAIL_QUEUED');
+      expect(prisma.reservation.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ confirmationEmailSentAt: expect.anything() }) }),
+      );
     });
 
     it('does not attempt to send an email when guestEmail is absent', async () => {
@@ -421,8 +427,8 @@ describe('ReservationsService', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(emailService.sendCancellationEmail).toHaveBeenCalledWith('jane@example.com', 'Jane Doe', checkIn, checkOut);
-      expect(eventsService.record).toHaveBeenCalledWith('1', 'CANCELLATION_EMAIL_SENT');
+      expect(emailService.sendCancellationEmail).toHaveBeenCalledWith('jane@example.com', 'Jane Doe', checkIn, checkOut, '1');
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'CANCELLATION_EMAIL_QUEUED');
     });
 
     it('does not attempt a cancellation email when the reservation has no guest email', async () => {
@@ -477,8 +483,14 @@ describe('ReservationsService', () => {
         'jane@example.com',
         'Jane Doe',
         expect.stringContaining('tok-1'),
+        '1',
       );
-      expect(eventsService.record).toHaveBeenCalledWith('1', 'INITIAL_EMAIL_SENT');
+      // Queued, not sent: "sent" (confirmationEmailSentAt, INITIAL_EMAIL_SENT) is recorded by
+      // EmailSenderService once the 5-minute wait is over and it actually goes out.
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'INITIAL_EMAIL_QUEUED');
+      expect(prisma.reservation.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ confirmationEmailSentAt: expect.anything() }) }),
+      );
       expect(result.sent).toBe(true);
     });
 
@@ -522,8 +534,8 @@ describe('ReservationsService', () => {
 
       const result = await service.resendCancellationEmail('1');
 
-      expect(emailService.sendCancellationEmail).toHaveBeenCalledWith('jane@example.com', 'Jane Doe', checkIn, checkOut);
-      expect(eventsService.record).toHaveBeenCalledWith('1', 'CANCELLATION_EMAIL_SENT');
+      expect(emailService.sendCancellationEmail).toHaveBeenCalledWith('jane@example.com', 'Jane Doe', checkIn, checkOut, '1');
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'CANCELLATION_EMAIL_QUEUED');
       expect(result.sent).toBe(true);
     });
 

@@ -9,7 +9,7 @@ import {
 } from '../api/campaigns';
 import { PageContainer, PageHeader, Alert, Badge, Button, Card, EmptyState, FormField, Input, LoadingState, Select } from '../ui';
 import { formatDateTime } from '../lib/date';
-import { recipientStatusLabel } from '../lib/labels';
+import { recipientStatusLabel, recipientStatusTone } from '../lib/labels';
 
 export function CampaignsPage() {
   const [templates, setTemplates] = useState<CampaignTemplate[]>([]);
@@ -144,7 +144,7 @@ export function CampaignsPage() {
                 <ul className="mt-2 flex flex-col gap-1">
                   {c.recipients.map((r) => (
                     <li key={r.id} className="flex items-center gap-2 text-sm">
-                      <Badge tone={r.status === 'SENT' ? 'success' : 'danger'}>{recipientStatusLabel(r.status)}</Badge>
+                      <Badge tone={recipientStatusTone(r.status)}>{recipientStatusLabel(r.status)}</Badge>
                       {r.error ? <span>{r.error}</span> : null}
                     </li>
                   ))}

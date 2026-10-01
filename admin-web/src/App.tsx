@@ -9,6 +9,7 @@ import { GuestListPage } from './guests/GuestListPage';
 import { GuestDetailPage } from './guests/GuestDetailPage';
 import { TemplatesPage } from './templates/TemplatesPage';
 import { CampaignsPage } from './campaigns/CampaignsPage';
+import { EmailsPage } from './emails/EmailsPage';
 import { ActivityLogPage } from './activity/ActivityLogPage';
 import { NotificationsPage } from './notifications/NotificationsPage';
 import { SensorsPage } from './sensors/SensorsPage';
@@ -29,6 +30,7 @@ export function App() {
             <Route path="/guests/:id" element={<GuestDetailPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
+            <Route path="/emails" element={<EmailsPage />} />
             <Route path="/activity" element={<ActivityLogPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/sensors" element={<SensorsPage />} />

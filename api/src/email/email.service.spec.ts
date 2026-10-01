@@ -1,18 +1,12 @@
-jest.mock('resend', () => ({
-  Resend: jest.fn().mockImplementation(() => ({
-    emails: { send: jest.fn() },
-  })),
-}));
-
-import { Resend } from 'resend';
 import { EmailService } from './email.service';
 
+// EmailService renders each email and queues it in the outbox (EmailOutboxService). Sending,
+// debug-mode redirection and failure handling happen later, in EmailSenderService — see its spec.
 describe('EmailService', () => {
   let service: EmailService;
-  let sendMock: jest.Mock;
   let settingsService: { get: jest.Mock };
-  const originalDebugMode = process.env.DEBUG_MODE;
-  const originalDebugRecipient = process.env.EMAIL_DEBUG_RECIPIENT;
+  let outbox: { enqueue: jest.Mock };
+  const savedEnv = { ...process.env };
 
   const baseSettings = {
     initialEmailTemplate: 'Hola {{guestName}}, confirmá acá: {{confirmationUrl}}',
@@ -24,194 +18,127 @@ describe('EmailService', () => {
   };
 
   afterAll(() => {
-    // Restores whatever the real .env had, so these mutations can't leak into another
-    // spec file that happens to share this Jest worker and construct its own EmailService.
-    process.env.DEBUG_MODE = originalDebugMode;
-    process.env.EMAIL_DEBUG_RECIPIENT = originalDebugRecipient;
+    process.env = savedEnv;
   });
 
   beforeEach(() => {
-    process.env.EMAIL_FROM = 'reservas@labrisa.com.ar';
     process.env.ALERT_EMAIL = 'owner@labrisa.com.ar';
-    // Pinned explicitly so these tests behave the same regardless of the real .env this
-    // container loads (which has DEBUG_MODE=true for local guest-safe testing) —
-    // the debug-redirect behavior itself is covered by its own tests below, which set
-    // these deliberately instead of relying on ambient state.
-    process.env.DEBUG_MODE = 'false';
-    delete process.env.EMAIL_DEBUG_RECIPIENT;
+    process.env.EMAIL_INBOUND_ADDRESS = 'reservas@inbound.labrisa.com.ar';
     settingsService = { get: jest.fn().mockResolvedValue(baseSettings) };
-    service = new EmailService(settingsService as never);
-    sendMock = (Resend as unknown as jest.Mock).mock.results[
-      (Resend as unknown as jest.Mock).mock.results.length - 1
-    ].value.emails.send;
+    outbox = { enqueue: jest.fn().mockImplementation((input) => Promise.resolve({ id: 'e1', ...input })) };
+    service = new EmailService(settingsService as never, outbox as never);
   });
 
-  it('sends the initial confirmation email with the template rendered', async () => {
-    sendMock.mockResolvedValue({ error: null });
-
-    await expect(
-      service.sendInitialConfirmationEmail('guest@example.com', 'Jane Doe', 'https://reservas.labrisa.com.ar/r/abc'),
-    ).resolves.toBeUndefined();
-
-    expect(sendMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: 'guest@example.com',
-        html: 'Hola Jane Doe, confirmá acá: https://reservas.labrisa.com.ar/r/abc',
-      }),
+  it('queues the initial confirmation email, rendered, linked to the reservation, with Reply-To', async () => {
+    const entry = await service.sendInitialConfirmationEmail(
+      'guest@example.com',
+      'Jane Doe',
+      'https://reservas.labrisa.com.ar/r/abc',
+      'res-1',
     );
+
+    expect(outbox.enqueue).toHaveBeenCalledWith({
+      kind: 'INITIAL_CONFIRMATION',
+      to: 'guest@example.com',
+      subject: 'Confirmá tu reserva en La Brisa de Mar del Plata',
+      html: 'Hola Jane Doe, confirmá acá: https://reservas.labrisa.com.ar/r/abc',
+      replyTo: 'reservas@inbound.labrisa.com.ar',
+      reservationId: 'res-1',
+    });
+    expect(entry.id).toBe('e1');
   });
 
-  it('throws when Resend returns an error for the initial email', async () => {
-    sendMock.mockResolvedValue({ error: { message: 'bounced' } });
+  it('leaves Reply-To empty when no inbound address is configured', async () => {
+    delete process.env.EMAIL_INBOUND_ADDRESS;
 
-    await expect(
-      service.sendInitialConfirmationEmail('bad@example.com', 'Jane Doe', 'https://reservas.labrisa.com.ar/r/abc'),
-    ).rejects.toThrow('bounced');
+    await service.sendInitialConfirmationEmail('guest@example.com', 'Jane Doe', 'https://x/r/abc', 'res-1');
+
+    expect(outbox.enqueue).toHaveBeenCalledWith(expect.objectContaining({ replyTo: null }));
   });
 
-  it('sends the final confirmation email with the address, maps link, and check-in link rendered from settings', async () => {
-    sendMock.mockResolvedValue({ error: null });
+  it('queues the final confirmation email with the address, maps link, and check-in link', async () => {
+    await service.sendFinalConfirmationEmail('guest@example.com', 'Jane Doe', 'https://reservas.labrisa.com.ar/r/abc', 'res-1');
 
-    await expect(
-      service.sendFinalConfirmationEmail('guest@example.com', 'Jane Doe', 'https://reservas.labrisa.com.ar/r/abc'),
-    ).resolves.toBeUndefined();
-
-    expect(sendMock).toHaveBeenCalledWith(
+    expect(outbox.enqueue).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: 'guest@example.com',
+        kind: 'FINAL_CONFIRMATION',
+        subject: '¡Tu reserva está confirmada!',
         html: 'Hola Jane Doe, dirección: Calle Falsa 123, Mar del Plata — mapa: https://maps.example/labrisa — más info: https://reservas.labrisa.com.ar/r/abc',
+        reservationId: 'res-1',
       }),
     );
   });
 
-  it('sends a cancellation email with the dates formatted DD/MM/YYYY', async () => {
-    sendMock.mockResolvedValue({ error: null });
+  it('queues the cancellation email with the dates formatted DD/MM/YYYY', async () => {
+    await service.sendCancellationEmail(
+      'guest@example.com',
+      'Jane Doe',
+      new Date('2026-11-06T00:00:00.000Z'),
+      new Date('2026-11-08T00:00:00.000Z'),
+      'res-1',
+    );
 
-    await expect(
-      service.sendCancellationEmail(
-        'guest@example.com',
-        'Jane Doe',
-        new Date('2026-11-06T00:00:00.000Z'),
-        new Date('2026-11-08T00:00:00.000Z'),
-      ),
-    ).resolves.toBeUndefined();
-
-    expect(sendMock).toHaveBeenCalledWith(
+    expect(outbox.enqueue).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: 'guest@example.com',
+        kind: 'CANCELLATION',
+        subject: 'Tu reserva fue cancelada',
         html: 'Hola Jane Doe, se canceló tu reserva del 06/11/2026 al 08/11/2026',
+        reservationId: 'res-1',
       }),
     );
   });
 
-  it('throws when Resend returns an error for the cancellation email', async () => {
-    sendMock.mockResolvedValue({ error: { message: 'bounced' } });
+  it('queues a marketing email linked to its campaign recipient', async () => {
+    await service.sendMarketingEmail('guest@example.com', 'Come back!', '<p>We miss you</p>', 'cr-1');
 
-    await expect(
-      service.sendCancellationEmail('bad@example.com', 'Jane Doe', new Date('2026-11-06'), new Date('2026-11-08')),
-    ).rejects.toThrow('bounced');
+    expect(outbox.enqueue).toHaveBeenCalledWith({
+      kind: 'MARKETING',
+      to: 'guest@example.com',
+      subject: 'Come back!',
+      html: '<p>We miss you</p>',
+      replyTo: 'reservas@inbound.labrisa.com.ar',
+      campaignRecipientId: 'cr-1',
+    });
   });
 
-  it('sendAlert never throws even if Resend fails', async () => {
-    sendMock.mockRejectedValue(new Error('network error'));
+  it('queues a staff alert to ALERT_EMAIL with the message HTML-escaped', async () => {
+    await service.sendAlert('Falló algo', 'Reserva para <img src=x onerror=alert(1)>');
+
+    expect(outbox.enqueue).toHaveBeenCalledWith({
+      kind: 'ALERT',
+      to: 'owner@labrisa.com.ar',
+      subject: '[Alert] Falló algo',
+      html: '<p>Reserva para &lt;img src=x onerror=alert(1)&gt;</p>',
+    });
+  });
+
+  it('skips the alert when no alert address is configured', async () => {
+    delete process.env.ALERT_EMAIL;
+    delete process.env.ADMIN_SEED_EMAIL;
+
+    await service.sendAlert('Falló algo', 'details');
+
+    expect(outbox.enqueue).not.toHaveBeenCalled();
+  });
+
+  it('sendAlert never throws, even if queueing fails', async () => {
+    outbox.enqueue.mockRejectedValue(new Error('db down'));
 
     await expect(service.sendAlert('Something failed', 'details here')).resolves.toBeUndefined();
   });
 
-  it('sends a marketing email with the given subject and html', async () => {
-    sendMock.mockResolvedValue({ error: null });
-
-    await expect(
-      service.sendMarketingEmail('guest@example.com', 'Come back!', '<p>We miss you</p>'),
-    ).resolves.toBeUndefined();
-
-    expect(sendMock).toHaveBeenCalledWith({
-      from: 'reservas@labrisa.com.ar',
-      to: 'guest@example.com',
-      subject: 'Come back!',
-      html: '<p>We miss you</p>',
-    });
-  });
-
-  it('throws when Resend returns an error for a marketing email', async () => {
-    sendMock.mockResolvedValue({ error: { message: 'bounced' } });
-
-    await expect(service.sendMarketingEmail('bad@example.com', 'Subject', '<p>Body</p>')).rejects.toThrow('bounced');
-  });
-
-  describe('debug mode', () => {
-    // Fields are read once at construction, so each test builds its own instance after
-    // setting the env vars it needs — the shared beforeEach above already pinned
-    // DEBUG_MODE/EMAIL_DEBUG_RECIPIENT to a known-off state before this runs.
-    function buildDebugService(recipient?: string) {
-      process.env.DEBUG_MODE = 'true';
-      if (recipient) {
-        process.env.EMAIL_DEBUG_RECIPIENT = recipient;
-      } else {
-        delete process.env.EMAIL_DEBUG_RECIPIENT;
-      }
-      const debugService = new EmailService(settingsService as never);
-      const debugSendMock = (Resend as unknown as jest.Mock).mock.results[
-        (Resend as unknown as jest.Mock).mock.results.length - 1
-      ].value.emails.send;
-      return { debugService, debugSendMock };
-    }
-
-    it('redirects the confirmation email to the debug recipient and marks the real one in the subject', async () => {
-      const { debugService, debugSendMock } = buildDebugService('debug@example.com');
-      debugSendMock.mockResolvedValue({ error: null });
-
-      await debugService.sendInitialConfirmationEmail('real-guest@example.com', 'Jane Doe', 'https://x/r/abc');
-
-      expect(debugSendMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          to: 'debug@example.com',
-          subject: expect.stringContaining('real-guest@example.com'),
-        }),
-      );
-    });
-
-    it('redirects sendAlert too, since it goes through the same recipient resolution', async () => {
-      const { debugService, debugSendMock } = buildDebugService('debug@example.com');
-      debugSendMock.mockResolvedValue({ error: null });
-
-      await debugService.sendAlert('Something failed', 'details');
-
-      expect(debugSendMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'debug@example.com' }));
-    });
-
-    it('falls back to the real recipient when debug mode is on but no recipient is configured', async () => {
-      const { debugService, debugSendMock } = buildDebugService();
-      debugSendMock.mockResolvedValue({ error: null });
-
-      await debugService.sendInitialConfirmationEmail('real-guest@example.com', 'Jane Doe', 'https://x/r/abc');
-
-      expect(debugSendMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'real-guest@example.com' }));
-    });
-  });
   it('HTML-escapes the guest name before inserting it into an email template', async () => {
-    sendMock.mockResolvedValue({ error: null });
-
     await service.sendInitialConfirmationEmail(
       'guest@example.com',
       '<a href="https://evil.example">Jane</a>',
       'https://reservas.labrisa.com.ar/r/abc',
+      'res-1',
     );
 
-    expect(sendMock).toHaveBeenCalledWith(
+    expect(outbox.enqueue).toHaveBeenCalledWith(
       expect.objectContaining({
         html: 'Hola &lt;a href=&quot;https://evil.example&quot;&gt;Jane&lt;/a&gt;, confirmá acá: https://reservas.labrisa.com.ar/r/abc',
       }),
-    );
-  });
-
-  it('HTML-escapes the alert message', async () => {
-    sendMock.mockResolvedValue({ error: null });
-
-    await service.sendAlert('Falló algo', 'Reserva para <img src=x onerror=alert(1)>');
-
-    expect(sendMock).toHaveBeenCalledWith(
-      expect.objectContaining({ html: '<p>Reserva para &lt;img src=x onerror=alert(1)&gt;</p>' }),
     );
   });
 });

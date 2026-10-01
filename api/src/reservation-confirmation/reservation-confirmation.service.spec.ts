@@ -101,10 +101,13 @@ describe('ReservationConfirmationService', () => {
       'jane@example.com',
       'Jane Doe',
       expect.stringContaining('tok-1'),
+      'res-1',
     );
+    // Queued: FINAL_EMAIL_SENT and finalConfirmationEmailSentAt are recorded by
+    // EmailSenderService when it actually goes out.
     expect(eventsService.record).toHaveBeenCalledWith(
       'res-1',
-      'FINAL_EMAIL_SENT',
+      'FINAL_EMAIL_QUEUED',
     );
   });
 
@@ -144,11 +147,10 @@ describe('ReservationConfirmationService', () => {
         'jane@example.com',
         'Jane Doe',
         expect.stringContaining('tok-1'),
+        'res-1',
       );
-      expect(prisma.reservation.update).toHaveBeenCalledWith({
-        where: { id: 'res-1' },
-        data: { finalConfirmationEmailSentAt: expect.any(Date) },
-      });
+      expect(eventsService.record).toHaveBeenCalledWith('res-1', 'FINAL_EMAIL_QUEUED');
+      expect(prisma.reservation.update).not.toHaveBeenCalled();
     });
 
     it('reports sent: false when the resend fails', async () => {

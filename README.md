@@ -38,7 +38,16 @@
      `admin-web` image (`--build`).
    - **Email:** `RESEND_API_KEY`, `EMAIL_FROM`, `ALERT_EMAIL` — the API uses these to send the
      guest confirmation email and internal alerts via Resend. `EMAIL_FROM`'s domain must be
-     verified in Resend before emails will actually send.
+     verified in Resend before emails will actually send. Every email waits
+     `EMAIL_SEND_DELAY_MS` (default 5 minutes) in an outbox before it's sent; the admin's
+     "Emails" page lists them and can abort, retry or re-send. With `DEBUG_MODE=true` they all
+     go to `EMAIL_DEBUG_RECIPIENT` (default damian.mantuano@gmail.com).
+   - **Receiving email:** add an MX record for the receiving domain/subdomain as Resend's
+     dashboard shows (Receiving), create a webhook for the `email.received` event pointing at
+     `https://api.labrisa.com.ar/webhooks/resend`, and set `EMAIL_INBOUND_ADDRESS` (the
+     receiving address — also used as Reply-To on outgoing emails), `EMAIL_FORWARD_TO` (the staff
+     mailbox received emails are forwarded to, immediately) and `RESEND_WEBHOOK_SECRET` (the
+     webhook's signing secret).
    - **WhatsApp (Twilio):** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` — while
      using Twilio's WhatsApp Sandbox, any phone number you want to test with must first text the
      Sandbox's join code to the Sandbox number before it can receive anything. Real, un-prompted

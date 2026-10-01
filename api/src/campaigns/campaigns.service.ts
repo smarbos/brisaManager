@@ -26,10 +26,22 @@ export class CampaignsService {
 
     const guests = await this.guestsService.findEligibleForCampaign(filterType, filterMonths);
 
-    const results: { guestId: string; status: 'SENT' | 'FAILED'; error: string | null }[] = [];
+    // Every recipient starts SCHEDULED: each email waits in the outbox (5 minutes, abortable)
+    // and EmailSenderService moves its recipient to SENT/FAILED/ABORTED. Pacing to stay under
+    // Resend's rate limit happens in EmailDispatcherService, not here.
+    const campaign = await this.prisma.campaign.create({
+      data: {
+        templateId,
+        filterType,
+        filterMonths: filterMonths ?? null,
+        recipientCount: guests.length,
+        recipients: { create: guests.map((guest) => ({ guestId: guest.id, status: 'SCHEDULED' as const, error: null })) },
+      },
+      include: { recipients: true },
+    });
 
-    for (let i = 0; i < guests.length; i++) {
-      const guest = guests[i];
+    for (const guest of guests) {
+      const recipient = campaign.recipients.find((r) => r.guestId === guest.id);
       const unsubscribeUrl = `${process.env.API_ORIGIN}/public/guests/${guest.unsubscribeToken}/unsubscribe`;
       const subject = template.subject.replaceAll('{{guestName}}', guest.name);
       // The subject is plain text, but the body is HTML: guest.name is whatever the guest typed
@@ -38,30 +50,18 @@ export class CampaignsService {
 
       try {
         // findEligibleForCampaign() filters to guests with a non-null email.
-        await this.emailService.sendMarketingEmail(guest.email as string, subject, html);
-        results.push({ guestId: guest.id, status: 'SENT', error: null });
+        await this.emailService.sendMarketingEmail(guest.email as string, subject, html, recipient?.id);
       } catch (error) {
-        results.push({ guestId: guest.id, status: 'FAILED', error: (error as Error).message });
-      }
-
-      // Stay comfortably under Resend's ~2 req/sec default rate limit — a single 429 mid-batch
-      // would otherwise permanently record that recipient (and all after it) as FAILED with no
-      // safe retry path short of re-sending to the whole list.
-      if (i < guests.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 600));
+        if (recipient) {
+          await this.prisma.campaignRecipient.update({
+            where: { id: recipient.id },
+            data: { status: 'FAILED', error: (error as Error).message },
+          });
+        }
       }
     }
 
-    return this.prisma.campaign.create({
-      data: {
-        templateId,
-        filterType,
-        filterMonths: filterMonths ?? null,
-        recipientCount: guests.length,
-        recipients: { create: results },
-      },
-      include: { recipients: true },
-    });
+    return campaign;
   }
 
   listHistory() {

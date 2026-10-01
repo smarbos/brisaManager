@@ -5,7 +5,7 @@ export type CampaignFilterType = 'ALL' | 'STAYED_WITHIN_MONTHS' | 'NOT_STAYED_WI
 export interface CampaignRecipient {
   id: string;
   guestId: string;
-  status: 'SENT' | 'FAILED';
+  status: 'SCHEDULED' | 'SENT' | 'FAILED' | 'ABORTED';
   error: string | null;
 }
 
