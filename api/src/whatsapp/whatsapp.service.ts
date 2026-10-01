@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Twilio from 'twilio';
-import { normalizeArgentinePhoneForWhatsapp } from './phone-normalizer';
+import { normalizePhoneForWhatsapp } from './phone-normalizer';
 
 @Injectable()
 export class WhatsappService {
@@ -30,7 +30,7 @@ export class WhatsappService {
   // Never throws: every caller gets a plain boolean, matching this feature's "log it
   // silently, never block anything else" failure-handling decision (see the design spec).
   async sendMessage(rawPhone: string, body: string): Promise<boolean> {
-    const to = normalizeArgentinePhoneForWhatsapp(rawPhone);
+    const to = normalizePhoneForWhatsapp(rawPhone);
     if (!to) {
       this.logger.warn(`Could not normalize phone number for WhatsApp: ${rawPhone}`);
       return false;
