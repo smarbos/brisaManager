@@ -1,4 +1,4 @@
-import { Reservation, ReservationSource, ReservationStatus } from '../reservations/types';
+import { Reservation, ReservationSource, ReservationStatus, WhatsappMessageKind } from '../reservations/types';
 
 const SOURCE_LABELS: Record<ReservationSource, string> = {
   BOOKING: 'Booking.com',
@@ -46,6 +46,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   INITIAL_EMAIL_FAILED: 'Falló el email inicial',
   INITIAL_WHATSAPP_SENT: 'WhatsApp con el link enviado',
   INITIAL_WHATSAPP_FAILED: 'Falló el WhatsApp con el link',
+  WHATSAPP_UNDELIVERED: 'WhatsApp no entregado',
   FINAL_EMAIL_SENT: 'Email final enviado',
   FINAL_EMAIL_FAILED: 'Falló el email final',
   CANCELLATION_EMAIL_SENT: 'Email de cancelación enviado',
@@ -86,6 +87,40 @@ export function recipientStatusLabel(status: string): string {
   return RECIPIENT_STATUS_LABELS[status] ?? status;
 }
 
+const WHATSAPP_KIND_LABELS: Record<WhatsappMessageKind, string> = {
+  CHECKIN_LINK: 'El link de check-in',
+  RESERVATION_REMINDER: 'El recordatorio de reserva',
+  DEPOSIT_REMINDER: 'El recordatorio de depósito',
+};
+
+const WHATSAPP_KIND_TITLES: Record<WhatsappMessageKind, string> = {
+  CHECKIN_LINK: 'Link de check-in',
+  RESERVATION_REMINDER: 'Recordatorio de reserva',
+  DEPOSIT_REMINDER: 'Recordatorio de depósito',
+};
+
+export function whatsappKindTitle(kind: WhatsappMessageKind): string {
+  return WHATSAPP_KIND_TITLES[kind];
+}
+
+const WHATSAPP_STATUS_LABELS: Record<string, string> = {
+  accepted: 'En cola',
+  scheduled: 'En cola',
+  queued: 'En cola',
+  sending: 'Enviándose',
+  sent: 'Enviado, sin confirmación de entrega',
+  delivered: 'Entregado',
+  read: 'Leído',
+  failed: 'No entregado',
+  undelivered: 'No entregado',
+  canceled: 'No entregado',
+  rejected: 'Rechazado, no se envió',
+};
+
+export function whatsappStatusLabel(status: string): string {
+  return WHATSAPP_STATUS_LABELS[status] ?? status;
+}
+
 // A cancelled reservation needs no further action, so it's never flagged here even if it's
 // still missing data from whenever it was created.
 export function getReservationWarnings(reservation: Reservation): string[] {
@@ -101,6 +136,10 @@ export function getReservationWarnings(reservation: Reservation): string[] {
 
   if (reservation.guestEmail && !reservation.confirmationEmailSentAt) {
     warnings.push('El email de confirmación no se envió');
+  }
+
+  for (const issue of reservation.whatsappIssues ?? []) {
+    warnings.push(`${WHATSAPP_KIND_LABELS[issue.kind]} por WhatsApp no se entregó`);
   }
 
   if (Number(reservation.totalAmount) === 0) {

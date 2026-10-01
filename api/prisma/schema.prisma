@@ -38,7 +38,16 @@ enum ReservationEventType {
   CANCELLATION_EMAIL_FAILED
   INITIAL_WHATSAPP_SENT
   INITIAL_WHATSAPP_FAILED
+  // Twilio accepted a WhatsApp message but later reported it failed/undelivered (via its
+  // status callback — see WhatsappDeliveryService). Covers every WhatsappMessageKind.
+  WHATSAPP_UNDELIVERED
   FIELD_CHANGED
+}
+
+enum WhatsappMessageKind {
+  CHECKIN_LINK
+  RESERVATION_REMINDER
+  DEPOSIT_REMINDER
 }
 
 enum GuestEventType {
@@ -103,6 +112,7 @@ model Reservation {
   depositReminderSentAt         DateTime?
   events                        ReservationEvent[]
   images                        ReservationImage[]
+  whatsappMessages              WhatsappMessage[]
   notifications                 Notification[]
   missingFromChannelAt          DateTime?
   googleEventId                 String?
@@ -373,4 +383,25 @@ model AmbientDeviceReading {
   updatedAt DateTime      @updatedAt
 
   @@unique([deviceId, sensor])
+}
+
+// One row per WhatsApp send attempt, so delivery can be tracked after Twilio accepts the
+// message: Twilio reports later status changes (sent/delivered/read/undelivered/failed) to
+// POST /webhooks/twilio/whatsapp-status, matched by twilioSid. Attempts Twilio refused
+// outright (or that never reached it, e.g. an invalid phone) are recorded too, with status
+// "rejected" and no twilioSid — so both kinds of failure surface the same way in the admin.
+model WhatsappMessage {
+  id            String              @id @default(uuid())
+  reservationId String
+  reservation   Reservation         @relation(fields: [reservationId], references: [id])
+  kind          WhatsappMessageKind
+  twilioSid     String?             @unique
+  // A Twilio MessageStatus value, or "rejected" (ours — Twilio never sends it).
+  status        String
+  errorCode     String?
+  errorMessage  String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([reservationId, kind, createdAt])
 }

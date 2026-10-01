@@ -47,6 +47,7 @@ describe('WhatsappReminderSchedulerService', () => {
       expect.objectContaining({
         variables: { '1': 'Jane', '2': '18/09/2026', '3': '20/09/2026', '4': 'tok-1' },
       }),
+      { reservationId: 'res-1', kind: 'RESERVATION_REMINDER' },
     );
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-1' },
@@ -90,6 +91,7 @@ describe('WhatsappReminderSchedulerService', () => {
       expect.objectContaining({
         variables: { '1': 'John', '2': '18/09/2026', '3': 'tok-2' },
       }),
+      { reservationId: 'res-2', kind: 'DEPOSIT_REMINDER' },
     );
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-2' },

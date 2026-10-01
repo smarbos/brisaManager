@@ -8,6 +8,7 @@ import { ReservationConfirmationService } from '../reservation-confirmation/rese
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 import { GuestsService } from '../guests/guests.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { WhatsappDeliveryService } from '../whatsapp/whatsapp-delivery.service';
 
 describe('ReservationsService', () => {
   let service: ReservationsService;
@@ -25,6 +26,7 @@ describe('ReservationsService', () => {
   let googleCalendarPushService: { pushReservation: jest.Mock };
   let guestsService: { syncFromReservation: jest.Mock };
   let whatsappService: { sendTemplate: jest.Mock };
+  let whatsappDeliveryService: { recordSend: jest.Mock; latestByReservation: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -45,6 +47,10 @@ describe('ReservationsService', () => {
     googleCalendarPushService = { pushReservation: jest.fn() };
     guestsService = { syncFromReservation: jest.fn() };
     whatsappService = { sendTemplate: jest.fn().mockResolvedValue(true) };
+    whatsappDeliveryService = {
+      recordSend: jest.fn(),
+      latestByReservation: jest.fn().mockResolvedValue(new Map()),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -56,6 +62,7 @@ describe('ReservationsService', () => {
         { provide: GoogleCalendarPushService, useValue: googleCalendarPushService },
         { provide: GuestsService, useValue: guestsService },
         { provide: WhatsappService, useValue: whatsappService },
+        { provide: WhatsappDeliveryService, useValue: whatsappDeliveryService },
       ],
     }).compile();
 
@@ -602,6 +609,7 @@ describe('ReservationsService', () => {
         expect.objectContaining({
           variables: { '1': 'Jane Doe', '2': '12/12/2026', '3': '15/12/2026', '4': 'tok-1' },
         }),
+        { reservationId: 'res-1', kind: 'CHECKIN_LINK' },
       );
       expect(prisma.reservation.update).toHaveBeenCalledWith({
         where: { id: 'res-1' },
@@ -630,6 +638,11 @@ describe('ReservationsService', () => {
         'INITIAL_WHATSAPP_FAILED',
         expect.stringContaining('12345'),
       );
+      // Tracked as a rejected send too, so the admin list flags it like any other failure.
+      expect(whatsappDeliveryService.recordSend).toHaveBeenCalledWith(
+        { reservationId: 'res-1', kind: 'CHECKIN_LINK' },
+        expect.objectContaining({ accepted: false }),
+      );
     });
 
     it('resolves to false instead of rejecting when recording the event fails', async () => {
@@ -653,7 +666,10 @@ describe('ReservationsService', () => {
 
       await service.create({ ...validDto, guestPhone: '+5491122334455' });
 
-      expect(whatsappService.sendTemplate).toHaveBeenCalledWith('+5491122334455', expect.anything());
+      expect(whatsappService.sendTemplate).toHaveBeenCalledWith('+5491122334455', expect.anything(), {
+        reservationId: '1',
+        kind: 'CHECKIN_LINK',
+      });
     });
 
     it('does not send when the new reservation has no phone', async () => {
@@ -689,6 +705,31 @@ describe('ReservationsService', () => {
 
       expect(whatsappService.sendTemplate).toHaveBeenCalledTimes(1);
       expect(result).toEqual({ sent: true, reservation: existing });
+    });
+  });
+  describe('findAll WhatsApp issues', () => {
+    it('attaches whatsappIssues computed from each reservation\'s latest sends', async () => {
+      const base = {
+        checkIn: new Date('2099-01-10'),
+        datesConfirmedAt: null,
+        confirmationPaymentReceivedAt: null,
+      };
+      prisma.reservation.findMany.mockResolvedValue([
+        { ...base, id: 'res-1' },
+        { ...base, id: 'res-2' },
+      ]);
+      whatsappDeliveryService.latestByReservation.mockResolvedValue(
+        new Map([
+          ['res-1', [{ kind: 'CHECKIN_LINK', status: 'undelivered', errorCode: '63016', createdAt: new Date() }]],
+          ['res-2', [{ kind: 'CHECKIN_LINK', status: 'delivered', errorCode: null, createdAt: new Date() }]],
+        ]),
+      );
+
+      const result = await service.findAll({});
+
+      expect(whatsappDeliveryService.latestByReservation).toHaveBeenCalledWith(['res-1', 'res-2']);
+      expect(result[0].whatsappIssues).toEqual([{ kind: 'CHECKIN_LINK', status: 'undelivered', errorCode: '63016' }]);
+      expect(result[1].whatsappIssues).toEqual([]);
     });
   });
 });

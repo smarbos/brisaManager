@@ -53,6 +53,9 @@ High-level backlog of everything requested so far. Each section will be broken d
 - [x] Guest-facing app's look and feel matches labrisa.com.ar's branding (favicon pulled from the real site, footer links back to it, redesigned theme)
 - [x] **UI component library** — done: both `admin-web/src/ui/` and `guest-web/src/ui/` have a shared set of components (Button, Card, FormField, Input, Select, Table, Badge, PageHeader, Alert, etc.), applied across every page, mobile-first with working desktop layouts
 
+## 3c. WhatsApp delivery tracking
+- [x] Every WhatsApp send (check-in link, reservation reminder, deposit reminder) is tracked in `WhatsappMessage`; Twilio's signed status callback (`POST /webhooks/twilio/whatsapp-status`) updates it. Rejected or undelivered messages show on the reservation list's warning icon until resent successfully or no longer relevant, and on the reservation detail page with Twilio's error code. See `docs/superpowers/specs/2026-10-01-whatsapp-delivery-tracking-design.md`.
+
 ## 7. Staff notifications via WhatsApp (Twilio)
 - [ ] **Still entirely pending.** What exists today is guest-facing only: automatic WhatsApp reminders *to guests* (reservation reminder + deposit reminder, both on a daily schedule, templates configurable in Settings). There is no staff-group notification channel yet — nothing pings the team on Twilio WhatsApp for "reservation confirmed and paid", "guest checks out tomorrow", etc. Still needs its own brainstorming pass: which events trigger a message, Twilio WhatsApp Business template approval, where the group/recipient config lives.
 

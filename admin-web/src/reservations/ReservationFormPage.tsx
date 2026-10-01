@@ -17,7 +17,7 @@ import {
   updateReservation,
 } from '../api/reservations';
 import { getReservationImageBlob, listReservationImages, ReservationImage } from '../api/reservation-images';
-import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } from './types';
+import { Reservation, ReservationEvent, ReservationSource, ReservationStatus, WhatsappMessageStatus } from './types';
 import {
   PageContainer,
   PageHeader,
@@ -33,7 +33,7 @@ import {
 } from '../ui';
 import { formatDate, formatDateTime } from '../lib/date';
 import { shortId } from '../lib/id';
-import { sourceLabel, eventTypeLabel } from '../lib/labels';
+import { sourceLabel, eventTypeLabel, whatsappKindTitle, whatsappStatusLabel } from '../lib/labels';
 
 const emptyForm = {
   guestName: '',
@@ -68,6 +68,32 @@ function StepIcon({ done }: { done: boolean }) {
       }`}
     >
       {done ? '✓' : '✗'}
+    </span>
+  );
+}
+
+// Latest delivery status of one WhatsApp message, as Twilio last reported it. Twilio error
+// codes link to Twilio's own error reference rather than a local translation table.
+function WhatsappDeliveryStatus({ message }: { message: WhatsappMessageStatus }) {
+  const isProblem = ['failed', 'undelivered', 'canceled', 'rejected'].includes(message.status);
+  return (
+    <span className={isProblem ? 'text-warning' : undefined}>
+      {whatsappStatusLabel(message.status)}
+      {message.errorCode && /^\d+$/.test(message.errorCode) && (
+        <>
+          {' '}
+          (
+          <a
+            href={`https://www.twilio.com/docs/api/errors/${message.errorCode}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent hover:underline"
+          >
+            error {message.errorCode}
+          </a>
+          )
+        </>
+      )}
     </span>
   );
 }
@@ -341,6 +367,10 @@ export function ReservationFormPage() {
     }
   }
 
+  const whatsappMessages = reservationRecord?.whatsappMessages ?? [];
+  const checkinWhatsapp = whatsappMessages.find((message) => message.kind === 'CHECKIN_LINK');
+  const reminderWhatsapps = whatsappMessages.filter((message) => message.kind !== 'CHECKIN_LINK');
+
   return (
     <PageContainer>
       <PageHeader
@@ -552,6 +582,11 @@ export function ReservationFormPage() {
                           ? `Enviado el ${formatDateTime(reservationRecord.confirmationWhatsappSentAt)}`
                           : 'No enviado'}
                     </p>
+                    {checkinWhatsapp && (
+                      <p className="text-sm text-text-muted">
+                        Estado: <WhatsappDeliveryStatus message={checkinWhatsapp} />
+                      </p>
+                    )}
                   </div>
                 </div>
                 {reservationRecord.guestPhone && (
@@ -565,6 +600,18 @@ export function ReservationFormPage() {
                   </Button>
                 )}
               </li>
+              {reminderWhatsapps.length > 0 && (
+                <li className="py-3 pl-8">
+                  <p className="font-medium text-text">Recordatorios por WhatsApp</p>
+                  <ul className="text-sm text-text-muted">
+                    {reminderWhatsapps.map((message) => (
+                      <li key={message.kind}>
+                        {whatsappKindTitle(message.kind)}: <WhatsappDeliveryStatus message={message} />
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              )}
               <li className="flex items-start gap-3 py-3">
                 <StepIcon done={Boolean(reservationRecord.datesConfirmedAt)} />
                 <p className="font-medium text-text">
