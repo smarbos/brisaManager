@@ -188,7 +188,7 @@ export class ReservationsService {
     const reservations = await this.prisma.reservation.findMany({
       where: {
         source: query.source,
-        status: query.status,
+        ...(query.status?.length ? { status: { in: query.status } } : {}),
       },
       orderBy: { checkIn: 'desc' },
     });
