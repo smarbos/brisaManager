@@ -12,6 +12,22 @@ Manifest V3 extension with two independent content scripts:
   guest's check-in confirmation link for you to paste into that same chat.
   Airbnb never exposes the guest's real email on this page, so the chat
   message — not an email — is the primary way an Airbnb guest gets the link.
+- **Airbnb reservation page** (`content_script_airbnb_stay.js` +
+  `airbnb_stay_parsing.js`) — `/hosting/stay/<confirmation code>`, the page
+  reached from Airbnb's own host UI ("Hoy" → a reservation) rather than from
+  the email. Reads the guest's full name ("¿Quién viene?"), phone (after
+  opening "Administrá la reserva"), check-in/check-out, guests and price, and
+  takes the year from the page's "Booking date" row instead of guessing it.
+  Imports are keyed by the confirmation code (`airbnb_reference:
+  "confirmation_code"`). Airbnb's host UI is a single-page app, so this script
+  is injected on every `/hosting/` page and watches the URL, showing its button
+  only on a reservation page. After sending, it shows the message with the
+  check-in link (already copied) instead of filling a chat box.
+
+The two Airbnb pages expose different identifiers (the thread id vs. the
+confirmation code), so the API links them by dates: an Airbnb import that
+finds nothing under its own key updates a live Airbnb reservation with the
+exact same check-in/check-out instead of creating a duplicate.
 
 Both only ever act on a page a staff member is already logged into and
 viewing — no credentials are stored or handled by the extension.
