@@ -3,13 +3,14 @@ import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } f
 
 export interface ReservationFilters {
   source?: ReservationSource;
-  status?: ReservationStatus;
+  // One or several statuses; sent as repeated ?status= parameters.
+  status?: ReservationStatus[];
 }
 
 export function listReservations(filters: ReservationFilters = {}): Promise<Reservation[]> {
   const params = new URLSearchParams();
   if (filters.source) params.set('source', filters.source);
-  if (filters.status) params.set('status', filters.status);
+  for (const status of filters.status ?? []) params.append('status', status);
   const query = params.toString();
   return apiClient.request(`/reservations${query ? `?${query}` : ''}`);
 }

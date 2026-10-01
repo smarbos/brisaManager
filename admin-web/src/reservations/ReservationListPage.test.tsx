@@ -81,12 +81,25 @@ describe('ReservationListPage', () => {
     expect(screen.queryByText('John Smith')).not.toBeInTheDocument();
   });
 
-  it('defaults the status filter to Pendiente', async () => {
-    vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([]);
+  it('defaults the status filter to Pendientes y Aceptadas, asking for both statuses', async () => {
+    const spy = vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([]);
 
     renderPage();
 
-    expect(await screen.findByLabelText(/estado/i)).toHaveValue('PENDING');
+    const select = await screen.findByLabelText(/estado/i);
+    expect(select).toHaveDisplayValue('Pendientes y Aceptadas');
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: undefined, status: ['PENDING', 'CONFIRMED'] }));
+  });
+
+  it('asks for a single status when one is picked, and for none with Todos', async () => {
+    const spy = vi.spyOn(reservationsApi, 'listReservations').mockResolvedValue([]);
+
+    renderPage();
+    fireEvent.change(await screen.findByLabelText(/estado/i), { target: { value: 'CANCELLED' } });
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith({ source: undefined, status: ['CANCELLED'] }));
+
+    fireEvent.change(screen.getByLabelText(/estado/i), { target: { value: '' } });
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith({ source: undefined, status: undefined }));
   });
 
   it('shows the formatted price for a reservation with a total amount', async () => {
@@ -201,11 +214,11 @@ describe('ReservationListPage', () => {
 
     renderPage();
 
-    await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: undefined, status: 'PENDING' }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: undefined, status: ['PENDING', 'CONFIRMED'] }));
 
     fireEvent.change(screen.getByLabelText(/canal/i), { target: { value: 'AIRBNB' } });
 
-    await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: 'AIRBNB', status: 'PENDING' }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ source: 'AIRBNB', status: ['PENDING', 'CONFIRMED'] }));
   });
 
   it('shows a warning badge for a reservation missing from its channel feed', async () => {

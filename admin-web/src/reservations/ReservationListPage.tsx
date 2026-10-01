@@ -34,10 +34,22 @@ function CancelRowButton({ loading, onCancel }: { loading: boolean; onCancel: ()
   );
 }
 
+// The Estado filter's options, mapped to the statuses each one asks the API for. The default
+// shows what still needs attention or is coming up: pending and confirmed ("Confirmada") ones.
+type StatusFilter = 'PENDING_CONFIRMED' | '' | ReservationStatus;
+const STATUS_FILTERS: Record<StatusFilter, ReservationStatus[] | undefined> = {
+  PENDING_CONFIRMED: ['PENDING', 'CONFIRMED'],
+  '': undefined,
+  PENDING: ['PENDING'],
+  CONFIRMED: ['CONFIRMED'],
+  CANCELLED: ['CANCELLED'],
+  COMPLETED: ['COMPLETED'],
+};
+
 export function ReservationListPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [source, setSource] = useState<ReservationSource | ''>('');
-  const [status, setStatus] = useState<ReservationStatus | ''>('PENDING');
+  const [status, setStatus] = useState<StatusFilter>('PENDING_CONFIRMED');
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -48,7 +60,7 @@ export function ReservationListPage() {
     setLoading(true);
     listReservations({
       source: source || undefined,
-      status: status || undefined,
+      status: STATUS_FILTERS[status],
     })
       .then(setReservations)
       .catch((err) => {
@@ -106,7 +118,8 @@ export function ReservationListPage() {
               </Select>
             </FormField>
             <FormField label="Estado">
-              <Select value={status} onChange={(e) => setStatus(e.target.value as ReservationStatus | '')}>
+              <Select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
+                <option value="PENDING_CONFIRMED">Pendientes y Aceptadas</option>
                 <option value="">Todos</option>
                 <option value="PENDING">Pendiente</option>
                 <option value="CONFIRMED">Confirmada</option>

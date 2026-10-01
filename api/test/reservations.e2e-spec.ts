@@ -276,4 +276,61 @@ describe('ReservationsController (e2e)', () => {
         .expect(200);
     });
   });
+
+  describe('GET /reservations filtered by several statuses', () => {
+    async function createWithStatus(status: string) {
+      const created = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          guestName: 'E2E Guest',
+          guestEmail: 'e2e-reservations-guest@example.com',
+          checkIn: '2027-03-01',
+          checkOut: '2027-03-03',
+          paxCount: 2,
+          source: 'OTHER',
+          totalAmount: 1000,
+          currency: 'ARS',
+        })
+        .expect(201);
+      await prisma.reservation.update({ where: { id: created.body.id }, data: { status: status as never } });
+      return created.body.id as string;
+    }
+
+    it('returns pending and confirmed reservations together, without cancelled or completed ones', async () => {
+      const pending = await createWithStatus('PENDING');
+      const confirmed = await createWithStatus('CONFIRMED');
+      const cancelled = await createWithStatus('CANCELLED');
+      const completed = await createWithStatus('COMPLETED');
+
+      const response = await request(app.getHttpServer())
+        .get('/reservations?source=OTHER&status=PENDING&status=CONFIRMED')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      const ids = response.body.map((r: { id: string }) => r.id);
+      expect(ids).toEqual(expect.arrayContaining([pending, confirmed]));
+      expect(ids).not.toContain(cancelled);
+      expect(ids).not.toContain(completed);
+    });
+
+    it('still filters by a single status', async () => {
+      const cancelled = await createWithStatus('CANCELLED');
+
+      const response = await request(app.getHttpServer())
+        .get('/reservations?source=OTHER&status=CANCELLED')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(response.body.every((r: { status: string }) => r.status === 'CANCELLED')).toBe(true);
+      expect(response.body.map((r: { id: string }) => r.id)).toContain(cancelled);
+    });
+
+    it('rejects an unknown status', async () => {
+      await request(app.getHttpServer())
+        .get('/reservations?status=PENDING&status=NOPE')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(400);
+    });
+  });
 });
