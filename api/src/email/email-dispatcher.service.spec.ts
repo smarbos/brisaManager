@@ -10,7 +10,14 @@ describe('EmailDispatcherService', () => {
 
   const due = (id: string) => ({ id, status: 'SCHEDULED' });
 
+  const savedFlag = process.env.EMAIL_DISPATCHER_ENABLED;
+  afterAll(() => {
+    process.env.EMAIL_DISPATCHER_ENABLED = savedFlag;
+  });
+
   beforeEach(async () => {
+    // Jest runs with NODE_ENV=test, where the dispatcher stays off unless explicitly enabled.
+    process.env.EMAIL_DISPATCHER_ENABLED = 'true';
     prisma = {
       outboundEmail: {
         findMany: jest.fn().mockResolvedValue([due('a'), due('b')]),
@@ -84,5 +91,14 @@ describe('EmailDispatcherService', () => {
     prisma.outboundEmail.findMany.mockRejectedValue(new Error('db down'));
 
     await expect(dispatcher.tick()).resolves.toBeUndefined();
+  });
+
+  it('stays off under tests (NODE_ENV=test) unless explicitly enabled, so e2e runs never send queued emails', async () => {
+    delete process.env.EMAIL_DISPATCHER_ENABLED;
+
+    await dispatcher.tick();
+
+    expect(prisma.outboundEmail.findMany).not.toHaveBeenCalled();
+    expect(sender.send).not.toHaveBeenCalled();
   });
 });

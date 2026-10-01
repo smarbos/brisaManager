@@ -22,9 +22,16 @@ export class EmailDispatcherService {
     private readonly sender: EmailSenderService,
   ) {}
 
+  // Off under tests (Jest sets NODE_ENV=test) unless EMAIL_DISPATCHER_ENABLED=true: e2e suites boot
+  // the whole app against a shared database, and a running dispatcher would send whatever due
+  // emails it finds there — rows other runs left behind, not just the suite's own.
+  private enabled(): boolean {
+    return process.env.NODE_ENV !== 'test' || process.env.EMAIL_DISPATCHER_ENABLED === 'true';
+  }
+
   @Cron(CronExpression.EVERY_30_SECONDS)
   async tick(): Promise<void> {
-    if (this.running) {
+    if (this.running || !this.enabled()) {
       return;
     }
     this.running = true;

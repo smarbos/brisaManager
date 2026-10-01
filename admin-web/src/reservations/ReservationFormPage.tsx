@@ -33,7 +33,7 @@ import {
   Textarea,
   useTwoStepConfirm,
 } from '../ui';
-import { formatDate, formatDateTime } from '../lib/date';
+import { formatDate, formatDateTime, formatTime } from '../lib/date';
 import { shortId } from '../lib/id';
 import { sourceLabel, eventTypeLabel } from '../lib/labels';
 
@@ -141,6 +141,13 @@ export function ReservationFormPage() {
   const [overlaps, setOverlaps] = useState<Reservation[]>([]);
   const [images, setImages] = useState<ReservationImage[]>([]);
   const guestWebUrl = import.meta.env.VITE_GUEST_WEB_URL as string;
+
+  // The email of this kind still waiting in the outbox, if any — its row then says when it goes
+  // out, and its resend button is hidden so the operator doesn't queue a second copy (the
+  // waiting one can be aborted from the Emails section).
+  function waitingEmail(kind: OutboundEmail['kind']): OutboundEmail | undefined {
+    return outboundEmails.find((email) => email.kind === kind && email.status === 'SCHEDULED');
+  }
 
   function loadOutboundEmails() {
     if (!id) return;
@@ -536,13 +543,15 @@ export function ReservationFormPage() {
                     <p className="text-sm text-text-muted">
                       {!reservationRecord.guestEmail
                         ? 'La reserva no tiene un email de huésped'
-                        : reservationRecord.confirmationEmailSentAt
-                          ? `Enviado el ${formatDateTime(reservationRecord.confirmationEmailSentAt)}`
-                          : 'No enviado'}
+                        : waitingEmail('INITIAL_CONFIRMATION')
+                          ? `Programado para las ${formatTime(waitingEmail('INITIAL_CONFIRMATION')!.sendAt)}`
+                          : reservationRecord.confirmationEmailSentAt
+                            ? `Enviado el ${formatDateTime(reservationRecord.confirmationEmailSentAt)}`
+                            : 'No enviado'}
                     </p>
                   </div>
                 </div>
-                {reservationRecord.guestEmail && (
+                {reservationRecord.guestEmail && !waitingEmail('INITIAL_CONFIRMATION') && (
                   <Button
                     type="button"
                     variant="secondary"
@@ -652,20 +661,24 @@ export function ReservationFormPage() {
                     <div>
                       <p className="font-medium text-text">Email de confirmación final</p>
                       <p className="text-sm text-text-muted">
-                        {reservationRecord.finalConfirmationEmailSentAt
-                          ? `Enviado el ${formatDateTime(reservationRecord.finalConfirmationEmailSentAt)}`
-                          : 'No enviado'}
+                        {waitingEmail('FINAL_CONFIRMATION')
+                          ? `Programado para las ${formatTime(waitingEmail('FINAL_CONFIRMATION')!.sendAt)}`
+                          : reservationRecord.finalConfirmationEmailSentAt
+                            ? `Enviado el ${formatDateTime(reservationRecord.finalConfirmationEmailSentAt)}`
+                            : 'No enviado'}
                       </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    loading={actionLoading === 'resendFinalEmail'}
-                    onClick={handleResendFinalEmail}
-                  >
-                    Reenviar email de confirmación final
-                  </Button>
+                  {!waitingEmail('FINAL_CONFIRMATION') && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={actionLoading === 'resendFinalEmail'}
+                      onClick={handleResendFinalEmail}
+                    >
+                      Reenviar email de confirmación final
+                    </Button>
+                  )}
                 </li>
               )}
               {reservationRecord.status === 'CANCELLED' && reservationRecord.guestEmail && (
@@ -675,20 +688,24 @@ export function ReservationFormPage() {
                     <div>
                       <p className="font-medium text-text">Email de cancelación</p>
                       <p className="text-sm text-text-muted">
-                        {reservationRecord.cancellationEmailSentAt
-                          ? `Enviado el ${formatDateTime(reservationRecord.cancellationEmailSentAt)}`
-                          : 'No enviado'}
+                        {waitingEmail('CANCELLATION')
+                          ? `Programado para las ${formatTime(waitingEmail('CANCELLATION')!.sendAt)}`
+                          : reservationRecord.cancellationEmailSentAt
+                            ? `Enviado el ${formatDateTime(reservationRecord.cancellationEmailSentAt)}`
+                            : 'No enviado'}
                       </p>
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    loading={actionLoading === 'resendCancellationEmail'}
-                    onClick={handleResendCancellationEmail}
-                  >
-                    Reenviar email de cancelación
-                  </Button>
+                  {!waitingEmail('CANCELLATION') && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={actionLoading === 'resendCancellationEmail'}
+                      onClick={handleResendCancellationEmail}
+                    >
+                      Reenviar email de cancelación
+                    </Button>
+                  )}
                 </li>
               )}
             </ul>
