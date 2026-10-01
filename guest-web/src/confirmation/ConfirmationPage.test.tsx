@@ -191,7 +191,7 @@ describe('ConfirmationPage', () => {
     expect(screen.getByText('0000003100012345678901')).toBeInTheDocument();
     expect(screen.getByText('LABRISA.DEMO.ARS')).toBeInTheDocument();
     expect(screen.getByText(/depósito de garantía/i)).toBeInTheDocument();
-    expect(screen.getByText('ARS 150.000 · se cobra al check-in')).toBeInTheDocument();
+    expect(screen.getByText('ARS 150.000 · por transferencia a la misma cuenta')).toBeInTheDocument();
     expect(screen.getAllByText(/pendiente/i)).toHaveLength(2);
     expect(screen.queryByText(/acepto las reglas de la casa/i)).not.toBeInTheDocument();
     // The rules recap shouldn't be buried in the final step only — a guest deciding whether

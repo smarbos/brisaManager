@@ -514,7 +514,7 @@ export function ConfirmationPage() {
                 <div>
                   <p className="font-semibold text-heading">Depósito de garantía</p>
                   <p className="text-sm text-text-muted">
-                    {formatMoney(reservation.currency, reservation.securityDepositAmount)} · se cobra al check-in
+                    {formatMoney(reservation.currency, reservation.securityDepositAmount)} · por transferencia a la misma cuenta
                   </p>
                 </div>
                 <Badge tone={reservation.depositReceivedAt ? 'success' : 'warning'}>
