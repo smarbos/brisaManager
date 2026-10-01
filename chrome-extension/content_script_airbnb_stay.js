@@ -79,9 +79,23 @@
     await waitUntil(() => Boolean(findPhoneRowTitle()));
   }
 
+  // The first guest row holds the name in its own element, sometimes followed by a profile
+  // line in another one ("Maika Diaz" + "Intereses: animales") — so take the row's first piece
+  // of text, not the whole row's text.
+  function firstOwnText(el) {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
+    let node = walker.currentNode;
+    while (node) {
+      const text = ownText(node).replace(/\s+/g, " ").trim();
+      if (text) return text;
+      node = walker.nextNode();
+    }
+    return "";
+  }
+
   function extractGuestName() {
     const firstGuest = document.querySelector('[data-testid="hosting-details-whos-coming"] li');
-    const fromList = firstGuest ? firstGuest.textContent.replace(/\s+/g, " ").trim() : "";
+    const fromList = firstGuest ? firstOwnText(firstGuest) : "";
     if (fromList && !/^\+?\d/.test(fromList)) return fromList;
 
     const heading = document.querySelector("h1");
