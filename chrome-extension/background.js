@@ -81,8 +81,10 @@ function sendReservation(payload) {
 
 // Passive lookup the content script runs on page load, before the operator has clicked
 // anything — lets it show "already loaded" instead of only finding out after a click.
-function checkReservationStatus({ source, resId }) {
-  const query = new URLSearchParams({ source, res_id: resId }).toString();
+function checkReservationStatus({ source, resId, airbnbReference }) {
+  const params = { source, res_id: resId };
+  if (airbnbReference) params.airbnb_reference = airbnbReference;
+  const query = new URLSearchParams(params).toString();
   return laBrisaFetch(`/reservations/import/status?${query}`);
 }
 
