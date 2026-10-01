@@ -5,11 +5,12 @@ import { EmailSenderService } from './email-sender.service';
 import { EmailDispatcherService } from './email-dispatcher.service';
 import { SettingsModule } from '../settings/settings.module';
 import { OutboundEmailsController } from './outbound-emails.controller';
+import { ResendWebhooksController } from './resend-webhooks.controller';
 
 @Global()
 @Module({
   imports: [SettingsModule],
-  controllers: [OutboundEmailsController],
+  controllers: [OutboundEmailsController, ResendWebhooksController],
   providers: [EmailService, EmailOutboxService, EmailSenderService, EmailDispatcherService],
   exports: [EmailService, EmailOutboxService],
 })

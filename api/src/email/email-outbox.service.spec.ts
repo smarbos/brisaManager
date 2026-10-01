@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 describe('EmailOutboxService', () => {
   let service: EmailOutboxService;
   let prisma: {
-    outboundEmail: { create: jest.Mock; findUnique: jest.Mock; updateMany: jest.Mock; findMany: jest.Mock };
+    outboundEmail: { create: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock; findMany: jest.Mock };
   };
   let sender: { send: jest.Mock; applyEffects: jest.Mock };
   const originalDelay = process.env.EMAIL_SEND_DELAY_MS;
@@ -31,6 +31,7 @@ describe('EmailOutboxService', () => {
       outboundEmail: {
         create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'new', ...data })),
         findUnique: jest.fn().mockResolvedValue(entry),
+        findFirst: jest.fn().mockResolvedValue(null),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findMany: jest.fn().mockResolvedValue([]),
       },
@@ -178,6 +179,43 @@ describe('EmailOutboxService', () => {
         take: 50,
         skip: 50,
       });
+    });
+  });
+
+  describe('forwardInbound', () => {
+    const received = { email_id: 'in-1', from: 'guest@example.com', subject: 'Hola' };
+    const savedForwardTo = process.env.EMAIL_FORWARD_TO;
+    afterEach(() => {
+      process.env.EMAIL_FORWARD_TO = savedForwardTo;
+    });
+
+    it('does nothing when no forward-to mailbox is configured', async () => {
+      delete process.env.EMAIL_FORWARD_TO;
+
+      expect(await service.forwardInbound(received)).toBeNull();
+      expect(prisma.outboundEmail.create).not.toHaveBeenCalled();
+    });
+
+    it('does not forward the same received email twice', async () => {
+      process.env.EMAIL_FORWARD_TO = 'staff@example.com';
+      prisma.outboundEmail.findFirst.mockResolvedValue({ id: 'existing' });
+
+      expect(await service.forwardInbound(received)).toEqual({ id: 'existing' });
+      expect(prisma.outboundEmail.create).not.toHaveBeenCalled();
+      expect(sender.send).not.toHaveBeenCalled();
+    });
+
+    it('queues the forward with no delay and sends it right away', async () => {
+      process.env.EMAIL_FORWARD_TO = 'staff@example.com';
+      const before = Date.now();
+
+      await service.forwardInbound(received);
+
+      const data = prisma.outboundEmail.create.mock.calls[0][0].data;
+      expect(data).toMatchObject({ kind: 'INBOUND_FORWARD', to: 'staff@example.com', inboundEmailId: 'in-1', subject: 'Fwd: Hola (de guest@example.com)' });
+      expect(data.sendAt.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(data.sendAt.getTime()).toBeGreaterThanOrEqual(before);
+      expect(sender.send).toHaveBeenCalled();
     });
   });
 });
