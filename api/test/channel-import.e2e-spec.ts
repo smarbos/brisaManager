@@ -37,6 +37,8 @@ describe('ChannelImportController (e2e)', () => {
     // entirely, not just the outbound Resend call — the exact call to sendInitialEmail is
     // already verified with mocks in channel-import.service.spec.ts, so this file doesn't
     // need to re-observe it, only confirm nothing here reaches a real external API.
+    // sendInitialWhatsapp is stubbed for the same reason: its own Prisma writes, and no real
+    // Twilio send.
     // This file's own request count (across every `it` below) has grown past the
     // endpoint's real 10-req/min-per-IP throttle limit, which exists to slow down brute-
     // force token guesses — a legitimate production concern, not something to loosen just
@@ -45,7 +47,10 @@ describe('ChannelImportController (e2e)', () => {
     // limit or on any other test file.
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(ReservationsService)
-      .useValue({ sendInitialEmail: jest.fn().mockResolvedValue(undefined) })
+      .useValue({
+        sendInitialEmail: jest.fn().mockResolvedValue(undefined),
+        sendInitialWhatsapp: jest.fn().mockResolvedValue(true),
+      })
       .overrideGuard(ThrottlerGuard)
       .useValue({ canActivate: () => true })
       .compile();

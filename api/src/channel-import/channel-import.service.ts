@@ -230,6 +230,16 @@ export class ChannelImportService {
       void this.reservationsService.sendInitialEmail(reservation);
     }
 
+    // The check-in link also goes out over WhatsApp whenever we have a phone — but only
+    // once the name and both dates were actually scraped: unlike the email, the WhatsApp
+    // template states them ("Tu estadía del ... al ..."), and the placeholders used above
+    // when they're missing (today's date, "Huésped de ... (pendiente de completar)") would
+    // tell the guest something wrong. Staff can still send it from the reservation page
+    // once they've filled those in.
+    if (guestPhone && dto.guest_name?.trim() && dto.check_in && dto.check_out) {
+      void this.reservationsService.sendInitialWhatsapp(reservation);
+    }
+
     // Every reservation reaches the shared Google Calendar on creation, regardless of
     // which scraped fields are still unverified — the calendar is a staff-facing
     // visibility/double-booking-prevention tool (per the Google Calendar integration

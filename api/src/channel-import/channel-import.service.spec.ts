@@ -20,7 +20,7 @@ describe('ChannelImportService', () => {
   let eventsService: { record: jest.Mock };
   let googleCalendarPushService: { pushReservation: jest.Mock };
   let guestsService: { syncFromReservation: jest.Mock };
-  let reservationsService: { sendInitialEmail: jest.Mock };
+  let reservationsService: { sendInitialEmail: jest.Mock; sendInitialWhatsapp: jest.Mock };
   const originalHotelId = process.env.BOOKING_HOTEL_ID;
 
   beforeAll(() => {
@@ -42,7 +42,7 @@ describe('ChannelImportService', () => {
     eventsService = { record: jest.fn() };
     googleCalendarPushService = { pushReservation: jest.fn() };
     guestsService = { syncFromReservation: jest.fn() };
-    reservationsService = { sendInitialEmail: jest.fn() };
+    reservationsService = { sendInitialEmail: jest.fn(), sendInitialWhatsapp: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -813,6 +813,63 @@ describe('ChannelImportService', () => {
         checkOut,
         status: 'PENDING',
       });
+    });
+  });
+
+  describe('WhatsApp check-in link', () => {
+    const scrapedDto: ImportReservationDto = {
+      ...baseDto,
+      source: 'airbnb',
+      hotel_id: undefined,
+      res_id: '1000000484',
+      guest_name: 'María Laura',
+      guest_phone: '+591 75278095',
+      check_in: '2026-12-12',
+      check_out: '2026-12-15',
+    };
+
+    beforeEach(() => {
+      prisma.reservation.findUnique.mockResolvedValue(null);
+      prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-wa', ...data }));
+    });
+
+    it('sends it for a new import with a phone, name and dates', async () => {
+      const { reservation } = await service.import(scrapedDto);
+
+      expect(reservationsService.sendInitialWhatsapp).toHaveBeenCalledWith(reservation);
+    });
+
+    it('does not send it when the name or dates were not scraped (placeholders would be wrong)', async () => {
+      await service.import({ ...scrapedDto, guest_name: null });
+      await service.import({ ...scrapedDto, check_in: null });
+      await service.import({ ...scrapedDto, check_out: null });
+
+      expect(reservationsService.sendInitialWhatsapp).not.toHaveBeenCalled();
+    });
+
+    it('does not send it without a phone', async () => {
+      await service.import({ ...scrapedDto, guest_phone: null });
+
+      expect(reservationsService.sendInitialWhatsapp).not.toHaveBeenCalled();
+    });
+
+    it('does not send it when re-importing an existing reservation', async () => {
+      const existing = {
+        id: 'res-existing',
+        status: 'PENDING',
+        guestName: 'María Laura',
+        guestEmail: null,
+        guestPhone: null,
+        guestId: null,
+        checkIn: new Date('2026-12-01T00:00:00Z'),
+        checkOut: new Date('2026-12-05T00:00:00Z'),
+      };
+      prisma.reservation.findUnique.mockResolvedValue(existing);
+      prisma.reservation.update.mockResolvedValue({ ...existing, guestPhone: '+59175278095' });
+
+      await service.import(scrapedDto);
+
+      expect(reservationsService.sendInitialWhatsapp).not.toHaveBeenCalled();
     });
   });
 });
