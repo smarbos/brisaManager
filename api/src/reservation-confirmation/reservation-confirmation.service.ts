@@ -42,27 +42,26 @@ export class ReservationConfirmationService {
   }
 
   // Public (not just used internally by maybeAutoConfirm()) so resendFinalEmail() below can
-  // retry it on demand. Returns whether it actually sent, matching
+  // retry it on demand. Returns whether it was queued, matching
   // ReservationsService.sendInitialEmail()'s same contract.
   async sendFinalEmail(reservation: Reservation): Promise<boolean> {
     try {
       const confirmationUrl = `${process.env.GUEST_WEB_ORIGIN}/r/${reservation.confirmationToken}`;
+      // Queued: it goes out after the outbox's 5-minute wait, and EmailSenderService records
+      // finalConfirmationEmailSentAt / FINAL_EMAIL_SENT (or _FAILED) when it does.
       await this.emailService.sendFinalConfirmationEmail(
         reservation.guestEmail as string,
         reservation.guestName,
         confirmationUrl,
+        reservation.id,
       );
-      await this.prisma.reservation.update({
-        where: { id: reservation.id },
-        data: { finalConfirmationEmailSentAt: new Date() },
-      });
-      await this.eventsService.record(reservation.id, 'FINAL_EMAIL_SENT');
+      await this.eventsService.record(reservation.id, 'FINAL_EMAIL_QUEUED');
       return true;
     } catch (error) {
       await this.eventsService.record(reservation.id, 'FINAL_EMAIL_FAILED', (error as Error).message);
       await this.emailService.sendAlert(
         'Falló el email de confirmación final',
-        `La reserva ${reservation.id} para ${reservation.guestName} está confirmada pero falló el envío del email final: ${(error as Error).message}`,
+        `La reserva ${reservation.id} para ${reservation.guestName} está confirmada pero no se pudo preparar el email final: ${(error as Error).message}`,
       );
       return false;
     }
