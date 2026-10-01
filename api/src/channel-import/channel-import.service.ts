@@ -43,6 +43,21 @@ const EXTERNAL_REFERENCE_PREFIX: Record<
   airbnb: 'airbnb-thread',
 };
 
+// The two Airbnb pages expose different identifiers for the same reservation — the messages
+// thread (reached from Airbnb's email) only has its thread id, the reservation page (reached
+// from Airbnb's own UI) only its confirmation code — so each gets its own prefix, and imports
+// from the two are linked by matching dates instead (see findLiveAirbnbByDates()).
+function externalReferenceFor(
+  source: ImportReservationDto['source'],
+  resId: string,
+  airbnbReference?: ImportReservationDto['airbnb_reference'],
+): string {
+  if (source === 'airbnb' && airbnbReference === 'confirmation_code') {
+    return `airbnb-code-${resId}`;
+  }
+  return `${EXTERNAL_REFERENCE_PREFIX[source]}-${resId}`;
+}
+
 // Best-effort only: a badly-scraped phone string from Booking.com's/Airbnb's page must never
 // block an import the way an invalid number blocks admin-web's manual form or guest-web's
 // check-in wizard (both hard-reject via IsValidPhoneNumber). If it doesn't parse as a real
@@ -82,7 +97,9 @@ function parseAmount(raw: string | null): number {
 function buildNotes(dto: ImportReservationDto): string {
   const base =
     dto.source === 'airbnb'
-      ? `Creada desde la extensión de Chrome (mensajes de Airbnb, thread ${dto.res_id}).`
+      ? dto.airbnb_reference === 'confirmation_code'
+        ? `Creada desde la extensión de Chrome (página de la reserva de Airbnb, código ${dto.res_id}).`
+        : `Creada desde la extensión de Chrome (mensajes de Airbnb, thread ${dto.res_id}).`
       : `Creada desde la extensión de Chrome (Booking.com extranet, res_id ${dto.res_id}, hotel_id ${dto.hotel_id}).`;
   if (dto.unverified_fields.length === 0) {
     return base;
@@ -123,11 +140,19 @@ export class ChannelImportService {
     }
 
     const source = SOURCE_MAP[dto.source];
-    const externalReference = `${EXTERNAL_REFERENCE_PREFIX[dto.source]}-${dto.res_id}`;
+    const externalReference = externalReferenceFor(dto.source, dto.res_id, dto.airbnb_reference);
 
     const existing = await this.prisma.reservation.findUnique({
       where: { source_externalReference: { source, externalReference } },
     });
+
+    // Not imported from this page yet — it may have been from the other Airbnb page.
+    if (!existing || existing.status === 'CANCELLED') {
+      const sameStay = await this.findLiveAirbnbByDates(dto);
+      if (sameStay) {
+        return this.updateFromRescan(sameStay, dto);
+      }
+    }
 
     if (existing && existing.status !== 'CANCELLED') {
       // The operator explicitly re-ran the extension against this same thread — treat that
@@ -336,12 +361,31 @@ export class ChannelImportService {
     return { reservation: updated, created: false };
   }
 
+  // A live Airbnb reservation with exactly these dates is the same stay imported from the other
+  // Airbnb page (see externalReferenceFor()): there's one property, so two live reservations
+  // can't share the same check-in and check-out. Only once the dates were actually picked up —
+  // the extension's review panel has the operator confirm them before sending.
+  private async findLiveAirbnbByDates(dto: ImportReservationDto) {
+    if (dto.source !== 'airbnb' || !dto.check_in || !dto.check_out) {
+      return null;
+    }
+    return this.prisma.reservation.findFirst({
+      where: {
+        source: 'AIRBNB',
+        status: { not: 'CANCELLED' },
+        checkIn: new Date(dto.check_in),
+        checkOut: new Date(dto.check_out),
+      },
+    });
+  }
+
   async checkStatus(
     source: ImportReservationDto['source'],
     resId: string,
+    airbnbReference?: ImportReservationDto['airbnb_reference'],
   ): Promise<ImportStatusResult> {
     const mappedSource = SOURCE_MAP[source];
-    const externalReference = `${EXTERNAL_REFERENCE_PREFIX[source]}-${resId}`;
+    const externalReference = externalReferenceFor(source, resId, airbnbReference);
 
     const existing = await this.prisma.reservation.findUnique({
       where: {

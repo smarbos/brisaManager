@@ -28,7 +28,7 @@ export class ChannelImportController {
   // anything — lets it show "already loaded" instead of only finding out after a click.
   @Get('status')
   status(@Query() query: ImportStatusQueryDto) {
-    return this.channelImportService.checkStatus(query.source, query.res_id);
+    return this.channelImportService.checkStatus(query.source, query.res_id, query.airbnb_reference);
   }
 
   @Post()
