@@ -17,6 +17,8 @@ import {
   updateReservation,
 } from '../api/reservations';
 import { getReservationImageBlob, listReservationImages, ReservationImage } from '../api/reservation-images';
+import { listOutboundEmails, OutboundEmail } from '../api/outbound-emails';
+import { OutboundEmailList } from '../emails/OutboundEmailList';
 import { Reservation, ReservationEvent, ReservationSource, ReservationStatus } from './types';
 import {
   PageContainer,
@@ -135,9 +137,19 @@ export function ReservationFormPage() {
   const [actionLoading, setActionLoading] = useState<ActionKey | null>(null);
   const [reservationRecord, setReservationRecord] = useState<Reservation | null>(null);
   const [events, setEvents] = useState<ReservationEvent[]>([]);
+  const [outboundEmails, setOutboundEmails] = useState<OutboundEmail[]>([]);
   const [overlaps, setOverlaps] = useState<Reservation[]>([]);
   const [images, setImages] = useState<ReservationImage[]>([]);
   const guestWebUrl = import.meta.env.VITE_GUEST_WEB_URL as string;
+
+  function loadOutboundEmails() {
+    if (!id) return;
+    listOutboundEmails({ reservationId: id })
+      .then(setOutboundEmails)
+      .catch((err) => {
+        console.error('Failed to load the reservation emails', err);
+      });
+  }
 
   function loadReservation() {
     if (!id) return;
@@ -156,6 +168,7 @@ export function ReservationFormPage() {
         console.error('Failed to load the reservation', err);
         setError('No se pudo cargar la reserva');
       });
+    loadOutboundEmails();
     listReservationEvents(id)
       .then(setEvents)
       .catch((err) => {
@@ -232,7 +245,7 @@ export function ReservationFormPage() {
       const { sent } = await resendInitialEmail(id);
       loadReservation();
       if (!sent) {
-        setActionError('El email no pudo enviarse. Revisá el historial de eventos para más detalles.');
+        setActionError('El email no se pudo programar. Revisá el historial de eventos para más detalles.');
       }
     } catch {
       setActionError('No se pudo reenviar el email de confirmación. Por favor, intentá de nuevo.');
@@ -266,7 +279,7 @@ export function ReservationFormPage() {
       const { sent } = await resendFinalEmail(id);
       loadReservation();
       if (!sent) {
-        setActionError('El email no pudo enviarse. Revisá el historial de eventos para más detalles.');
+        setActionError('El email no se pudo programar. Revisá el historial de eventos para más detalles.');
       }
     } catch {
       setActionError('No se pudo reenviar el email de confirmación final. Por favor, intentá de nuevo.');
@@ -283,7 +296,7 @@ export function ReservationFormPage() {
       const { sent } = await resendCancellationEmail(id);
       loadReservation();
       if (!sent) {
-        setActionError('El email no pudo enviarse. Revisá el historial de eventos para más detalles.');
+        setActionError('El email no se pudo programar. Revisá el historial de eventos para más detalles.');
       }
     } catch {
       setActionError('No se pudo reenviar el email de cancelación. Por favor, intentá de nuevo.');
@@ -695,6 +708,23 @@ export function ReservationFormPage() {
               )}
             </div>
           </Card>
+
+          {outboundEmails.length > 0 && (
+            <Card className="mt-6">
+              <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Emails</h2>
+              <p className="mb-3 text-sm text-text-muted">
+                Cada email espera 5 minutos antes de enviarse: mientras tanto lo podés abortar.
+              </p>
+              <OutboundEmailList
+                emails={outboundEmails}
+                showReservationLink={false}
+                onChanged={() => {
+                  loadOutboundEmails();
+                  loadReservation();
+                }}
+              />
+            </Card>
+          )}
 
           <Card className="mt-6">
             <h2 className="mb-3 font-heading text-lg font-semibold text-heading">Historial de eventos</h2>

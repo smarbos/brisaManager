@@ -44,6 +44,12 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   RESERVATION_CANCELLED: 'Reserva cancelada',
   INITIAL_EMAIL_SENT: 'Email inicial enviado',
   INITIAL_EMAIL_FAILED: 'Falló el email inicial',
+  INITIAL_EMAIL_QUEUED: 'Email inicial programado',
+  INITIAL_EMAIL_ABORTED: 'Email inicial abortado',
+  FINAL_EMAIL_QUEUED: 'Email final programado',
+  FINAL_EMAIL_ABORTED: 'Email final abortado',
+  CANCELLATION_EMAIL_QUEUED: 'Email de cancelación programado',
+  CANCELLATION_EMAIL_ABORTED: 'Email de cancelación abortado',
   INITIAL_WHATSAPP_SENT: 'WhatsApp con el link enviado',
   INITIAL_WHATSAPP_FAILED: 'Falló el WhatsApp con el link',
   FINAL_EMAIL_SENT: 'Email final enviado',
@@ -80,10 +86,20 @@ export function extensionErrorSourceLabel(source: string): string {
 const RECIPIENT_STATUS_LABELS: Record<string, string> = {
   SENT: 'Enviado',
   FAILED: 'Fallido',
+  SCHEDULED: 'Programado',
+  ABORTED: 'Abortado',
 };
 
 export function recipientStatusLabel(status: string): string {
   return RECIPIENT_STATUS_LABELS[status] ?? status;
+}
+
+// Campaign recipients go SCHEDULED → SENT/FAILED/ABORTED as their outbox email is sent.
+export function recipientStatusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger' {
+  if (status === 'SENT') return 'success';
+  if (status === 'FAILED') return 'danger';
+  if (status === 'SCHEDULED') return 'warning';
+  return 'neutral';
 }
 
 // A cancelled reservation needs no further action, so it's never flagged here even if it's
@@ -151,4 +167,33 @@ const GUEST_EVENT_TYPE_LABELS: Record<string, string> = {
 
 export function guestEventTypeLabel(type: string): string {
   return GUEST_EVENT_TYPE_LABELS[type] ?? type;
+}
+
+const OUTBOUND_EMAIL_KIND_LABELS: Record<string, string> = {
+  INITIAL_CONFIRMATION: 'Confirmación inicial',
+  FINAL_CONFIRMATION: 'Confirmación final',
+  CANCELLATION: 'Cancelación',
+  MARKETING: 'Campaña',
+  ALERT: 'Alerta interna',
+  INBOUND_FORWARD: 'Reenvío de email recibido',
+};
+
+export function outboundEmailKindLabel(kind: string): string {
+  return OUTBOUND_EMAIL_KIND_LABELS[kind] ?? kind;
+}
+
+const OUTBOUND_EMAIL_STATUS: Record<string, { label: string; tone: 'neutral' | 'success' | 'warning' | 'danger' }> = {
+  SCHEDULED: { label: 'Programado', tone: 'warning' },
+  SENDING: { label: 'Enviando', tone: 'warning' },
+  SENT: { label: 'Enviado', tone: 'success' },
+  FAILED: { label: 'Falló', tone: 'danger' },
+  ABORTED: { label: 'Abortado', tone: 'neutral' },
+};
+
+export function outboundEmailStatusLabel(status: string): string {
+  return OUTBOUND_EMAIL_STATUS[status]?.label ?? status;
+}
+
+export function outboundEmailStatusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger' {
+  return OUTBOUND_EMAIL_STATUS[status]?.tone ?? 'neutral';
 }
