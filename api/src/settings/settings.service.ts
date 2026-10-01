@@ -28,12 +28,6 @@ const DEFAULT_FINAL_EMAIL_TEMPLATE =
 const DEFAULT_CANCELLATION_EMAIL_TEMPLATE =
   'Hola {{guestName}},<br><br>Te confirmamos que tu reserva del {{checkIn}} al {{checkOut}} en La Brisa de Mar del Plata fue cancelada. Si creés que esto es un error, por favor contactanos.';
 
-const DEFAULT_RESERVATION_REMINDER_WHATSAPP_TEMPLATE =
-  'Hola {{guestName}}! Te recordamos tu reserva en La Brisa de Mar del Plata del {{checkIn}} al {{checkOut}}. ¡Te esperamos!';
-
-const DEFAULT_DEPOSIT_REMINDER_WHATSAPP_TEMPLATE =
-  'Hola {{guestName}}, todavía no registramos el depósito de tu reserva del {{checkIn}}. {{paymentInstructions}}';
-
 const DEFAULT_CONFIRMATION_STEP_TEXT =
   '¡Todo listo! Completaste todos los pasos necesarios para tu estadía en La Brisa de Mar del Plata.';
 
@@ -63,8 +57,6 @@ export class SettingsService {
         cancellationEmailTemplate: DEFAULT_CANCELLATION_EMAIL_TEMPLATE,
         reservationReminderDaysBefore: 3,
         depositReminderDaysAfter: 3,
-        reservationReminderWhatsappTemplate: DEFAULT_RESERVATION_REMINDER_WHATSAPP_TEMPLATE,
-        depositReminderWhatsappTemplate: DEFAULT_DEPOSIT_REMINDER_WHATSAPP_TEMPLATE,
         bankAccountHolder: '',
         bankCuil: '',
         bankAccountNumber: '',

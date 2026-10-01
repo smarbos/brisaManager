@@ -59,14 +59,6 @@ export class UpdateSettingsDto {
   @Min(1)
   depositReminderDaysAfter: number;
 
-  @IsString()
-  @MinLength(1)
-  reservationReminderWhatsappTemplate: string;
-
-  @IsString()
-  @MinLength(1)
-  depositReminderWhatsappTemplate: string;
-
   // Optional, like the iCal URLs above: bank details may not be set up yet when Settings
   // is first created, and the guest-facing payment step simply shows blank fields rather
   // than a broken page until an admin fills these in.
