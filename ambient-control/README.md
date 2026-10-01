@@ -114,7 +114,8 @@ to production, and `AMBIENT_API_KEY` added to production's `.env`, before
 a flashed device can authenticate.
 
 1. Copy `include/secrets.h.example` to `include/secrets.h` (gitignored) and
-   fill in your WiFi SSID/password. `AMBIENT_API_KEY` must match the
+   list every WiFi network the device may join in `WIFI_NETWORKS` (e.g. the
+   apartment's and the lab's), in priority order. `AMBIENT_API_KEY` must match the
    `AMBIENT_API_KEY` set in **production's** `.env`, not the local dev one.
 2. Before flashing a second physical device (e.g. one per room), change
    `config.h`'s `DEVICE_ID` and `DEVICE_NAME` first - each device needs a
@@ -227,11 +228,15 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
   to the nearest whole degree/percent. A failed read (occasional timing
   glitch or checksum failure) keeps the last known-good value rather than
   reporting garbage or a stale error as if it were real.
-- WiFi connects at boot with a 15s timeout; sensor sampling and local
-  `ALERT` detection work regardless of WiFi state. If it never connected
-  (or drops later), `maintainWiFi()` (called every `loop()`) retries
-  `WiFi.begin()` every `WIFI_RETRY_INTERVAL_MS` (10s) until it's back -
-  covers a router reboot or a temporary outage without a manual reset.
+- WiFi connects at boot by trying each network in `WIFI_NETWORKS` in order,
+  each with a 15s timeout; sensor sampling and local `ALERT` detection work
+  regardless of WiFi state. If it never connected (or drops later),
+  `maintainWiFi()` (called every `loop()`) retries every
+  `WIFI_RETRY_INTERVAL_MS` (10s), moving on to the next network each time,
+  until it's back - covers a router reboot, a temporary outage, or carrying
+  the device between the lab and the apartment, without a manual reset.
+  The flash isn't encrypted, so every password listed is readable by anyone
+  with USB access to the device.
 - An "emergency" is a sustained, much-higher-than-alert reading from
   either gas sensor: at/above `smokeAlertThreshold` (or `coAlertThreshold`)
   times `EMERGENCY_THRESHOLD_MULTIPLIER` (2x), continuously, for
