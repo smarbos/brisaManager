@@ -16,6 +16,36 @@ Manifest V3 extension with two independent content scripts:
 Both only ever act on a page a staff member is already logged into and
 viewing — no credentials are stored or handled by the extension.
 
+## Review before sending
+
+Neither script sends anything straight from the scrape. Clicking the main
+button ("Enviar a La Brisa" on Booking.com, "Generar link de check-in" /
+"Actualizar datos de la reserva" on Airbnb) opens a review panel
+(`review_panel.js`, loaded before both content scripts) with every picked-up
+field — guest name, phone (Airbnb) or email (Booking.com), check-in,
+check-out, guests, total price, currency — in editable inputs. A field the
+scraper didn't find shows empty, flagged "No se encontró en la página". The
+operator corrects whatever is wrong (Airbnb's guest-name guess and inferred
+year in particular) and clicks "Confirmar y enviar"; "Cancelar" or Esc sends
+nothing. The panel says what confirming will do — create the reservation and
+send the guest the check-in link by WhatsApp (Airbnb, with a phone) or email
+(Booking.com, with an email), or just update an already-loaded reservation.
+
+The name and both dates are required and check-out must be after check-in;
+"Confirmar y enviar" stays disabled until they are. Every field the operator
+confirmed with a value is sent as verified: only fields left empty (plus
+`status`, which neither page exposes) go in `unverified_fields`.
+
+### Tests
+
+`validateReview()` and `buildReviewedPayload()` in `review_panel.js` are plain
+functions with tests in `tests/`, run with Node's built-in test runner (no
+dependencies). Node isn't needed on the host — from the repo root:
+
+```bash
+docker compose run --rm --no-deps -T -v "$PWD/chrome-extension:/ext:ro" api node --test /ext/tests/
+```
+
 ## Status
 
 **Booking.com: Phase 2 (real extraction).** Selectors were confirmed
@@ -108,7 +138,7 @@ Brisa..." badge shows right below the main button while that request is in
 flight, then either a green "✓ Ya cargada en La Brisa" badge (and the main
 button relabels to "Actualizar datos de la reserva") or, if the check itself
 failed, a red "No se pudo verificar el estado en La Brisa" badge. Clicking
-the main button either way still runs the same extraction +
+the main button either way still runs the same extraction, review panel and
 `POST /reservations/import`; the only difference is what the backend does
 with an already-existing, non-cancelled match — see "Re-importing an
 already-loaded reservation" under API contract below.

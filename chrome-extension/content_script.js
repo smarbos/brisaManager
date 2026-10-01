@@ -588,6 +588,29 @@
       unverified_fields: unverifiedFields,
     };
 
+    // Nothing is sent until the operator has reviewed (and, if needed, corrected) every
+    // picked-up field — see review_panel.js.
+    globalThis.LaBrisaReview.openReviewPanel({
+      title: "Reserva de Booking.com",
+      basePayload: payload,
+      fields: [
+        { key: "guest_name", label: "Nombre del huésped", type: "text", value: fields.guestName },
+        { key: "guest_email", label: "Email", type: "email", value: guestEmail },
+        { key: "check_in", label: "Check-in", type: "date", value: fields.checkIn },
+        { key: "check_out", label: "Check-out", type: "date", value: fields.checkOut },
+        { key: "guests", label: "Huéspedes", type: "number", value: fields.guests },
+        { key: "total_price", label: "Precio total", type: "text", value: fields.totalPrice },
+        { key: "currency", label: "Moneda", type: "text", value: fields.currency },
+      ],
+      describeAction: (values) =>
+        values.guest_email && values.guest_email.trim()
+          ? "Al confirmar se crea la reserva en La Brisa y se le envía el link de check-in al huésped por email (si ya estaba cargada, solo se actualizan sus datos)."
+          : "Al confirmar se crea la reserva en La Brisa (sin email, no se le envía el link al huésped; si ya estaba cargada, solo se actualizan sus datos).",
+      onConfirm: submitReservation,
+    });
+  }
+
+  function submitReservation(payload) {
     showToast("Enviando a La Brisa...", "info");
 
     chrome.runtime.sendMessage(
