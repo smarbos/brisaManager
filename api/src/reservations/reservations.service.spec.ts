@@ -744,4 +744,20 @@ describe('ReservationsService', () => {
       expect(result[1].whatsappIssues).toEqual([]);
     });
   });
+
+  describe('guest contact on update', () => {
+    it('rejects an edit that leaves the reservation with neither email nor phone', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', guestEmail: 'jane@example.com', guestPhone: null });
+
+      await expect(service.update('1', { guestEmail: null, guestPhone: null })).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma.reservation.update).not.toHaveBeenCalled();
+    });
+
+    it('allows an edit that does not touch the contact fields, even on a reservation that has none', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', guestEmail: null, guestPhone: null, checkIn: new Date('2026-01-10'), checkOut: new Date('2026-01-15') });
+      prisma.reservation.update.mockResolvedValue({ id: '1', guestEmail: null, guestPhone: null });
+
+      await expect(service.update('1', { paxCount: 3 })).resolves.toBeDefined();
+    });
+  });
 });

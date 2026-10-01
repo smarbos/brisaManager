@@ -15,8 +15,8 @@ export interface WhatsappMessageStatus {
 export interface Reservation {
   id: string;
   guestName: string;
-  guestPhone?: string;
-  guestEmail?: string;
+  guestPhone?: string | null;
+  guestEmail?: string | null;
   checkIn: string;
   checkOut: string;
   paxCount: number;

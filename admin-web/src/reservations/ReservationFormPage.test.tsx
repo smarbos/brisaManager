@@ -83,9 +83,7 @@ describe('ReservationFormPage', () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
 
-  it('allows saving with no guest phone at all, since the field is optional', async () => {
-    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
-
+  function renderNewReservation() {
     render(
       <MemoryRouter initialEntries={['/reservations/new']}>
         <Routes>
@@ -93,14 +91,44 @@ describe('ReservationFormPage', () => {
         </Routes>
       </MemoryRouter>,
     );
-
     fireEvent.change(screen.getByLabelText(/nombre del huésped/i), { target: { value: 'Jane Doe' } });
     fireEvent.change(screen.getByLabelText(/check-in/i), { target: { value: '2026-01-10' } });
     fireEvent.change(screen.getByLabelText(/check-out/i), { target: { value: '2026-01-15' } });
     fireEvent.change(screen.getByLabelText(/monto total/i), { target: { value: '100000' } });
+  }
+
+  it('saves with only an email, sending the empty phone as none', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+    renderNewReservation();
+
+    fireEvent.change(screen.getByLabelText(/email del huésped/i), { target: { value: 'jane@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ guestPhone: '' })));
+    await waitFor(() =>
+      expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ guestEmail: 'jane@example.com', guestPhone: null })),
+    );
+  });
+
+  it('saves with only a phone, sending the empty email as none', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+    renderNewReservation();
+
+    fireEvent.change(screen.getByLabelText(/teléfono del huésped/i), { target: { value: '+5491100000000' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() =>
+      expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ guestEmail: null, guestPhone: '+5491100000000' })),
+    );
+  });
+
+  it('asks for an email or a phone when both are empty, without saving', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+    renderNewReservation();
+
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    expect(await screen.findByText('Cargá el email o el teléfono del huésped.')).toBeInTheDocument();
+    expect(createSpy).not.toHaveBeenCalled();
   });
 
   it('shows a link back to the reservations list', () => {

@@ -192,6 +192,8 @@ export function ReservationFormPage() {
         setForm({
           ...emptyForm,
           ...reservation,
+          guestEmail: reservation.guestEmail ?? '',
+          guestPhone: reservation.guestPhone ?? '',
           checkIn: reservation.checkIn.slice(0, 10),
           checkOut: reservation.checkOut.slice(0, 10),
           totalAmount: Number(reservation.totalAmount),
@@ -365,19 +367,28 @@ export function ReservationFormPage() {
     // reservation with no phone at all (optional field), but a non-empty value must be a
     // real number — unlike the Chrome extension's import path, which best-effort normalizes
     // a scraped phone and never rejects the import over it (see ChannelImportService).
-    if (form.guestPhone && !isValidPhoneNumber(form.guestPhone, 'AR')) {
+    // A reservation needs at least one way to reach the guest — either one is enough. An empty
+    // field is sent as null ("none"), not "", which the API would reject as an invalid phone.
+    const rawEmail = (form.guestEmail ?? '').trim();
+    const rawPhone = (form.guestPhone ?? '').trim();
+    if (!rawEmail && !rawPhone) {
+      setError('Cargá el email o el teléfono del huésped.');
+      return;
+    }
+    if (rawPhone && !isValidPhoneNumber(rawPhone, 'AR')) {
       setPhoneError('Ingresá un número de teléfono válido.');
       return;
     }
     setPhoneError(null);
     setError(null);
     setSubmitting(true);
-    const guestPhone = form.guestPhone ? parsePhoneNumberFromString(form.guestPhone, 'AR')!.number : form.guestPhone;
+    const guestEmail = rawEmail || null;
+    const guestPhone = rawPhone ? parsePhoneNumberFromString(rawPhone, 'AR')!.number : null;
     try {
       if (isEditing && id) {
-        await updateReservation(id, { ...form, guestPhone });
+        await updateReservation(id, { ...form, guestEmail, guestPhone });
       } else {
-        await createReservation({ ...form, guestPhone });
+        await createReservation({ ...form, guestEmail, guestPhone });
       }
       navigate('/');
     } catch {

@@ -53,6 +53,11 @@ describe('ReservationsController (e2e)', () => {
     });
     await prisma.reservation.deleteMany({ where: { guestName: 'E2E Guest' } });
     await prisma.reservation.deleteMany({ where: { guestName: 'Overlap E2E Guest' } });
+    // Guests synced from the emails these reservations were created with.
+    const guestEmails = ['e2e-reservations-guest@example.com', 'only-email@example.com', 'edit-me@example.com'];
+    await prisma.guestEvent.deleteMany({ where: { guest: { email: { in: guestEmails } } } });
+    await prisma.reservation.updateMany({ where: { guest: { email: { in: guestEmails } } }, data: { guestId: null } });
+    await prisma.guest.deleteMany({ where: { email: { in: guestEmails } } });
     await prisma.adminUser.deleteMany({ where: { email: 'e2e-reservations@labrisa.com.ar' } });
     await app.close();
   });
@@ -63,6 +68,7 @@ describe('ReservationsController (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         guestName: 'E2E Guest',
+        guestEmail: 'e2e-reservations-guest@example.com',
         checkIn: '2026-02-01',
         checkOut: '2026-02-05',
         paxCount: 3,
@@ -124,6 +130,7 @@ describe('ReservationsController (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         guestName: 'Overlap E2E Guest',
+        guestEmail: 'e2e-reservations-guest@example.com',
         checkIn: '2026-07-01',
         checkOut: '2026-07-10',
         paxCount: 2,
@@ -155,7 +162,7 @@ describe('ReservationsController (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .send({
           guestName: 'E2E Guest',
-          ...(guestPhone ? { guestPhone } : {}),
+          ...(guestPhone ? { guestPhone } : { guestEmail: 'e2e-reservations-guest@example.com' }),
           checkIn: '2026-11-01',
           checkOut: '2026-11-05',
           paxCount: 2,
@@ -202,6 +209,71 @@ describe('ReservationsController (e2e)', () => {
 
     it('requires authentication', async () => {
       await request(app.getHttpServer()).post('/reservations/any-id/send-initial-whatsapp').expect(401);
+    });
+  });
+
+  describe('guest contact: email or phone, at least one', () => {
+    const base = {
+      guestName: 'E2E Guest',
+      checkIn: '2026-12-01',
+      checkOut: '2026-12-05',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+    };
+
+    it('saves a reservation with only an email (the phone left empty)', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...base, guestEmail: 'only-email@example.com', guestPhone: '' })
+        .expect(201);
+
+      expect(response.body.guestEmail).toBe('only-email@example.com');
+      expect(response.body.guestPhone).toBeNull();
+    });
+
+    it('saves a reservation with only a phone, storing the empty email as none', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...base, guestEmail: '', guestPhone: '+54 9 223 555-1111' })
+        .expect(201);
+
+      expect(response.body.guestEmail).toBeNull();
+      expect(response.body.guestPhone).toBe('+54 9 223 555-1111');
+    });
+
+    it('rejects a reservation with neither email nor phone', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...base, guestEmail: '', guestPhone: '' })
+        .expect(400);
+
+      expect(JSON.stringify(response.body.message)).toContain('email o el teléfono');
+    });
+
+    it('rejects an edit that clears both, but allows an edit that leaves them alone', async () => {
+      const created = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...base, guestEmail: 'edit-me@example.com' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/reservations/${created.body.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ guestEmail: '', guestPhone: '' })
+        .expect(400)
+        .expect((res) => expect(JSON.stringify(res.body.message)).toContain('email o el teléfono'));
+
+      await request(app.getHttpServer())
+        .patch(`/reservations/${created.body.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ paxCount: 3 })
+        .expect(200);
     });
   });
 });
