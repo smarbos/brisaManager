@@ -66,6 +66,7 @@ describe('ChannelImportController (e2e)', () => {
       OR: [
         { source: 'BOOKING' as const, externalReference: { startsWith: 'booking-extranet-e2e-test' } },
         { source: 'AIRBNB' as const, externalReference: { startsWith: 'airbnb-thread-e2e-test' } },
+        { source: 'AIRBNB' as const, externalReference: { startsWith: 'airbnb-code-E2E' } },
       ],
     };
     const created = await prisma.reservation.findMany({ where, select: { id: true } });
@@ -313,8 +314,10 @@ describe('ChannelImportController (e2e)', () => {
           res_id: 'e2e-test-status-loaded',
           guest_name: 'Status Check Guest',
           guest_email: null,
-          check_in: '2026-11-06',
-          check_out: '2026-11-08',
+          // Dates no other Airbnb import in this file uses: Airbnb imports with identical dates
+          // are deliberately linked as the same stay (see findLiveAirbnbByDates()).
+          check_in: '2026-11-20',
+          check_out: '2026-11-22',
           guests: 2,
           total_price: null,
           currency: null,
@@ -335,6 +338,69 @@ describe('ChannelImportController (e2e)', () => {
         status: 'PENDING',
       });
       expect(imported.body.created).toBe(true);
+    });
+  });
+
+  describe('Airbnb stay page (confirmation code)', () => {
+    it('links a stay-page import to the same stay already imported from its messages thread', async () => {
+      const fromThread = await request(app.getHttpServer())
+        .post('/reservations/import')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .send({
+          ...basePayload,
+          source: 'airbnb',
+          hotel_id: undefined,
+          res_id: 'e2e-test-cross-page-thread',
+          guest_name: 'Cross Page Guest',
+          check_in: '2026-12-01',
+          check_out: '2026-12-03',
+        })
+        .expect(201);
+
+      const fromStayPage = await request(app.getHttpServer())
+        .post('/reservations/import')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .send({
+          ...basePayload,
+          source: 'airbnb',
+          hotel_id: undefined,
+          res_id: 'E2ECROSSPG',
+          airbnb_reference: 'confirmation_code',
+          guest_name: 'Cross Page Guest Full Name',
+          check_in: '2026-12-01',
+          check_out: '2026-12-03',
+          unverified_fields: ['status'],
+        })
+        .expect(201);
+
+      expect(fromThread.body.created).toBe(true);
+      expect(fromStayPage.body.created).toBe(false);
+      expect(fromStayPage.body.id).toBe(fromThread.body.id);
+    });
+
+    it('checks status by confirmation code', async () => {
+      await request(app.getHttpServer())
+        .post('/reservations/import')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .send({
+          ...basePayload,
+          source: 'airbnb',
+          hotel_id: undefined,
+          res_id: 'E2ESTATUSC',
+          airbnb_reference: 'confirmation_code',
+          guest_name: 'Code Status Guest',
+          check_in: '2026-12-10',
+          check_out: '2026-12-12',
+        })
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .get('/reservations/import/status')
+        .set('Authorization', `Bearer ${apiKey}`)
+        .query({ source: 'airbnb', res_id: 'E2ESTATUSC', airbnb_reference: 'confirmation_code' })
+        .expect(200);
+
+      expect(response.body).toMatchObject({ exists: true, guestName: 'Code Status Guest' });
     });
   });
 });

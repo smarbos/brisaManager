@@ -15,11 +15,19 @@ export class ImportReservationDto {
   @MinLength(1)
   hotel_id?: string;
 
-  // Booking.com's reservation id, or Airbnb's messages-thread id — either way, the stable
-  // identifier used to dedupe repeat imports via externalReference.
+  // Booking.com's reservation id, or for Airbnb either the messages-thread id or the
+  // reservation's confirmation code (see airbnb_reference) — the stable identifier used to
+  // dedupe repeat imports via externalReference.
   @IsString()
   @MinLength(1)
   res_id: string;
+
+  // Airbnb only: which page res_id came from. "thread" (the default, for backward
+  // compatibility) is the messages thread reached from Airbnb's email; "confirmation_code" is
+  // the reservation page (/hosting/stay/<code>) reached from Airbnb's own UI.
+  @IsOptional()
+  @IsIn(['thread', 'confirmation_code'])
+  airbnb_reference?: 'thread' | 'confirmation_code';
 
   @IsOptional()
   @IsString()

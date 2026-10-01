@@ -14,6 +14,7 @@ describe('ChannelImportService', () => {
     reservation: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findFirst: jest.Mock;
       update: jest.Mock;
     };
   };
@@ -36,6 +37,7 @@ describe('ChannelImportService', () => {
       reservation: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
         update: jest.fn(),
       },
     };
@@ -878,6 +880,105 @@ describe('ChannelImportService', () => {
       await service.import(scrapedDto);
 
       expect(reservationsService.sendInitialWhatsapp).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Airbnb stay page (confirmation code) and cross-page matching', () => {
+    const stayDto: ImportReservationDto = {
+      ...baseDto,
+      source: 'airbnb',
+      hotel_id: undefined,
+      res_id: 'HMTEST1234',
+      airbnb_reference: 'confirmation_code',
+      guest_name: 'María Laura Gómez Ríos',
+      guest_phone: '+591 75278095',
+      check_in: '2026-10-27',
+      check_out: '2026-10-31',
+      unverified_fields: ['status'],
+    };
+
+    beforeEach(() => {
+      prisma.reservation.findUnique.mockResolvedValue(null);
+      prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-stay', ...data }));
+    });
+
+    it('keys a stay-page import by its confirmation code', async () => {
+      await service.import(stayDto);
+
+      expect(prisma.reservation.findUnique).toHaveBeenCalledWith({
+        where: { source_externalReference: { source: 'AIRBNB', externalReference: 'airbnb-code-HMTEST1234' } },
+      });
+      expect(prisma.reservation.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            externalReference: 'airbnb-code-HMTEST1234',
+            notes: expect.stringContaining('código HMTEST1234'),
+          }),
+        }),
+      );
+    });
+
+    it('updates a live Airbnb reservation with the exact same dates instead of creating a duplicate', async () => {
+      const fromThread = {
+        id: 'res-thread',
+        status: 'PENDING',
+        source: 'AIRBNB',
+        externalReference: 'airbnb-thread-1000000484',
+        guestName: 'María Laura',
+        guestEmail: null,
+        guestPhone: null,
+        guestId: null,
+        checkIn: new Date('2026-10-27T00:00:00Z'),
+        checkOut: new Date('2026-10-31T00:00:00Z'),
+      };
+      prisma.reservation.findFirst.mockResolvedValue(fromThread);
+      prisma.reservation.update.mockResolvedValue({ ...fromThread, guestName: stayDto.guest_name });
+
+      const { reservation, created } = await service.import(stayDto);
+
+      expect(prisma.reservation.findFirst).toHaveBeenCalledWith({
+        where: {
+          source: 'AIRBNB',
+          status: { not: 'CANCELLED' },
+          checkIn: new Date('2026-10-27'),
+          checkOut: new Date('2026-10-31'),
+        },
+      });
+      expect(created).toBe(false);
+      expect(reservation.id).toBe('res-thread');
+      expect(prisma.reservation.create).not.toHaveBeenCalled();
+      expect(reservationsService.sendInitialWhatsapp).not.toHaveBeenCalled();
+    });
+
+    it('matches by dates from the messages page too', async () => {
+      await service.import({ ...stayDto, res_id: '1000000484', airbnb_reference: undefined });
+
+      expect(prisma.reservation.findUnique).toHaveBeenCalledWith({
+        where: { source_externalReference: { source: 'AIRBNB', externalReference: 'airbnb-thread-1000000484' } },
+      });
+      expect(prisma.reservation.findFirst).toHaveBeenCalled();
+    });
+
+    it('does not date-match when the dates were not picked up', async () => {
+      await service.import({ ...stayDto, check_in: null, check_out: null });
+
+      expect(prisma.reservation.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('never date-matches Booking.com imports', async () => {
+      await service.import({ ...baseDto, check_in: '2026-10-27', check_out: '2026-10-31' });
+
+      expect(prisma.reservation.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('checks status by confirmation code', async () => {
+      prisma.reservation.findUnique.mockResolvedValue(null);
+
+      await service.checkStatus('airbnb', 'HMTEST1234', 'confirmation_code');
+
+      expect(prisma.reservation.findUnique).toHaveBeenCalledWith({
+        where: { source_externalReference: { source: 'AIRBNB', externalReference: 'airbnb-code-HMTEST1234' } },
+      });
     });
   });
 });
