@@ -81,9 +81,11 @@ export class ReservationsService {
 
   // Public (not just used internally by create()) so ChannelImportService can send the
   // same confirmation email once a scraped reservation's core fields are all verified,
-  // and so resendInitialEmail() below can retry it on demand. Returns whether it actually
-  // sent — existing fire-and-forget callers (`void this.sendInitialEmail(...)`) simply
-  // discard that, so this is not a breaking change for them.
+  // and so resendInitialEmail() below can retry it on demand. Returns whether the email was
+  // queued — it goes out after the outbox's 5-minute wait (and can be aborted until then);
+  // confirmationEmailSentAt and INITIAL_EMAIL_SENT/FAILED are recorded by EmailSenderService
+  // when it actually sends. Fire-and-forget callers (`void this.sendInitialEmail(...)`) simply
+  // discard the result.
   async sendInitialEmail(reservation: Reservation): Promise<boolean> {
     const confirmationUrl = `${process.env.GUEST_WEB_ORIGIN}/r/${reservation.confirmationToken}`;
 
@@ -92,18 +94,15 @@ export class ReservationsService {
         reservation.guestEmail as string,
         reservation.guestName,
         confirmationUrl,
+        reservation.id,
       );
-      await this.prisma.reservation.update({
-        where: { id: reservation.id },
-        data: { confirmationEmailSentAt: new Date() },
-      });
-      await this.eventsService.record(reservation.id, 'INITIAL_EMAIL_SENT');
+      await this.eventsService.record(reservation.id, 'INITIAL_EMAIL_QUEUED');
       return true;
     } catch (error) {
       await this.eventsService.record(reservation.id, 'INITIAL_EMAIL_FAILED', (error as Error).message);
       await this.emailService.sendAlert(
         'Falló el email de confirmación inicial',
-        `Se creó la reserva ${reservation.id} para ${reservation.guestName} pero falló el envío del email de confirmación inicial: ${(error as Error).message}`,
+        `Se creó la reserva ${reservation.id} para ${reservation.guestName} pero no se pudo preparar el email de confirmación inicial: ${(error as Error).message}`,
       );
       return false;
     }
@@ -348,7 +347,7 @@ export class ReservationsService {
   }
 
   // Public (not just used internally by cancel()) so resendCancellationEmail() below can
-  // retry it on demand. Returns whether it actually sent, matching sendInitialEmail()'s and
+  // retry it on demand. Returns whether it was queued, matching sendInitialEmail()'s and
   // ReservationConfirmationService.sendFinalEmail()'s same contract.
   async sendCancellationEmail(reservation: Reservation): Promise<boolean> {
     try {
@@ -357,18 +356,15 @@ export class ReservationsService {
         reservation.guestName,
         reservation.checkIn,
         reservation.checkOut,
+        reservation.id,
       );
-      await this.prisma.reservation.update({
-        where: { id: reservation.id },
-        data: { cancellationEmailSentAt: new Date() },
-      });
-      await this.eventsService.record(reservation.id, 'CANCELLATION_EMAIL_SENT');
+      await this.eventsService.record(reservation.id, 'CANCELLATION_EMAIL_QUEUED');
       return true;
     } catch (error) {
       await this.eventsService.record(reservation.id, 'CANCELLATION_EMAIL_FAILED', (error as Error).message);
       await this.emailService.sendAlert(
         'Falló el email de cancelación',
-        `Se canceló la reserva ${reservation.id} para ${reservation.guestName} pero falló el envío del email de cancelación: ${(error as Error).message}`,
+        `Se canceló la reserva ${reservation.id} para ${reservation.guestName} pero no se pudo preparar el email de cancelación: ${(error as Error).message}`,
       );
       return false;
     }

@@ -96,13 +96,16 @@ describe('CampaignsController (e2e)', () => {
       .send({ templateId, filterType: 'ALL' })
       .expect(201);
 
-    expect(sendResponse.body.recipientCount).toBeGreaterThanOrEqual(1);
-    // EmailService is stubbed above to always resolve, so every attempted recipient is SENT.
-    expect(
-      sendResponse.body.recipients.every((r: { status: string }) => r.status === 'SENT'),
-    ).toBe(true);
-
     sentCampaignId = sendResponse.body.id;
+
+    expect(sendResponse.body.recipientCount).toBeGreaterThanOrEqual(1);
+    // Every recipient starts SCHEDULED: its email waits in the outbox, and EmailSenderService
+    // moves it to SENT/FAILED/ABORTED when it goes out (EmailService is stubbed above).
+    expect(
+      sendResponse.body.recipients.every((r: { status: string }) => r.status === 'SCHEDULED'),
+    ).toBe(true);
+    const ownRecipient = sendResponse.body.recipients.find((r: { guestId: string }) => r.guestId === guestId);
+    expect(ownRecipient).toBeDefined();
 
     const historyResponse = await request(app.getHttpServer())
       .get('/campaigns')

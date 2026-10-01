@@ -41,6 +41,12 @@ enum ReservationEventType {
   // Twilio accepted a WhatsApp message but later reported it failed/undelivered (via its
   // status callback — see WhatsappDeliveryService). Covers every WhatsappMessageKind.
   WHATSAPP_UNDELIVERED
+  INITIAL_EMAIL_QUEUED
+  FINAL_EMAIL_QUEUED
+  CANCELLATION_EMAIL_QUEUED
+  INITIAL_EMAIL_ABORTED
+  FINAL_EMAIL_ABORTED
+  CANCELLATION_EMAIL_ABORTED
   FIELD_CHANGED
 }
 
@@ -66,6 +72,25 @@ enum CampaignFilterType {
 enum CampaignRecipientStatus {
   SENT
   FAILED
+  SCHEDULED
+  ABORTED
+}
+
+enum OutboundEmailKind {
+  INITIAL_CONFIRMATION
+  FINAL_CONFIRMATION
+  CANCELLATION
+  MARKETING
+  ALERT
+  INBOUND_FORWARD
+}
+
+enum OutboundEmailStatus {
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+  ABORTED
 }
 
 enum NotificationType {
@@ -114,6 +139,7 @@ model Reservation {
   images                        ReservationImage[]
   whatsappMessages              WhatsappMessage[]
   notifications                 Notification[]
+  outboundEmails                OutboundEmail[]
   missingFromChannelAt          DateTime?
   googleEventId                 String?
   createdAt                     DateTime           @default(now())
@@ -267,6 +293,42 @@ model CampaignRecipient {
   status     CampaignRecipientStatus
   error      String?
   createdAt  DateTime                @default(now())
+
+  outboundEmail OutboundEmail?
+}
+
+// Every outgoing email waits here before it's sent (see
+// docs/superpowers/specs/2026-10-01-email-outbox-design.md): content is rendered when the entry
+// is created, EmailDispatcherService sends it once sendAt is reached, and the operator can abort,
+// retry or resend it from the admin. `to` is the real recipient; `sentTo` is where it actually
+// went, which differs in debug mode.
+model OutboundEmail {
+  id                  String              @id @default(uuid())
+  kind                OutboundEmailKind
+  status              OutboundEmailStatus @default(SCHEDULED)
+  to                  String
+  sentTo              String?
+  subject             String
+  html                String              @default("")
+  replyTo             String?
+  inboundEmailId      String?
+  sendAt              DateTime
+  sentAt              DateTime?
+  abortedAt           DateTime?
+  attempts            Int                 @default(0)
+  lastError           String?
+  resendId            String?
+  reservationId       String?
+  reservation         Reservation?        @relation(fields: [reservationId], references: [id])
+  campaignRecipientId String?             @unique
+  campaignRecipient   CampaignRecipient?  @relation(fields: [campaignRecipientId], references: [id])
+  resentFromId        String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([status, sendAt])
+  @@index([reservationId])
+  @@index([inboundEmailId])
 }
 
 // A payment/deposit receipt the guest uploaded from the check-in page (Step 3). The file

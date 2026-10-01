@@ -56,6 +56,14 @@ function CampaignIcon() {
     </svg>
   );
 }
+function EmailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z" />
+      <path d="m3.5 7 8.5 6 8.5-6" />
+    </svg>
+  );
+}
 function SensorIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -128,6 +136,7 @@ const groups: NavGroup[] = [
       { to: '/notifications', label: 'Notificaciones', icon: BellIcon, showUnreadBadge: true },
       { to: '/templates', label: 'Plantillas', icon: TemplateIcon },
       { to: '/campaigns', label: 'Campañas', icon: CampaignIcon },
+      { to: '/emails', label: 'Emails', icon: EmailIcon },
     ],
   },
   {
