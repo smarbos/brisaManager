@@ -4,10 +4,12 @@ import { EmailOutboxService } from './email-outbox.service';
 import { EmailSenderService } from './email-sender.service';
 import { EmailDispatcherService } from './email-dispatcher.service';
 import { SettingsModule } from '../settings/settings.module';
+import { OutboundEmailsController } from './outbound-emails.controller';
 
 @Global()
 @Module({
   imports: [SettingsModule],
+  controllers: [OutboundEmailsController],
   providers: [EmailService, EmailOutboxService, EmailSenderService, EmailDispatcherService],
   exports: [EmailService, EmailOutboxService],
 })
