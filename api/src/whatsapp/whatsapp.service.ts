@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Twilio from 'twilio';
 import { normalizePhoneForWhatsapp } from './phone-normalizer';
+import { TemplateMessage } from './whatsapp-templates';
 
 @Injectable()
 export class WhatsappService {
@@ -29,7 +30,29 @@ export class WhatsappService {
 
   // Never throws: every caller gets a plain boolean, matching this feature's "log it
   // silently, never block anything else" failure-handling decision (see the design spec).
+  // Freeform text only delivers within 24h of the guest's last message to us — anything
+  // business-initiated goes through sendTemplate() instead.
   async sendMessage(rawPhone: string, body: string): Promise<boolean> {
+    return this.send(rawPhone, { body });
+  }
+
+  // Sends a Meta-approved template (Twilio Content API). Without a configured template SID,
+  // sends the message's equivalent freeform text instead, which is what works on the Twilio
+  // Sandbox and in local dev.
+  async sendTemplate(rawPhone: string, message: TemplateMessage): Promise<boolean> {
+    if (!message.templateSid) {
+      return this.sendMessage(rawPhone, message.fallbackBody);
+    }
+    return this.send(rawPhone, {
+      contentSid: message.templateSid,
+      contentVariables: JSON.stringify(message.variables),
+    });
+  }
+
+  private async send(
+    rawPhone: string,
+    content: { body: string } | { contentSid: string; contentVariables: string },
+  ): Promise<boolean> {
     const to = normalizePhoneForWhatsapp(rawPhone);
     if (!to) {
       this.logger.warn(`Could not normalize phone number for WhatsApp: ${rawPhone}`);
@@ -42,7 +65,7 @@ export class WhatsappService {
     }
 
     try {
-      await client.messages.create({ from: this.from, to, body });
+      await client.messages.create({ from: this.from, to, ...content });
       return true;
     } catch (error) {
       this.logger.error(`Failed to send WhatsApp message to ${to}: ${(error as Error).message}`);
