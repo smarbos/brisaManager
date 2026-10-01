@@ -817,6 +817,8 @@ describe('ChannelImportService', () => {
   });
 
   describe('WhatsApp check-in link', () => {
+    // Relative to today, so the "upcoming stay" fixture never ages into a past one.
+    const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
     const scrapedDto: ImportReservationDto = {
       ...baseDto,
       source: 'airbnb',
@@ -824,8 +826,8 @@ describe('ChannelImportService', () => {
       res_id: '1000000484',
       guest_name: 'María Laura',
       guest_phone: '+591 75278095',
-      check_in: '2026-12-12',
-      check_out: '2026-12-15',
+      check_in: daysFromNow(30),
+      check_out: daysFromNow(33),
     };
 
     beforeEach(() => {
@@ -843,6 +845,12 @@ describe('ChannelImportService', () => {
       await service.import({ ...scrapedDto, guest_name: null });
       await service.import({ ...scrapedDto, check_in: null });
       await service.import({ ...scrapedDto, check_out: null });
+
+      expect(reservationsService.sendInitialWhatsapp).not.toHaveBeenCalled();
+    });
+
+    it('does not send it for a stay that has already ended (e.g. an old thread, or a mis-inferred year)', async () => {
+      await service.import({ ...scrapedDto, check_in: daysFromNow(-10), check_out: daysFromNow(-7) });
 
       expect(reservationsService.sendInitialWhatsapp).not.toHaveBeenCalled();
     });

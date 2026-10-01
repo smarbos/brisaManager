@@ -235,8 +235,10 @@ export class ChannelImportService {
     // template states them ("Tu estadía del ... al ..."), and the placeholders used above
     // when they're missing (today's date, "Huésped de ... (pendiente de completar)") would
     // tell the guest something wrong. Staff can still send it from the reservation page
-    // once they've filled those in.
-    if (guestPhone && dto.guest_name?.trim() && dto.check_in && dto.check_out) {
+    // once they've filled those in. Never for a stay that has already ended: an old thread
+    // re-imported, or a year the Airbnb script inferred wrong (it never sees the year), would
+    // otherwise invite the guest to check in for a finished stay.
+    if (guestPhone && dto.guest_name?.trim() && dto.check_in && dto.check_out && checkOut > now) {
       void this.reservationsService.sendInitialWhatsapp(reservation);
     }
 
