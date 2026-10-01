@@ -548,11 +548,10 @@
 
     const { guestName, guests, checkIn, checkOut, totalPrice, guestPhone } = extractReservationFields();
 
-    // Every field is always unverified, found or not — see the file-header comment. This
-    // isn't theoretical: the guest-name guess has already been confirmed wrong once in real
-    // use (it matched a page-chrome heading instead of the conversation's), so "found
-    // something" is not the same as "found correctly" until real captures confirm the
-    // selectors.
+    // Every field starts unverified, found or not — see the file-header comment. This isn't
+    // theoretical: the guest-name guess has already been confirmed wrong once in real use (it
+    // matched a page-chrome heading instead of the conversation's), so "found something" is
+    // not the same as "found correctly". The operator's review below is what verifies them.
     const unverifiedFields = [
       "guest_name",
       "guest_phone",
@@ -579,6 +578,33 @@
       unverified_fields: unverifiedFields,
     };
 
+    // Nothing is sent until the operator has reviewed (and, if needed, corrected) every
+    // picked-up field — see review_panel.js.
+    globalThis.LaBrisaReview.openReviewPanel({
+      title: knownExisting ? "Actualizar reserva de Airbnb" : "Nueva reserva de Airbnb",
+      basePayload: payload,
+      fields: [
+        { key: "guest_name", label: "Nombre del huésped", type: "text", value: guestName },
+        { key: "guest_phone", label: "Teléfono", type: "text", value: guestPhone },
+        { key: "check_in", label: "Check-in", type: "date", value: checkIn },
+        { key: "check_out", label: "Check-out", type: "date", value: checkOut },
+        { key: "guests", label: "Huéspedes", type: "number", value: guests },
+        { key: "total_price", label: "Precio total", type: "text", value: totalPrice },
+        { key: "currency", label: "Moneda", type: "text", value: payload.currency },
+      ],
+      describeAction: (values) => {
+        if (knownExisting) {
+          return "Al confirmar se actualizan los datos de la reserva ya cargada en La Brisa (no se le reenvía nada al huésped) y se prepara el mensaje con el link en el chat.";
+        }
+        return values.guest_phone && values.guest_phone.trim()
+          ? "Al confirmar se crea la reserva en La Brisa, se le envía el link de check-in al huésped por WhatsApp y se prepara el mensaje con el link en el chat."
+          : "Al confirmar se crea la reserva en La Brisa y se prepara el mensaje con el link en el chat (sin teléfono, no se envía por WhatsApp).";
+      },
+      onConfirm: (reviewedPayload) => submitReservation(threadId, reviewedPayload),
+    });
+  }
+
+  function submitReservation(threadId, payload) {
     showToast("Generando link de check-in...", "info");
 
     chrome.runtime.sendMessage(
@@ -650,8 +676,13 @@
     renderStatusBadge("No se pudo verificar el estado en La Brisa", "error");
   }
 
+  // Whether La Brisa already has this thread's reservation (from the last status check or
+  // send) — decides what the review panel tells the operator confirming will do.
+  let knownExisting = false;
+
   function showStatusBadge(status) {
     const sendButton = document.querySelector(".la-brisa-fab--send");
+    knownExisting = Boolean(status && status.exists);
 
     if (!status || !status.exists) {
       document.querySelectorAll(".la-brisa-status").forEach((el) => el.remove());
