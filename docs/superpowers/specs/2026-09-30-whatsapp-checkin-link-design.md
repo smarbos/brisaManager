@@ -84,13 +84,17 @@ approval anyway, and a wrong ID pasted into Settings would silently stop all sen
 ### `WhatsappService.sendTemplate`
 
 ```ts
-sendTemplate(
-  rawPhone: string,
-  templateSid: string | undefined,
-  variables: Record<string, string>,  // { '1': 'María', '2': '12/12/2026', ... }
-  fallbackBody: string,
-): Promise<boolean>
+interface TemplateMessage {
+  templateSid: string | undefined;
+  variables: Record<string, string>;  // { '1': 'María', '2': '12/12/2026', ... }
+  fallbackBody: string;
+}
+sendTemplate(rawPhone: string, message: TemplateMessage): Promise<boolean>
 ```
+
+Each message is built by a function in `api/src/whatsapp/whatsapp-templates.ts`
+(`checkinLinkMessage`, `reservationReminderMessage`, `depositReminderMessage`), which reads
+the template SID from its env var at call time and owns the variable numbering.
 
 - With a `templateSid`: `client.messages.create({ from, to, contentSid, contentVariables:
   JSON.stringify(variables) })`.
@@ -118,14 +122,19 @@ sendTemplate(
 - Sends `checkin_link` with `{1: guestName, 2: checkIn, 3: checkOut, 4: confirmationToken}`.
 - On success: stamps a new `Reservation.confirmationWhatsappSentAt DateTime?` and records a
   new `INITIAL_WHATSAPP_SENT` reservation event.
-- On failure: records `INITIAL_WHATSAPP_FAILED` (with a reason note). No staff alert email —
+- On failure: records `INITIAL_WHATSAPP_FAILED` with a reason note — "not a valid WhatsApp
+  number" (checked before calling Twilio) or "Twilio didn't accept the message". No staff alert email —
   same "log it, never block" handling as the reminders.
 
-Automatic triggers — whenever the new reservation has a `guestPhone`, fire-and-forget like
-the email (`void this.sendInitialWhatsapp(...)`), independent of whether there's an email:
-- `ReservationsService.create` (manual creation by staff).
+Automatic triggers — whenever the new reservation has a `guestPhone`, independent of whether
+there's an email, called the same way as the email in each place:
+- `ReservationsService.create` (manual creation by staff) — awaited, like the email there.
 - `ChannelImportService.import`, on the create path only (not on updates of an existing
-  imported reservation).
+  imported reservation) — fire-and-forget, like the email there, so `sendInitialWhatsapp`
+  must never reject. Only when the scrape actually found the guest name and both dates:
+  unlike the email, the template states them, and the import's placeholders for missing
+  values (today's date, "Huésped de … (pendiente de completar)") would tell the guest
+  something wrong. Staff can send it from the reservation page once those are filled in.
 
 Not triggered when a guest enters/changes their phone inside the check-in flow
 (`PublicReservationsService.confirmDates`) — they're already on the link — nor when staff
