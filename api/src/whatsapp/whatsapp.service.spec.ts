@@ -64,4 +64,53 @@ describe('WhatsappService', () => {
 
     expect(mockTwilioConstructor).not.toHaveBeenCalled();
   });
+  describe('sendTemplate', () => {
+    const message = {
+      templateSid: 'HX123',
+      variables: { '1': 'María', '2': 'tok-1' },
+      fallbackBody: 'Hola María, entrá acá: https://x/r/tok-1',
+    };
+
+    it('sends the approved template with stringified variables and no body', async () => {
+      createMock.mockResolvedValue({ sid: 'SM123' });
+
+      const result = await service.sendTemplate('+5491122334455', message);
+
+      expect(result).toBe(true);
+      expect(createMock).toHaveBeenCalledWith({
+        from: 'whatsapp:+14155238886',
+        to: 'whatsapp:+5491122334455',
+        contentSid: 'HX123',
+        contentVariables: JSON.stringify({ '1': 'María', '2': 'tok-1' }),
+      });
+    });
+
+    it('falls back to the freeform body when no template SID is configured', async () => {
+      createMock.mockResolvedValue({ sid: 'SM123' });
+
+      const result = await service.sendTemplate('+5491122334455', { ...message, templateSid: undefined });
+
+      expect(result).toBe(true);
+      expect(createMock).toHaveBeenCalledWith({
+        from: 'whatsapp:+14155238886',
+        to: 'whatsapp:+5491122334455',
+        body: 'Hola María, entrá acá: https://x/r/tok-1',
+      });
+    });
+
+    it('returns false when the phone cannot be normalized', async () => {
+      const result = await service.sendTemplate('not a phone number', message);
+
+      expect(result).toBe(false);
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('returns false when Twilio rejects the template send', async () => {
+      createMock.mockRejectedValue(new Error('Content SID not found'));
+
+      const result = await service.sendTemplate('+5491122334455', message);
+
+      expect(result).toBe(false);
+    });
+  });
 });
