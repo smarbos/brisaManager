@@ -190,19 +190,44 @@ unsigned long lastDhtSampleAt = 0;
 
 unsigned long lastWifiRetryAt = 0;
 
-void connectWiFi() {
-  Serial.print("Connecting to WiFi");
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+constexpr size_t WIFI_NETWORK_COUNT = sizeof(WIFI_NETWORKS) / sizeof(WIFI_NETWORKS[0]);
+static_assert(WIFI_NETWORK_COUNT > 0, "secrets.h must list at least one network in WIFI_NETWORKS");
 
-  unsigned long start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_CONNECT_TIMEOUT_MS) {
-    delay(250);
-    Serial.print(".");
+// Index into WIFI_NETWORKS of the network currently being tried (or last connected to).
+size_t currentWifiNetwork = 0;
+
+void beginWiFi(size_t index) {
+  currentWifiNetwork = index;
+  Serial.print("Trying WiFi network \"");
+  Serial.print(WIFI_NETWORKS[index].ssid);
+  Serial.println("\"");
+  WiFi.begin(WIFI_NETWORKS[index].ssid, WIFI_NETWORKS[index].password);
+}
+
+// At boot, tries each network in WIFI_NETWORKS in order (each with the full
+// WIFI_CONNECT_TIMEOUT_MS) and stops at the first that connects. Blocking is fine here:
+// nothing is being monitored yet.
+void connectWiFi() {
+  for (size_t i = 0; i < WIFI_NETWORK_COUNT; i++) {
+    beginWiFi(i);
+
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < WIFI_CONNECT_TIMEOUT_MS) {
+      delay(250);
+      Serial.print(".");
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+      break;
+    }
+    WiFi.disconnect();
   }
-  Serial.println();
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("WiFi connected, IP: ");
+    Serial.print("WiFi connected to \"");
+    Serial.print(WIFI_NETWORKS[currentWifiNetwork].ssid);
+    Serial.print("\", IP: ");
     Serial.println(WiFi.localIP());
   } else {
     // Sensor sampling and local ALERT detection still work without WiFi -
@@ -214,8 +239,12 @@ void connectWiFi() {
 }
 
 // Called every loop() iteration. A no-op while connected; while disconnected (never connected
-// at boot, or dropped later), retries WiFi.begin() every WIFI_RETRY_INTERVAL_MS instead of
-// giving up - covers a router reboot, a temporary outage, etc. without needing a manual reset.
+// at boot, or dropped later), retries every WIFI_RETRY_INTERVAL_MS instead of giving up -
+// covers a router reboot, a temporary outage, etc. without needing a manual reset. Each retry
+// moves on to the next network in WIFI_NETWORKS (wrapping around), so a device carried from the
+// lab to the apartment finds the local network within a few retries. WiFi.begin() doesn't
+// block, so sampling and the emergency buzzer keep running while it reconnects - which is why
+// this rotates through the list instead of using WiFiMulti, whose scan blocks the loop.
 void maintainWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     return;
@@ -229,7 +258,7 @@ void maintainWiFi() {
 
   Serial.println("WiFi not connected - retrying...");
   WiFi.disconnect();
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  beginWiFi((currentWifiNetwork + 1) % WIFI_NETWORK_COUNT);
 }
 
 void setup() {
