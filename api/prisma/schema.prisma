@@ -36,6 +36,8 @@ enum ReservationEventType {
   FINAL_EMAIL_FAILED
   CANCELLATION_EMAIL_SENT
   CANCELLATION_EMAIL_FAILED
+  INITIAL_WHATSAPP_SENT
+  INITIAL_WHATSAPP_FAILED
   FIELD_CHANGED
 }
 
@@ -94,6 +96,7 @@ model Reservation {
   depositReceivedAt             DateTime?
   depositReturnedAt             DateTime?
   confirmationEmailSentAt       DateTime?
+  confirmationWhatsappSentAt    DateTime?
   finalConfirmationEmailSentAt  DateTime?
   cancellationEmailSentAt       DateTime?
   reservationReminderSentAt     DateTime?

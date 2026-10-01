@@ -1,10 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { EmailService } from '../email/email.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 import { GuestsService } from '../guests/guests.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { checkinLinkMessage } from '../whatsapp/whatsapp-templates';
+import { normalizePhoneForWhatsapp } from '../whatsapp/phone-normalizer';
 import { diffReservationFields, reservationFieldLabel } from './reservation-field-changes';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
@@ -13,6 +16,8 @@ import { Reservation } from '@prisma/client';
 
 @Injectable()
 export class ReservationsService {
+  private readonly logger = new Logger(ReservationsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventsService: ReservationEventsService,
@@ -20,6 +25,7 @@ export class ReservationsService {
     private readonly confirmationService: ReservationConfirmationService,
     private readonly googleCalendarPushService: GoogleCalendarPushService,
     private readonly guestsService: GuestsService,
+    private readonly whatsappService: WhatsappService,
   ) {}
 
   private validateDates(checkIn: string, checkOut: string) {
@@ -44,6 +50,12 @@ export class ReservationsService {
 
     if (reservation.guestEmail) {
       await this.sendInitialEmail(reservation);
+    }
+
+    // Awaited like the email above (rather than fire-and-forget), so its event row is
+    // written before the response — same reason the email is.
+    if (reservation.guestPhone) {
+      await this.sendInitialWhatsapp(reservation);
     }
 
     // Fire-and-forget: pushReservation never throws (all failures are caught and logged
@@ -104,6 +116,59 @@ export class ReservationsService {
     }
 
     const sent = await this.sendInitialEmail(reservation);
+    return { sent, reservation: await this.findOne(id) };
+  }
+
+  // The same guest link as sendInitialEmail(), over WhatsApp, using the Meta-approved
+  // `checkin_link` template (see whatsapp-templates.ts). Public so ChannelImportService can
+  // send it for imported reservations and sendInitialWhatsappById() can retry on demand.
+  // Never rejects — channel-import calls it fire-and-forget — and returns whether it sent.
+  // A failure is recorded as a reservation event, without a staff alert email: WhatsApp is
+  // an additional channel, same handling as the daily reminders.
+  async sendInitialWhatsapp(reservation: Reservation): Promise<boolean> {
+    try {
+      const phone = reservation.guestPhone as string;
+      if (!normalizePhoneForWhatsapp(phone)) {
+        await this.eventsService.record(
+          reservation.id,
+          'INITIAL_WHATSAPP_FAILED',
+          `El teléfono "${phone}" no es un número válido para WhatsApp`,
+        );
+        return false;
+      }
+
+      const sent = await this.whatsappService.sendTemplate(phone, checkinLinkMessage(reservation));
+      if (!sent) {
+        await this.eventsService.record(
+          reservation.id,
+          'INITIAL_WHATSAPP_FAILED',
+          'Twilio no aceptó el mensaje (ver los logs del API)',
+        );
+        return false;
+      }
+
+      await this.prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { confirmationWhatsappSentAt: new Date() },
+      });
+      await this.eventsService.record(reservation.id, 'INITIAL_WHATSAPP_SENT');
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to send the check-in link over WhatsApp for ${reservation.id}: ${(error as Error).message}`,
+      );
+      return false;
+    }
+  }
+
+  // Explicit staff-triggered send/resend — always attempts it, even if one already went out.
+  async sendInitialWhatsappById(id: string): Promise<{ sent: boolean; reservation: Reservation }> {
+    const reservation = await this.findOne(id);
+    if (!reservation.guestPhone) {
+      throw new BadRequestException('This reservation has no guest phone to send to');
+    }
+
+    const sent = await this.sendInitialWhatsapp(reservation);
     return { sent, reservation: await this.findOne(id) };
   }
 

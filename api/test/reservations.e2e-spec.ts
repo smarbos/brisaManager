@@ -5,6 +5,9 @@ import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthService } from '../src/auth/auth.service';
+import { WhatsappService } from '../src/whatsapp/whatsapp.service';
+
+const sendTemplate = jest.fn().mockResolvedValue(true);
 
 describe('ReservationsController (e2e)', () => {
   let app: INestApplication;
@@ -12,7 +15,12 @@ describe('ReservationsController (e2e)', () => {
   let accessToken: string;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // This file creates reservations with a guestPhone, which now sends the check-in link
+    // over WhatsApp — stub it so no test ever messages a real number through Twilio.
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(WhatsappService)
+      .useValue({ sendTemplate, sendMessage: jest.fn().mockResolvedValue(true) })
+      .compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
@@ -138,5 +146,62 @@ describe('ReservationsController (e2e)', () => {
       .expect(200);
 
     expect(excludedResponse.body.some((r: { id: string }) => r.id === first.body.id)).toBe(false);
+  });
+
+  describe('POST /reservations/:id/send-initial-whatsapp', () => {
+    async function createReservation(guestPhone?: string) {
+      const response = await request(app.getHttpServer())
+        .post('/reservations')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          guestName: 'E2E Guest',
+          ...(guestPhone ? { guestPhone } : {}),
+          checkIn: '2026-11-01',
+          checkOut: '2026-11-05',
+          paxCount: 2,
+          source: 'DIRECT',
+          totalAmount: 100000,
+          currency: 'ARS',
+        })
+        .expect(201);
+      return response.body as { id: string; confirmationWhatsappSentAt: string | null };
+    }
+
+    it('sends the link on creation when there is a phone', async () => {
+      sendTemplate.mockClear();
+
+      const created = await createReservation('+54 9 223 555-1234');
+
+      expect(sendTemplate).toHaveBeenCalledTimes(1);
+      const events = await prisma.reservationEvent.findMany({ where: { reservationId: created.id } });
+      expect(events.map((e) => e.type)).toContain('INITIAL_WHATSAPP_SENT');
+    });
+
+    it('resends on demand and returns { sent, reservation }', async () => {
+      const created = await createReservation('+54 9 223 555-1234');
+      sendTemplate.mockClear();
+
+      const response = await request(app.getHttpServer())
+        .post(`/reservations/${created.id}/send-initial-whatsapp`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(201);
+
+      expect(sendTemplate).toHaveBeenCalledTimes(1);
+      expect(response.body.sent).toBe(true);
+      expect(response.body.reservation.confirmationWhatsappSentAt).not.toBeNull();
+    });
+
+    it('returns 400 for a reservation without a phone', async () => {
+      const created = await createReservation();
+
+      await request(app.getHttpServer())
+        .post(`/reservations/${created.id}/send-initial-whatsapp`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(400);
+    });
+
+    it('requires authentication', async () => {
+      await request(app.getHttpServer()).post('/reservations/any-id/send-initial-whatsapp').expect(401);
+    });
   });
 });

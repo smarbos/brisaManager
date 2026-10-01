@@ -7,6 +7,7 @@ import { EmailService } from '../email/email.service';
 import { ReservationConfirmationService } from '../reservation-confirmation/reservation-confirmation.service';
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 import { GuestsService } from '../guests/guests.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 describe('ReservationsService', () => {
   let service: ReservationsService;
@@ -23,6 +24,7 @@ describe('ReservationsService', () => {
   let confirmationService: { maybeAutoConfirm: jest.Mock };
   let googleCalendarPushService: { pushReservation: jest.Mock };
   let guestsService: { syncFromReservation: jest.Mock };
+  let whatsappService: { sendTemplate: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -42,6 +44,7 @@ describe('ReservationsService', () => {
     confirmationService = { maybeAutoConfirm: jest.fn() };
     googleCalendarPushService = { pushReservation: jest.fn() };
     guestsService = { syncFromReservation: jest.fn() };
+    whatsappService = { sendTemplate: jest.fn().mockResolvedValue(true) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -52,6 +55,7 @@ describe('ReservationsService', () => {
         { provide: ReservationConfirmationService, useValue: confirmationService },
         { provide: GoogleCalendarPushService, useValue: googleCalendarPushService },
         { provide: GuestsService, useValue: guestsService },
+        { provide: WhatsappService, useValue: whatsappService },
       ],
     }).compile();
 
@@ -577,6 +581,114 @@ describe('ReservationsService', () => {
       expect(prisma.reservation.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({ id: { not: 'res-1' } }),
       });
+    });
+  });
+  describe('sendInitialWhatsapp', () => {
+    const reservation = {
+      id: 'res-1',
+      guestName: 'Jane Doe',
+      guestPhone: '+5491122334455',
+      checkIn: new Date('2026-12-12T00:00:00Z'),
+      checkOut: new Date('2026-12-15T00:00:00Z'),
+      confirmationToken: 'tok-1',
+    } as never;
+
+    it('sends the check-in link template, stamps confirmationWhatsappSentAt and records the event', async () => {
+      const result = await service.sendInitialWhatsapp(reservation);
+
+      expect(result).toBe(true);
+      expect(whatsappService.sendTemplate).toHaveBeenCalledWith(
+        '+5491122334455',
+        expect.objectContaining({
+          variables: { '1': 'Jane Doe', '2': '12/12/2026', '3': '15/12/2026', '4': 'tok-1' },
+        }),
+      );
+      expect(prisma.reservation.update).toHaveBeenCalledWith({
+        where: { id: 'res-1' },
+        data: { confirmationWhatsappSentAt: expect.any(Date) },
+      });
+      expect(eventsService.record).toHaveBeenCalledWith('res-1', 'INITIAL_WHATSAPP_SENT');
+    });
+
+    it('records a failure without stamping when Twilio does not accept the message', async () => {
+      whatsappService.sendTemplate.mockResolvedValue(false);
+
+      const result = await service.sendInitialWhatsapp(reservation);
+
+      expect(result).toBe(false);
+      expect(prisma.reservation.update).not.toHaveBeenCalled();
+      expect(eventsService.record).toHaveBeenCalledWith('res-1', 'INITIAL_WHATSAPP_FAILED', expect.any(String));
+    });
+
+    it('records an invalid phone as the failure reason and never calls Twilio', async () => {
+      const result = await service.sendInitialWhatsapp({ ...(reservation as object), guestPhone: '12345' } as never);
+
+      expect(result).toBe(false);
+      expect(whatsappService.sendTemplate).not.toHaveBeenCalled();
+      expect(eventsService.record).toHaveBeenCalledWith(
+        'res-1',
+        'INITIAL_WHATSAPP_FAILED',
+        expect.stringContaining('12345'),
+      );
+    });
+
+    it('resolves to false instead of rejecting when recording the event fails', async () => {
+      eventsService.record.mockRejectedValue(new Error('db down'));
+
+      await expect(service.sendInitialWhatsapp(reservation)).resolves.toBe(false);
+    });
+  });
+
+  describe('WhatsApp on create', () => {
+    it('sends the check-in link when the new reservation has a phone', async () => {
+      const created = {
+        id: '1',
+        ...validDto,
+        guestPhone: '+5491122334455',
+        confirmationToken: 'tok-1',
+        checkIn: new Date('2026-01-10'),
+        checkOut: new Date('2026-01-15'),
+      };
+      prisma.reservation.create.mockResolvedValue(created);
+
+      await service.create({ ...validDto, guestPhone: '+5491122334455' });
+
+      expect(whatsappService.sendTemplate).toHaveBeenCalledWith('+5491122334455', expect.anything());
+    });
+
+    it('does not send when the new reservation has no phone', async () => {
+      prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto });
+
+      await service.create(validDto);
+
+      expect(whatsappService.sendTemplate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sendInitialWhatsappById', () => {
+    it('rejects a reservation with no phone', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', guestPhone: null });
+
+      await expect(service.sendInitialWhatsappById('1')).rejects.toBeInstanceOf(BadRequestException);
+      expect(whatsappService.sendTemplate).not.toHaveBeenCalled();
+    });
+
+    it('sends even if one was already sent, and returns the refreshed reservation', async () => {
+      const existing = {
+        id: '1',
+        guestName: 'Jane Doe',
+        guestPhone: '+5491122334455',
+        checkIn: new Date('2026-12-12T00:00:00Z'),
+        checkOut: new Date('2026-12-15T00:00:00Z'),
+        confirmationToken: 'tok-1',
+        confirmationWhatsappSentAt: new Date('2026-09-01'),
+      };
+      prisma.reservation.findUnique.mockResolvedValue(existing);
+
+      const result = await service.sendInitialWhatsappById('1');
+
+      expect(whatsappService.sendTemplate).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ sent: true, reservation: existing });
     });
   });
 });

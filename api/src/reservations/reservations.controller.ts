@@ -67,6 +67,11 @@ export class ReservationsController {
     return this.reservationsService.resendInitialEmail(id);
   }
 
+  @Post(':id/send-initial-whatsapp')
+  sendInitialWhatsapp(@Param('id') id: string) {
+    return this.reservationsService.sendInitialWhatsappById(id);
+  }
+
   @Post(':id/resend-final-email')
   resendFinalEmail(@Param('id') id: string) {
     return this.confirmationService.resendFinalEmail(id);
