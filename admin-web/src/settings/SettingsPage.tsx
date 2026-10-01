@@ -31,8 +31,6 @@ export function SettingsPage() {
   const [cancellationEmailTemplate, setCancellationEmailTemplate] = useState('');
   const [reservationReminderDaysBefore, setReservationReminderDaysBefore] = useState(3);
   const [depositReminderDaysAfter, setDepositReminderDaysAfter] = useState(3);
-  const [reservationReminderWhatsappTemplate, setReservationReminderWhatsappTemplate] = useState('');
-  const [depositReminderWhatsappTemplate, setDepositReminderWhatsappTemplate] = useState('');
   const [bankAccountHolder, setBankAccountHolder] = useState('');
   const [bankCuil, setBankCuil] = useState('');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
@@ -78,8 +76,6 @@ export function SettingsPage() {
         setCancellationEmailTemplate(settings.cancellationEmailTemplate);
         setReservationReminderDaysBefore(settings.reservationReminderDaysBefore);
         setDepositReminderDaysAfter(settings.depositReminderDaysAfter);
-        setReservationReminderWhatsappTemplate(settings.reservationReminderWhatsappTemplate);
-        setDepositReminderWhatsappTemplate(settings.depositReminderWhatsappTemplate);
         setBankAccountHolder(settings.bankAccountHolder);
         setBankCuil(settings.bankCuil);
         setBankAccountNumber(settings.bankAccountNumber);
@@ -152,8 +148,6 @@ export function SettingsPage() {
         cancellationEmailTemplate,
         reservationReminderDaysBefore,
         depositReminderDaysAfter,
-        reservationReminderWhatsappTemplate,
-        depositReminderWhatsappTemplate,
         bankAccountHolder,
         bankCuil,
         bankAccountNumber,
@@ -452,7 +446,8 @@ export function SettingsPage() {
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Recordatorios de WhatsApp</h2>
           <p className="mb-4 text-sm text-text-muted">
             Se envían automáticamente por WhatsApp (vía Twilio) cuando el huésped tiene un número de teléfono
-            cargado. Podés usar las mismas variables entre llaves dobles indicadas debajo de cada uno.
+            cargado. El texto de cada mensaje es una plantilla aprobada por WhatsApp y se edita en la consola de
+            Twilio, no acá.
           </p>
           <div className="flex flex-col gap-4">
             <FormField label="Días antes del check-in para el recordatorio de reserva">
@@ -465,15 +460,6 @@ export function SettingsPage() {
                 }
               />
             </FormField>
-            <FormField label="Mensaje de recordatorio de reserva">
-              <Textarea
-                value={reservationReminderWhatsappTemplate}
-                onChange={(e) => setReservationReminderWhatsappTemplate(e.target.value)}
-                rows={4}
-              />
-            </FormField>
-            <p className="-mt-2 text-xs text-text-muted">Variables: {'{{guestName}} {{checkIn}} {{checkOut}}'}</p>
-
             <FormField label="Días después del email inicial para el recordatorio de depósito">
               <Input
                 type="number"
@@ -482,16 +468,6 @@ export function SettingsPage() {
                 onChange={(e) => setDepositReminderDaysAfter(e.target.value === '' ? 0 : Number(e.target.value))}
               />
             </FormField>
-            <FormField label="Mensaje de recordatorio de depósito">
-              <Textarea
-                value={depositReminderWhatsappTemplate}
-                onChange={(e) => setDepositReminderWhatsappTemplate(e.target.value)}
-                rows={4}
-              />
-            </FormField>
-            <p className="-mt-2 text-xs text-text-muted">
-              Variables: {'{{guestName}} {{checkIn}} {{paymentInstructions}}'}
-            </p>
           </div>
         </Card>
 

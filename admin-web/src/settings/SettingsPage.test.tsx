@@ -17,8 +17,6 @@ const baseSettings: settingsApi.Settings = {
   cancellationEmailTemplate: 'Hi {{guestName}}, {{checkIn}} to {{checkOut}}',
   reservationReminderDaysBefore: 3,
   depositReminderDaysAfter: 3,
-  reservationReminderWhatsappTemplate: 'Reminder for {{guestName}}: {{checkIn}} to {{checkOut}}',
-  depositReminderWhatsappTemplate: 'Deposit reminder for {{guestName}}: {{checkIn}}',
   bankAccountHolder: 'Jane Doe',
   bankCuil: '27111111111',
   bankAccountNumber: '1234567890',
@@ -170,23 +168,15 @@ describe('SettingsPage', () => {
     await waitFor(() =>
       expect(screen.getByLabelText(/días antes del check-in/i)).toHaveValue(3),
     );
-    expect(screen.getByLabelText(/mensaje de recordatorio de reserva/i)).toHaveValue(
-      'Reminder for {{guestName}}: {{checkIn}} to {{checkOut}}',
-    );
     expect(screen.getByLabelText(/días después del email inicial/i)).toHaveValue(3);
-    expect(screen.getByLabelText(/mensaje de recordatorio de depósito/i)).toHaveValue(
-      'Deposit reminder for {{guestName}}: {{checkIn}}',
-    );
+    expect(screen.queryByLabelText(/mensaje de recordatorio/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/se edita en la consola de twilio/i)).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/mensaje de recordatorio de reserva/i), {
-      target: { value: 'Updated reservation reminder' },
-    });
+    fireEvent.change(screen.getByLabelText(/días antes del check-in/i), { target: { value: '5' } });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
     await waitFor(() =>
-      expect(updateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ reservationReminderWhatsappTemplate: 'Updated reservation reminder' }),
-      ),
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ reservationReminderDaysBefore: 5 })),
     );
   });
 

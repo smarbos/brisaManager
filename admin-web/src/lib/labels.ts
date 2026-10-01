@@ -44,6 +44,8 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   RESERVATION_CANCELLED: 'Reserva cancelada',
   INITIAL_EMAIL_SENT: 'Email inicial enviado',
   INITIAL_EMAIL_FAILED: 'Falló el email inicial',
+  INITIAL_WHATSAPP_SENT: 'WhatsApp con el link enviado',
+  INITIAL_WHATSAPP_FAILED: 'Falló el WhatsApp con el link',
   FINAL_EMAIL_SENT: 'Email final enviado',
   FINAL_EMAIL_FAILED: 'Falló el email final',
   CANCELLATION_EMAIL_SENT: 'Email de cancelación enviado',

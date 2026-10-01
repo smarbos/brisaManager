@@ -11,8 +11,6 @@ export interface Settings {
   cancellationEmailTemplate: string;
   reservationReminderDaysBefore: number;
   depositReminderDaysAfter: number;
-  reservationReminderWhatsappTemplate: string;
-  depositReminderWhatsappTemplate: string;
   bankAccountHolder: string;
   bankCuil: string;
   bankAccountNumber: string;

@@ -730,4 +730,70 @@ describe('ReservationFormPage', () => {
     await screen.findByText(/copiar link de confirmación/i);
     expect(screen.queryByRole('button', { name: /cancelar reserva/i })).not.toBeInTheDocument();
   });
+  const reservationWithPhone = {
+    id: '1',
+    guestName: 'Jane Doe',
+    guestPhone: '+5491122334455',
+    checkIn: '2026-01-10',
+    checkOut: '2026-01-15',
+    paxCount: 2,
+    source: 'DIRECT',
+    totalAmount: 100000,
+    currency: 'ARS',
+    status: 'PENDING',
+    confirmationToken: 'tok-1',
+  };
+
+  function renderReservationPage() {
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  it('sends the check-in link over WhatsApp', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue(reservationWithPhone as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
+    const sendSpy = vi
+      .spyOn(reservationsApi, 'sendInitialWhatsapp')
+      .mockResolvedValue({ sent: true, reservation: {} as never });
+
+    renderReservationPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /enviar link por whatsapp/i }));
+
+    await waitFor(() => expect(sendSpy).toHaveBeenCalledWith('1'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows an error when the WhatsApp could not be sent', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue(reservationWithPhone as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
+    vi.spyOn(reservationsApi, 'sendInitialWhatsapp').mockResolvedValue({ sent: false, reservation: {} as never });
+
+    renderReservationPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /enviar link por whatsapp/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/el whatsapp no pudo enviarse/i);
+  });
+
+  it('hides the WhatsApp button when the reservation has no phone', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      ...reservationWithPhone,
+      guestPhone: undefined,
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
+
+    renderReservationPage();
+
+    expect(await screen.findByText(/la reserva no tiene un teléfono de huésped/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /enviar link por whatsapp/i })).not.toBeInTheDocument();
+  });
 });
