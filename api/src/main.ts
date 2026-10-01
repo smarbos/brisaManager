@@ -5,7 +5,9 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: the Resend webhook (ResendWebhooksController) verifies its signature against the
+  // exact bytes received, which the parsed JSON body can't reproduce.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // In production every request arrives through exactly one proxy hop (Traefik, see
   // docker-compose.prod.yml). Without this, req.ip is Traefik's container IP for every

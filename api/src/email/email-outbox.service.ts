@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { OutboundEmail, OutboundEmailKind, OutboundEmailStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailSenderService } from './email-sender.service';
@@ -33,6 +33,8 @@ export function sendDelayMs(): number {
 // that are due, and EmailSenderService performs each send.
 @Injectable()
 export class EmailOutboxService {
+  private readonly logger = new Logger(EmailOutboxService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly sender: EmailSenderService,
@@ -64,6 +66,36 @@ export class EmailOutboxService {
       take: PAGE_SIZE,
       skip: (page - 1) * PAGE_SIZE,
     });
+  }
+
+  // An email received by Resend (webhook email.received) is forwarded to the staff mailbox
+  // right away — no 5-minute wait — but still through the outbox, so a failed forward can be
+  // retried from the admin. A repeated delivery of the same email (Resend retries webhooks) is
+  // ignored.
+  async forwardInbound(email: { email_id: string; from: string; subject: string }): Promise<OutboundEmail | null> {
+    const forwardTo = process.env.EMAIL_FORWARD_TO;
+    if (!forwardTo) {
+      this.logger.warn(`Received email ${email.email_id} but EMAIL_FORWARD_TO is not set — not forwarded.`);
+      return null;
+    }
+    const existing = await this.prisma.outboundEmail.findFirst({ where: { inboundEmailId: email.email_id } });
+    if (existing) {
+      return existing;
+    }
+
+    const entry = await this.enqueue({
+      kind: 'INBOUND_FORWARD',
+      to: forwardTo,
+      subject: `Fwd: ${email.subject} (de ${email.from})`,
+      inboundEmailId: email.email_id,
+      sendAt: new Date(),
+    });
+    const { count } = await this.prisma.outboundEmail.updateMany({
+      where: { id: entry.id, status: 'SCHEDULED' },
+      data: { status: 'SENDING' },
+    });
+    // Otherwise the dispatcher claimed it first and is sending it.
+    return count === 1 ? this.sender.send(await this.get(entry.id)) : entry;
   }
 
   // Only a still-waiting email can be aborted. The conditional update makes this safe against
