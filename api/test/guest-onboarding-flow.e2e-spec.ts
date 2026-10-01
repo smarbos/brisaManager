@@ -53,6 +53,8 @@ describe('Full guest onboarding flow (e2e)', () => {
     });
     await prisma.reservation.deleteMany({ where: { guestName: 'Onboarding E2E Guest' } });
     // acceptContract now always syncs a Guest record from the phone/email the guest submits.
+    // Its change events (e.g. the contract step updating the name) reference it, so they go first.
+    await prisma.guestEvent.deleteMany({ where: { guest: { email: 'onboarding-e2e-guest@example.com' } } });
     await prisma.guest.deleteMany({ where: { email: 'onboarding-e2e-guest@example.com' } });
     await prisma.adminUser.deleteMany({ where: { email: 'e2e-onboarding@labrisa.com.ar' } });
     await app.close();
@@ -64,6 +66,7 @@ describe('Full guest onboarding flow (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         guestName: 'Onboarding E2E Guest',
+        guestEmail: 'onboarding-e2e-guest@example.com',
         checkIn: '2099-05-01',
         checkOut: '2099-05-05',
         paxCount: 2,
@@ -121,6 +124,7 @@ describe('Full guest onboarding flow (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({
         guestName: 'Onboarding E2E Guest',
+        guestEmail: 'onboarding-e2e-guest@example.com',
         checkIn: '2099-06-01',
         checkOut: '2099-06-05',
         paxCount: 2,

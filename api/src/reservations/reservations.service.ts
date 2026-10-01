@@ -11,7 +11,7 @@ import { computeWhatsappIssues } from '../whatsapp/whatsapp-issues';
 import { checkinLinkMessage } from '../whatsapp/whatsapp-templates';
 import { normalizePhoneForWhatsapp } from '../whatsapp/phone-normalizer';
 import { diffReservationFields, reservationFieldLabel } from './reservation-field-changes';
-import { CreateReservationDto } from './dto/create-reservation.dto';
+import { CreateReservationDto, GUEST_CONTACT_REQUIRED_MESSAGE } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { QueryReservationDto } from './dto/query-reservation.dto';
 import { Reservation } from '@prisma/client';
@@ -227,6 +227,17 @@ export class ReservationsService {
 
     if (dto.checkIn && dto.checkOut) {
       this.validateDates(dto.checkIn, dto.checkOut);
+    }
+
+    // "At least one way to reach the guest" is checked on the result of an edit that touches
+    // the email or phone (whatever it sets, else what's already stored). An edit that leaves
+    // them alone isn't blocked, so a reservation imported without either (Booking.com/Airbnb)
+    // can still have its dates or amount corrected.
+    const touchesContact = dto.guestEmail !== undefined || dto.guestPhone !== undefined;
+    const resultingEmail = dto.guestEmail !== undefined ? dto.guestEmail : existing.guestEmail;
+    const resultingPhone = dto.guestPhone !== undefined ? dto.guestPhone : existing.guestPhone;
+    if (touchesContact && !resultingEmail && !resultingPhone) {
+      throw new BadRequestException(GUEST_CONTACT_REQUIRED_MESSAGE);
     }
 
     const normalizedExternalReference =
