@@ -6,6 +6,8 @@ import { ReservationConfirmationService } from '../reservation-confirmation/rese
 import { GoogleCalendarPushService } from '../google-calendar/google-calendar-push.service';
 import { GuestsService } from '../guests/guests.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { WhatsappDeliveryService } from '../whatsapp/whatsapp-delivery.service';
+import { computeWhatsappIssues } from '../whatsapp/whatsapp-issues';
 import { checkinLinkMessage } from '../whatsapp/whatsapp-templates';
 import { normalizePhoneForWhatsapp } from '../whatsapp/phone-normalizer';
 import { diffReservationFields, reservationFieldLabel } from './reservation-field-changes';
@@ -26,6 +28,7 @@ export class ReservationsService {
     private readonly googleCalendarPushService: GoogleCalendarPushService,
     private readonly guestsService: GuestsService,
     private readonly whatsappService: WhatsappService,
+    private readonly whatsappDeliveryService: WhatsappDeliveryService,
   ) {}
 
   private validateDates(checkIn: string, checkOut: string) {
@@ -134,10 +137,18 @@ export class ReservationsService {
           'INITIAL_WHATSAPP_FAILED',
           `El teléfono "${phone}" no es un número válido para WhatsApp`,
         );
+        // Tracked like any other rejected send, so the admin list flags it too.
+        await this.whatsappDeliveryService.recordSend(
+          { reservationId: reservation.id, kind: 'CHECKIN_LINK' },
+          { accepted: false, errorCode: null, errorMessage: 'Teléfono inválido para WhatsApp' },
+        );
         return false;
       }
 
-      const sent = await this.whatsappService.sendTemplate(phone, checkinLinkMessage(reservation));
+      const sent = await this.whatsappService.sendTemplate(phone, checkinLinkMessage(reservation), {
+        reservationId: reservation.id,
+        kind: 'CHECKIN_LINK',
+      });
       if (!sent) {
         await this.eventsService.record(
           reservation.id,
@@ -172,14 +183,36 @@ export class ReservationsService {
     return { sent, reservation: await this.findOne(id) };
   }
 
+  // Each reservation carries `whatsappIssues`: the WhatsApp messages whose latest send was
+  // rejected or undelivered and still matter — what the list's warning icon shows.
   async findAll(query: QueryReservationDto) {
-    return this.prisma.reservation.findMany({
+    const reservations = await this.prisma.reservation.findMany({
       where: {
         source: query.source,
         status: query.status,
       },
       orderBy: { checkIn: 'desc' },
     });
+
+    const latest = await this.whatsappDeliveryService.latestByReservation(reservations.map((r) => r.id));
+    const now = new Date();
+    return reservations.map((reservation) => ({
+      ...reservation,
+      whatsappIssues: computeWhatsappIssues(reservation, latest.get(reservation.id) ?? [], now),
+    }));
+  }
+
+  // The staff detail view: findOne() plus WhatsApp delivery state — the latest send of each
+  // message kind, and the subset still worth flagging. Separate from findOne() so the many
+  // internal callers keep getting a plain Reservation.
+  async findOneWithWhatsappStatus(id: string) {
+    const reservation = await this.findOne(id);
+    const whatsappMessages = (await this.whatsappDeliveryService.latestByReservation([id])).get(id) ?? [];
+    return {
+      ...reservation,
+      whatsappMessages,
+      whatsappIssues: computeWhatsappIssues(reservation, whatsappMessages),
+    };
   }
 
   async findOne(id: string) {

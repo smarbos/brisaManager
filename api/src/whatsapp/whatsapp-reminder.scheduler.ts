@@ -54,6 +54,7 @@ export class WhatsappReminderSchedulerService {
         const sent = await this.whatsappService.sendTemplate(
           reservation.guestPhone as string,
           reservationReminderMessage(reservation),
+          { reservationId: reservation.id, kind: 'RESERVATION_REMINDER' },
         );
         if (sent) {
           await this.prisma.reservation.update({
@@ -89,6 +90,7 @@ export class WhatsappReminderSchedulerService {
         const sent = await this.whatsappService.sendTemplate(
           reservation.guestPhone as string,
           depositReminderMessage(reservation),
+          { reservationId: reservation.id, kind: 'DEPOSIT_REMINDER' },
         );
         if (sent) {
           await this.prisma.reservation.update({
