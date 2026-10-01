@@ -23,8 +23,6 @@ describe('SettingsController (e2e)', () => {
     airbnbIcalUrl: string | null;
     reservationReminderDaysBefore: number;
     depositReminderDaysAfter: number;
-    reservationReminderWhatsappTemplate: string;
-    depositReminderWhatsappTemplate: string;
     soundAlertWindows: string;
   } | null;
 
@@ -79,8 +77,6 @@ describe('SettingsController (e2e)', () => {
         cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
         reservationReminderDaysBefore: 3,
         depositReminderDaysAfter: 3,
-        reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
-        depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
         airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',
@@ -118,8 +114,6 @@ describe('SettingsController (e2e)', () => {
         cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
         reservationReminderDaysBefore: 5,
         depositReminderDaysAfter: 4,
-        reservationReminderWhatsappTemplate: 'E2E WhatsApp reservation reminder {{guestName}}',
-        depositReminderWhatsappTemplate: 'E2E WhatsApp deposit reminder {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
         airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',
@@ -130,8 +124,8 @@ describe('SettingsController (e2e)', () => {
 
     expect(response.body.reservationReminderDaysBefore).toBe(5);
     expect(response.body.depositReminderDaysAfter).toBe(4);
-    expect(response.body.reservationReminderWhatsappTemplate).toBe('E2E WhatsApp reservation reminder {{guestName}}');
-    expect(response.body.depositReminderWhatsappTemplate).toBe('E2E WhatsApp deposit reminder {{guestName}}');
+    expect(response.body).not.toHaveProperty('reservationReminderWhatsappTemplate');
+    expect(response.body).not.toHaveProperty('depositReminderWhatsappTemplate');
 
     const getResponse = await request(app.getHttpServer())
       .get('/settings')
@@ -157,8 +151,6 @@ describe('SettingsController (e2e)', () => {
         cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
         reservationReminderDaysBefore: 3,
         depositReminderDaysAfter: 3,
-        reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
-        depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
         airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',
@@ -194,8 +186,6 @@ describe('SettingsController (e2e)', () => {
         cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
         reservationReminderDaysBefore: 3,
         depositReminderDaysAfter: 3,
-        reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
-        depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
         airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: 'not a valid value',
@@ -220,8 +210,6 @@ describe('SettingsController (e2e)', () => {
         cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
         reservationReminderDaysBefore: 3,
         depositReminderDaysAfter: 3,
-        reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
-        depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
         airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',
@@ -255,8 +243,6 @@ describe('SettingsController (e2e)', () => {
         cancellationEmailTemplate: 'E2E cancellation template {{guestName}}',
         reservationReminderDaysBefore: 3,
         depositReminderDaysAfter: 3,
-        reservationReminderWhatsappTemplate: 'E2E reservation reminder template {{guestName}}',
-        depositReminderWhatsappTemplate: 'E2E deposit reminder template {{guestName}}',
         confirmationStepText: 'E2E confirmation step text',
         airbnbMessageTemplate: 'E2E airbnb message template {{confirmationUrl}}',
         confirmationPaymentValue: '30%',

@@ -81,8 +81,6 @@ describe('SettingsService', () => {
       cancellationEmailTemplate: 'new cancellation template',
       reservationReminderDaysBefore: 3,
       depositReminderDaysAfter: 3,
-      reservationReminderWhatsappTemplate: 'new reservation reminder template',
-      depositReminderWhatsappTemplate: 'new deposit reminder template',
       confirmationStepText: 'new confirmation step text',
       confirmationPaymentValue: '30%',
       securityDepositValue: '15%',

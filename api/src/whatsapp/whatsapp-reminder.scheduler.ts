@@ -3,15 +3,11 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappService } from './whatsapp.service';
-import { renderTemplate } from '../common/render-template';
+import { depositReminderMessage, reservationReminderMessage } from './whatsapp-templates';
 
 function startOfUtcDayOffset(days: number): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days));
-}
-
-function formatDateOnly(date: Date): string {
-  return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC' }).format(date);
 }
 
 @Injectable()
@@ -36,10 +32,7 @@ export class WhatsappReminderSchedulerService {
     }
   }
 
-  private async sendReservationReminders(settings: {
-    reservationReminderDaysBefore: number;
-    reservationReminderWhatsappTemplate: string;
-  }): Promise<void> {
+  private async sendReservationReminders(settings: { reservationReminderDaysBefore: number }): Promise<void> {
     // checkIn/checkOut are stored as UTC midnight with no time-of-day component (same
     // convention EmailService's cancellation email relies on), but that's not
     // structurally guaranteed (e.g. channel-sync's node-ical import could construct
@@ -58,12 +51,10 @@ export class WhatsappReminderSchedulerService {
 
     for (const reservation of reservations) {
       try {
-        const body = renderTemplate(settings.reservationReminderWhatsappTemplate, {
-          guestName: reservation.guestName,
-          checkIn: formatDateOnly(reservation.checkIn),
-          checkOut: formatDateOnly(reservation.checkOut),
-        });
-        const sent = await this.whatsappService.sendMessage(reservation.guestPhone as string, body);
+        const sent = await this.whatsappService.sendTemplate(
+          reservation.guestPhone as string,
+          reservationReminderMessage(reservation),
+        );
         if (sent) {
           await this.prisma.reservation.update({
             where: { id: reservation.id },
@@ -78,11 +69,7 @@ export class WhatsappReminderSchedulerService {
     }
   }
 
-  private async sendDepositReminders(settings: {
-    depositReminderDaysAfter: number;
-    depositReminderWhatsappTemplate: string;
-    paymentInstructions: string;
-  }): Promise<void> {
+  private async sendDepositReminders(settings: { depositReminderDaysAfter: number }): Promise<void> {
     const cutoff = new Date();
     cutoff.setUTCDate(cutoff.getUTCDate() - settings.depositReminderDaysAfter);
 
@@ -99,12 +86,10 @@ export class WhatsappReminderSchedulerService {
 
     for (const reservation of reservations) {
       try {
-        const body = renderTemplate(settings.depositReminderWhatsappTemplate, {
-          guestName: reservation.guestName,
-          checkIn: formatDateOnly(reservation.checkIn),
-          paymentInstructions: settings.paymentInstructions,
-        });
-        const sent = await this.whatsappService.sendMessage(reservation.guestPhone as string, body);
+        const sent = await this.whatsappService.sendTemplate(
+          reservation.guestPhone as string,
+          depositReminderMessage(reservation),
+        );
         if (sent) {
           await this.prisma.reservation.update({
             where: { id: reservation.id },

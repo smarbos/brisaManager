@@ -7,20 +7,17 @@ import { PrismaService } from '../prisma/prisma.service';
 describe('WhatsappReminderSchedulerService', () => {
   let scheduler: WhatsappReminderSchedulerService;
   let prisma: { reservation: { findMany: jest.Mock; update: jest.Mock } };
-  let whatsappService: { sendMessage: jest.Mock };
+  let whatsappService: { sendTemplate: jest.Mock };
   let settingsService: { get: jest.Mock };
 
   const baseSettings = {
     reservationReminderDaysBefore: 3,
     depositReminderDaysAfter: 3,
-    reservationReminderWhatsappTemplate: 'Reminder for {{guestName}}: {{checkIn}} to {{checkOut}}',
-    depositReminderWhatsappTemplate: 'Deposit reminder for {{guestName}}: {{checkIn}}. {{paymentInstructions}}',
-    paymentInstructions: 'Transfer to CBU 123',
   };
 
   beforeEach(async () => {
     prisma = { reservation: { findMany: jest.fn().mockResolvedValue([]), update: jest.fn() } };
-    whatsappService = { sendMessage: jest.fn() };
+    whatsappService = { sendTemplate: jest.fn() };
     settingsService = { get: jest.fn().mockResolvedValue(baseSettings) };
 
     const moduleRef = await Test.createTestingModule({
@@ -38,16 +35,18 @@ describe('WhatsappReminderSchedulerService', () => {
   it('sends a reservation reminder and stamps reservationReminderSentAt on success', async () => {
     prisma.reservation.findMany
       .mockResolvedValueOnce([
-        { id: 'res-1', guestName: 'Jane', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18'), checkOut: new Date('2026-09-20') },
+        { id: 'res-1', confirmationToken: 'tok-1', guestName: 'Jane', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18'), checkOut: new Date('2026-09-20') },
       ])
       .mockResolvedValueOnce([]);
-    whatsappService.sendMessage.mockResolvedValue(true);
+    whatsappService.sendTemplate.mockResolvedValue(true);
 
     await scheduler.handleDailyReminders();
 
-    expect(whatsappService.sendMessage).toHaveBeenCalledWith(
+    expect(whatsappService.sendTemplate).toHaveBeenCalledWith(
       '+5491122334455',
-      expect.stringContaining('Jane'),
+      expect.objectContaining({
+        variables: { '1': 'Jane', '2': '18/09/2026', '3': '20/09/2026', '4': 'tok-1' },
+      }),
     );
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-1' },
@@ -66,10 +65,10 @@ describe('WhatsappReminderSchedulerService', () => {
   it('does not stamp reservationReminderSentAt when the send fails', async () => {
     prisma.reservation.findMany
       .mockResolvedValueOnce([
-        { id: 'res-1', guestName: 'Jane', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18'), checkOut: new Date('2026-09-20') },
+        { id: 'res-1', confirmationToken: 'tok-1', guestName: 'Jane', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18'), checkOut: new Date('2026-09-20') },
       ])
       .mockResolvedValueOnce([]);
-    whatsappService.sendMessage.mockResolvedValue(false);
+    whatsappService.sendTemplate.mockResolvedValue(false);
 
     await scheduler.handleDailyReminders();
 
@@ -80,15 +79,17 @@ describe('WhatsappReminderSchedulerService', () => {
     prisma.reservation.findMany
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        { id: 'res-2', guestName: 'John', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18') },
+        { id: 'res-2', confirmationToken: 'tok-2', guestName: 'John', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18') },
       ]);
-    whatsappService.sendMessage.mockResolvedValue(true);
+    whatsappService.sendTemplate.mockResolvedValue(true);
 
     await scheduler.handleDailyReminders();
 
-    expect(whatsappService.sendMessage).toHaveBeenCalledWith(
+    expect(whatsappService.sendTemplate).toHaveBeenCalledWith(
       '+5491122334455',
-      expect.stringContaining('CBU 123'),
+      expect.objectContaining({
+        variables: { '1': 'John', '2': '18/09/2026', '3': 'tok-2' },
+      }),
     );
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-2' },
@@ -109,11 +110,11 @@ describe('WhatsappReminderSchedulerService', () => {
   it('continues processing remaining reservations when one send throws', async () => {
     prisma.reservation.findMany
       .mockResolvedValueOnce([
-        { id: 'res-1', guestName: 'Jane', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18'), checkOut: new Date('2026-09-20') },
-        { id: 'res-2', guestName: 'Bob', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18'), checkOut: new Date('2026-09-20') },
+        { id: 'res-1', confirmationToken: 'tok-1', guestName: 'Jane', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18'), checkOut: new Date('2026-09-20') },
+        { id: 'res-2', confirmationToken: 'tok-2', guestName: 'Bob', guestPhone: '+5491122334455', checkIn: new Date('2026-09-18'), checkOut: new Date('2026-09-20') },
       ])
       .mockResolvedValueOnce([]);
-    whatsappService.sendMessage.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(true);
+    whatsappService.sendTemplate.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(true);
 
     await scheduler.handleDailyReminders();
 
