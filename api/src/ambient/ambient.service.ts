@@ -24,6 +24,13 @@ export const DEVICE_OFFLINE_CRITICAL_THRESHOLD_MS = 30 * 60 * 1000;
 // alert, so it should reflect reality close to one missed heartbeat, not several.
 export const DEVICE_ONLINE_DISPLAY_THRESHOLD_MS = 7 * 60 * 1000;
 
+// Mirrors MAX_CO_ALERT_THRESHOLD/MAX_SMOKE_ALERT_THRESHOLD in ambient-control's config.h. The
+// firmware already refuses to go above these; a heartbeat reporting more means the device runs
+// older or modified firmware, which is itself worth flagging.
+export const MAX_GAS_ALERT_THRESHOLD: Record<string, number> = { co: 2500, smoke: 3200 };
+
+const GAS_SENSOR_LABELS: Record<string, string> = { co: 'CO', smoke: 'humo' };
+
 function deviceOfflineDedupeKey(deviceId: string): string {
   return `device-offline:${deviceId}`;
 }
@@ -152,6 +159,9 @@ export class AmbientService {
 
     for (const reading of readings) {
       const threshold = reading.threshold ?? null;
+      if (threshold != null && reading.sensor in MAX_GAS_ALERT_THRESHOLD) {
+        await this.checkGasThreshold(deviceId, reading.sensor, threshold);
+      }
       await this.prisma.ambientDeviceReading.upsert({
         where: { deviceId_sensor: { deviceId, sensor: reading.sensor } },
         create: { deviceId, sensor: reading.sensor, level: reading.level, threshold },
@@ -163,6 +173,34 @@ export class AmbientService {
     await this.notificationsService.resolveOpen(deviceOfflineCriticalDedupeKey(deviceId));
 
     return device;
+  }
+
+  // CO/smoke thresholds are life-safety settings: raising one (e.g. by calibrating in
+  // contaminated air over USB) silently weakens alerts, so staff hears about every change, and
+  // about any value above the firmware cap.
+  private async checkGasThreshold(deviceId: string, sensor: string, threshold: number) {
+    const previous = await this.prisma.ambientDeviceReading.findUnique({
+      where: { deviceId_sensor: { deviceId, sensor } },
+    });
+    const label = GAS_SENSOR_LABELS[sensor];
+
+    const previousThreshold = previous?.threshold ?? null;
+    if (previousThreshold != null && previousThreshold !== threshold) {
+      const message = `El umbral de alerta de ${label} del dispositivo ${deviceId} cambió de ${previousThreshold} a ${threshold}. Si nadie lo recalibró, revisá el dispositivo.`;
+      this.logger.warn(message);
+      await this.prisma.ambientEvent.create({ data: { deviceId, sensor, level: threshold, message } });
+      await this.notificationsService.create({ type: 'AMBIENT_ALERT', message });
+    }
+
+    const max = MAX_GAS_ALERT_THRESHOLD[sensor];
+    const overCapDedupeKey = `ambient-threshold-over-cap:${deviceId}:${sensor}`;
+    if (threshold > max && !(await this.notificationsService.hasOpen(overCapDedupeKey))) {
+      await this.notificationsService.create({
+        type: 'AMBIENT_ALERT',
+        message: `El umbral de alerta de ${label} del dispositivo ${deviceId} es ${threshold} y supera el máximo permitido (${max}): las alertas pueden no dispararse. Revisá el firmware del dispositivo.`,
+        dedupeKey: overCapDedupeKey,
+      });
+    }
   }
 
   listAll() {

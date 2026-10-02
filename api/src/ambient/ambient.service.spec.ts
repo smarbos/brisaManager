@@ -15,7 +15,7 @@ describe('AmbientService', () => {
   let prisma: {
     ambientEvent: { create: jest.Mock; findMany: jest.Mock };
     ambientDevice: { upsert: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
-    ambientDeviceReading: { upsert: jest.Mock };
+    ambientDeviceReading: { upsert: jest.Mock; findUnique: jest.Mock };
   };
   let notificationsService: { hasOpen: jest.Mock; create: jest.Mock; resolveOpen: jest.Mock };
   let settingsService: { get: jest.Mock };
@@ -29,7 +29,7 @@ describe('AmbientService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
-      ambientDeviceReading: { upsert: jest.fn() },
+      ambientDeviceReading: { upsert: jest.fn(), findUnique: jest.fn().mockResolvedValue(null) },
     };
     notificationsService = {
       hasOpen: jest.fn().mockResolvedValue(false),
@@ -315,6 +315,88 @@ describe('AmbientService', () => {
         where: { id: 'ambient-control-01' },
         data: { pendingCommand: null },
       });
+    });
+  });
+
+  describe('recordHeartbeat - gas threshold tamper detection', () => {
+    it('alerts staff when a CO threshold differs from the last one reported', async () => {
+      prisma.ambientDeviceReading.findUnique.mockResolvedValue({ threshold: 900 });
+
+      await service.recordHeartbeat({
+        deviceId: 'ambient-control-01',
+        readings: [{ sensor: 'co', level: 400, threshold: 2400 }],
+      });
+
+      expect(prisma.ambientDeviceReading.findUnique).toHaveBeenCalledWith({
+        where: { deviceId_sensor: { deviceId: 'ambient-control-01', sensor: 'co' } },
+      });
+      const message = 'El umbral de alerta de CO del dispositivo ambient-control-01 cambió de 900 a 2400. Si nadie lo recalibró, revisá el dispositivo.';
+      expect(prisma.ambientEvent.create).toHaveBeenCalledWith({
+        data: { deviceId: 'ambient-control-01', sensor: 'co', level: 2400, message },
+      });
+      expect(notificationsService.create).toHaveBeenCalledWith({ type: 'AMBIENT_ALERT', message });
+    });
+
+    it('alerts for a smoke threshold change too', async () => {
+      prisma.ambientDeviceReading.findUnique.mockResolvedValue({ threshold: 2500 });
+
+      await service.recordHeartbeat({
+        deviceId: 'ambient-control-01',
+        readings: [{ sensor: 'smoke', level: 400, threshold: 1100 }],
+      });
+
+      expect(notificationsService.create).toHaveBeenCalledWith({
+        type: 'AMBIENT_ALERT',
+        message: expect.stringContaining('umbral de alerta de humo'),
+      });
+    });
+
+    it('does not alert while the threshold is unchanged', async () => {
+      prisma.ambientDeviceReading.findUnique.mockResolvedValue({ threshold: 2500 });
+
+      await service.recordHeartbeat({
+        deviceId: 'ambient-control-01',
+        readings: [{ sensor: 'co', level: 400, threshold: 2500 }],
+      });
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+      expect(prisma.ambientEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('does not alert on a first-ever reading within the cap', async () => {
+      await service.recordHeartbeat({
+        deviceId: 'ambient-control-01',
+        readings: [{ sensor: 'co', level: 400, threshold: 1800 }],
+      });
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('alerts on a threshold above the firmware cap even when unchanged (older or modified firmware)', async () => {
+      prisma.ambientDeviceReading.findUnique.mockResolvedValue({ threshold: 3500 });
+
+      await service.recordHeartbeat({
+        deviceId: 'ambient-control-01',
+        readings: [{ sensor: 'co', level: 400, threshold: 3500 }],
+      });
+
+      expect(notificationsService.create).toHaveBeenCalledWith({
+        type: 'AMBIENT_ALERT',
+        message: expect.stringContaining('supera el máximo permitido (2500)'),
+        dedupeKey: 'ambient-threshold-over-cap:ambient-control-01:co',
+      });
+    });
+
+    it('ignores threshold changes on sensors that are not life-safety (sound)', async () => {
+      prisma.ambientDeviceReading.findUnique.mockResolvedValue({ threshold: 100 });
+
+      await service.recordHeartbeat({
+        deviceId: 'ambient-control-01',
+        readings: [{ sensor: 'sound', level: 40, threshold: 300 }],
+      });
+
+      expect(prisma.ambientDeviceReading.findUnique).not.toHaveBeenCalled();
+      expect(notificationsService.create).not.toHaveBeenCalled();
     });
   });
 

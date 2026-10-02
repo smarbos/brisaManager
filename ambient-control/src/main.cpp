@@ -261,6 +261,21 @@ void maintainWiFi() {
   beginWiFi((currentWifiNetwork + 1) % WIFI_NETWORK_COUNT);
 }
 
+// Reads a CO/smoke threshold from NVS, falling back to the default if what's stored is outside
+// (0, max] - see MAX_CO_ALERT_THRESHOLD in config.h.
+int loadGasThreshold(const char* key, int defaultValue, int maxValue) {
+  int stored = preferences.getInt(key, defaultValue);
+  if (stored <= 0 || stored > maxValue) {
+    Serial.print("Stored ");
+    Serial.print(key);
+    Serial.print(" out of range (");
+    Serial.print(stored);
+    Serial.println("), using the default.");
+    return defaultValue;
+  }
+  return stored;
+}
+
 void setup() {
   Serial.begin(115200);
   bootAt = millis();
@@ -280,18 +295,21 @@ void setup() {
   Serial.print("Loaded LOUD_THRESHOLD: ");
   Serial.println(loudThreshold);
 
-  coAlertThreshold = preferences.getInt(PREFS_KEY_CO_THRESHOLD, DEFAULT_CO_ALERT_THRESHOLD);
+  // Clamped on load as well as at calibration time - NVS lives in unencrypted flash, so a value
+  // written there directly (bypassing the serial commands) must not lift the cap either.
+  coAlertThreshold = loadGasThreshold(PREFS_KEY_CO_THRESHOLD, DEFAULT_CO_ALERT_THRESHOLD, MAX_CO_ALERT_THRESHOLD);
   Serial.print("Loaded CO_ALERT_THRESHOLD: ");
   Serial.println(coAlertThreshold);
 
-  smokeAlertThreshold = preferences.getInt(PREFS_KEY_SMOKE_THRESHOLD, DEFAULT_SMOKE_ALERT_THRESHOLD);
+  smokeAlertThreshold =
+      loadGasThreshold(PREFS_KEY_SMOKE_THRESHOLD, DEFAULT_SMOKE_ALERT_THRESHOLD, MAX_SMOKE_ALERT_THRESHOLD);
   Serial.print("Loaded SMOKE_ALERT_THRESHOLD: ");
   Serial.println(smokeAlertThreshold);
 
   Serial.println("millis,analog");
-  Serial.println("Send CALIBRATE over Serial (in a quiet room) to re-measure the sound threshold.");
-  Serial.println("Send CALIBRATE_CO over Serial (in clean air) to re-measure the CO threshold.");
-  Serial.println("Send CALIBRATE_SMOKE over Serial (in clean air) to re-measure the smoke threshold.");
+  Serial.println("Send CALIBRATE <pin> over Serial (in a quiet room) to re-measure the sound threshold.");
+  Serial.println("Send CALIBRATE_CO <pin> over Serial (in clean air) to re-measure the CO threshold.");
+  Serial.println("Send CALIBRATE_SMOKE <pin> over Serial (in clean air) to re-measure the smoke threshold.");
 
   connectWiFi();
 }
@@ -365,7 +383,17 @@ void runCoCalibration() {
     delay(10);
   }
 
-  coAlertThreshold = cleanAirPeak + CO_CALIBRATION_MARGIN;
+  int calibratedThreshold = cleanAirPeak + CO_CALIBRATION_MARGIN;
+  if (calibratedThreshold > MAX_CO_ALERT_THRESHOLD) {
+    // Not clean air (or a faulty sensor) - keep the current threshold rather than raise it.
+    Serial.print("CALIBRATION_REJECTED_CO,");
+    Serial.print(calibratedThreshold);
+    Serial.print(",");
+    Serial.println(MAX_CO_ALERT_THRESHOLD);
+    return;
+  }
+
+  coAlertThreshold = calibratedThreshold;
   preferences.putInt(PREFS_KEY_CO_THRESHOLD, coAlertThreshold);
 
   Serial.print("CALIBRATED_CO,");
@@ -394,7 +422,17 @@ void runSmokeCalibration() {
     delay(10);
   }
 
-  smokeAlertThreshold = cleanAirPeak + SMOKE_CALIBRATION_MARGIN;
+  int calibratedThreshold = cleanAirPeak + SMOKE_CALIBRATION_MARGIN;
+  if (calibratedThreshold > MAX_SMOKE_ALERT_THRESHOLD) {
+    // Same as runCoCalibration: reject rather than raise the threshold.
+    Serial.print("CALIBRATION_REJECTED_SMOKE,");
+    Serial.print(calibratedThreshold);
+    Serial.print(",");
+    Serial.println(MAX_SMOKE_ALERT_THRESHOLD);
+    return;
+  }
+
+  smokeAlertThreshold = calibratedThreshold;
   preferences.putInt(PREFS_KEY_SMOKE_THRESHOLD, smokeAlertThreshold);
 
   Serial.print("CALIBRATED_SMOKE,");
@@ -411,21 +449,71 @@ void runSmokeCalibration() {
 // checkSerialCommand() can dispatch to it despite appearing earlier in the file.
 void testBuzzer();
 
+// Compares every byte regardless of where the first mismatch is, so response timing doesn't
+// leak how much of a guessed PIN was right.
+bool pinMatches(const String& candidate) {
+  size_t expectedLength = strlen(SERIAL_ADMIN_PIN);
+  unsigned char diff = candidate.length() == expectedLength ? 0 : 1;
+  for (size_t i = 0; i < expectedLength; i++) {
+    char c = i < candidate.length() ? candidate[i] : 0;
+    diff |= c ^ SERIAL_ADMIN_PIN[i];
+  }
+  return diff == 0;
+}
+
+unsigned long serialLockedUntil = 0; // 0 means "not locked out"
+
+// Threshold-changing commands take SERIAL_ADMIN_PIN (secrets.h) as their last word:
+//   CALIBRATE <pin> | CALIBRATE_CO <pin> | CALIBRATE_SMOKE <pin> | SET_LOUD_THRESHOLD <value> <pin>
+// TEST_BUZZER stays open - it only makes noise, and staff can already trigger it remotely.
 void checkSerialCommand() {
-  if (Serial.available()) {
-    String command = Serial.readStringUntil('\n');
-    command.trim();
-    if (command == "CALIBRATE") {
-      runCalibration();
-    } else if (command == "CALIBRATE_CO") {
-      runCoCalibration();
-    } else if (command == "CALIBRATE_SMOKE") {
-      runSmokeCalibration();
-    } else if (command.startsWith("SET_LOUD_THRESHOLD ")) {
-      setLoudThreshold(command.substring(strlen("SET_LOUD_THRESHOLD ")).toInt());
-    } else if (command == "TEST_BUZZER") {
-      testBuzzer();
+  if (!Serial.available()) {
+    return;
+  }
+
+  String command = Serial.readStringUntil('\n');
+  command.trim();
+
+  if (command == "TEST_BUZZER") {
+    testBuzzer();
+    return;
+  }
+
+  int lastSpace = command.lastIndexOf(' ');
+  if (lastSpace < 0) {
+    if (command == "CALIBRATE" || command == "CALIBRATE_CO" || command == "CALIBRATE_SMOKE") {
+      Serial.println("PIN_REQUIRED");
     }
+    return;
+  }
+  String action = command.substring(0, lastSpace);
+  String pin = command.substring(lastSpace + 1);
+
+  bool known = action == "CALIBRATE" || action == "CALIBRATE_CO" || action == "CALIBRATE_SMOKE" ||
+               action.startsWith("SET_LOUD_THRESHOLD ");
+  if (!known) {
+    return;
+  }
+
+  if (serialLockedUntil != 0 && (long)(millis() - serialLockedUntil) < 0) {
+    Serial.println("PIN_LOCKED");
+    return;
+  }
+  if (!pinMatches(pin)) {
+    serialLockedUntil = millis() + SERIAL_PIN_FAILURE_LOCKOUT_MS;
+    Serial.println("PIN_REJECTED");
+    return;
+  }
+  serialLockedUntil = 0;
+
+  if (action == "CALIBRATE") {
+    runCalibration();
+  } else if (action == "CALIBRATE_CO") {
+    runCoCalibration();
+  } else if (action == "CALIBRATE_SMOKE") {
+    runSmokeCalibration();
+  } else {
+    setLoudThreshold(action.substring(strlen("SET_LOUD_THRESHOLD ")).toInt());
   }
 }
 
@@ -654,7 +742,7 @@ void checkSmokeAlert(unsigned long now, int smokeValue) {
 // smoke alert above already keeps staff informed while it stays elevated, so this only needs to
 // announce the emergency starting, not repeat it every loop.
 void checkSmokeEmergency(unsigned long now, int smokeValue) {
-  int emergencyThreshold = smokeAlertThreshold * EMERGENCY_THRESHOLD_MULTIPLIER;
+  int emergencyThreshold = min(smokeAlertThreshold * EMERGENCY_THRESHOLD_MULTIPLIER, MAX_EMERGENCY_THRESHOLD);
   bool isEmergencyHigh = smokeValue >= emergencyThreshold;
 
   if (!isEmergencyHigh) {
@@ -688,7 +776,7 @@ void checkSmokeEmergency(unsigned long now, int smokeValue) {
 // (coHighSince), since the normal alert threshold and the (higher) emergency threshold are
 // crossed at different moments.
 void checkCoEmergency(unsigned long now, int coValue) {
-  int emergencyThreshold = coAlertThreshold * EMERGENCY_THRESHOLD_MULTIPLIER;
+  int emergencyThreshold = min(coAlertThreshold * EMERGENCY_THRESHOLD_MULTIPLIER, MAX_EMERGENCY_THRESHOLD);
   bool isEmergencyHigh = coValue >= emergencyThreshold;
 
   if (!isEmergencyHigh) {

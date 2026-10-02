@@ -171,8 +171,8 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
 - `loudThreshold` marks a sample as "loud" - starts at `DEFAULT_LOUD_THRESHOLD`
   (150, a rough placeholder for 40dB gain) on a fresh device, but should be
   calibrated for wherever it's actually installed: make sure the room is
-  quiet and run `scripts/calibrate.py` (or send the line `CALIBRATE` from the
-  Serial Monitor). The firmware samples for 5 seconds, takes the 99th
+  quiet and run `scripts/calibrate.py` (or send the line `CALIBRATE <pin>` from
+  the Serial Monitor - see "Serial PIN" below). The firmware samples for 5 seconds, takes the 99th
   percentile of those quiet readings (so one stray spike can't inflate it),
   sets the threshold to 3x that (at least +50), prints
   `CALIBRATED,threshold,ambientLevel`, and saves it to flash (ESP32 NVS) so
@@ -182,7 +182,7 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
   RMS, so a threshold calibrated before that is ignored.
 - If the calibrated threshold flags the room's normal everyday volume as
   loud, set it explicitly instead: `scripts/calibrate.py --threshold 200` (or
-  send `SET_LOUD_THRESHOLD 200`). Prints `LOUD_THRESHOLD_SET,value` and saves
+  send `SET_LOUD_THRESHOLD 200 <pin>`). Prints `LOUD_THRESHOLD_SET,value` and saves
   it to flash the same way. For reference, party-level music measured ~150-300
   (median ~230) on the living-room unit, and a quiet room ~20-30.
 - A sound counts as loud only after 3 consecutive readings (~250ms) at/above
@@ -200,9 +200,14 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
 - `coAlertThreshold` marks a reading as elevated - starts at
   `DEFAULT_CO_ALERT_THRESHOLD` (2500, an uncalibrated placeholder) on a fresh
   device. Calibrate it independently from the sound sensor: with the sensor
-  in clean air, send `CALIBRATE_CO`. Same shape as `CALIBRATE` - 5 seconds of
-  sampling, sets the threshold to the highest clean-air reading plus a
+  in clean air, send `CALIBRATE_CO <pin>`. Same shape as `CALIBRATE` - 5 seconds
+  of sampling, sets the threshold to the highest clean-air reading plus a
   margin, prints `CALIBRATED_CO,threshold,cleanAirPeak`, saves to flash.
+  Calibration can only make the sensor more sensitive: if the result would
+  exceed `MAX_CO_ALERT_THRESHOLD` (2500, `config.h`) it prints
+  `CALIBRATION_REJECTED_CO,computed,max` and keeps the old threshold - a
+  "clean air" reading that high means the air isn't clean or the sensor is
+  faulty. A stored value above the cap is also ignored at boot.
 - Unlike the sound sensor's spike detection, a CO reading must stay at/above
   `coAlertThreshold` continuously for `CO_SUSTAINED_MS` (1 minute) before it
   counts as a real exposure - a single noisy sample won't alert. Once
@@ -215,8 +220,11 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
   an unstable just-powered-on value.
 - `smokeAlertThreshold` marks a reading as elevated smoke - starts at
   `DEFAULT_SMOKE_ALERT_THRESHOLD` (2500, uncalibrated placeholder). Calibrate
-  independently with `CALIBRATE_SMOKE` (clean air, 5 seconds, same shape as
-  the other two commands) - prints `CALIBRATED_SMOKE,threshold,cleanAirPeak`.
+  independently with `CALIBRATE_SMOKE <pin>` (clean air, 5 seconds, same shape
+  as the other two commands) - prints `CALIBRATED_SMOKE,threshold,cleanAirPeak`,
+  capped at `MAX_SMOKE_ALERT_THRESHOLD` (3200 - the MQ-2's clean-air baseline sits
+  around 2550-2630, above CO's cap) the same way as CO
+  (`CALIBRATION_REJECTED_SMOKE,computed,max`).
 - Unlike CO, smoke alerts fire immediately on a threshold crossing (same
   rising-edge shape as the sound sensor's `EVENT`) since smoke response
   needs to be fast, not averaged over time. While it stays elevated, it
@@ -239,7 +247,9 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
   with USB access to the device.
 - An "emergency" is a sustained, much-higher-than-alert reading from
   either gas sensor: at/above `smokeAlertThreshold` (or `coAlertThreshold`)
-  times `EMERGENCY_THRESHOLD_MULTIPLIER` (2x), continuously, for
+  times `EMERGENCY_THRESHOLD_MULTIPLIER` (2x, but never above
+  `MAX_EMERGENCY_THRESHOLD`, 4000 - the 12-bit ADC tops out at 4095, so an
+  uncapped 2x of the 2500 default could never be reached), continuously, for
   `EMERGENCY_SUSTAINED_MS` (1 minute) - independent of, and in addition to,
   that sensor's own immediate/sustained alert above. The emergency
   threshold is derived from the sensor's own calibrated alert threshold, so
@@ -252,6 +262,14 @@ TEST_BUZZER: beeping for 1 second.   <- buzzer test triggered (Serial command or
   (not repeated every loop, since the buzzer itself is the continuous
   local signal and the existing alert above already re-confirms
   periodically over the API).
+- **Serial PIN:** every threshold-changing command (`CALIBRATE`,
+  `CALIBRATE_CO`, `CALIBRATE_SMOKE`, `SET_LOUD_THRESHOLD`) takes
+  `SERIAL_ADMIN_PIN` from `secrets.h` as its last word. A missing or wrong PIN
+  prints `PIN_REQUIRED`/`PIN_REJECTED`, and after a wrong one every command is
+  ignored (`PIN_LOCKED`) for 5 seconds. `scripts/calibrate.py` reads the PIN
+  from `secrets.h` itself. The API also raises an ambient alert whenever a
+  heartbeat reports a CO or smoke threshold different from the last one, so
+  a recalibration (legitimate or not) never goes unnoticed.
 - `TEST_BUZZER` beeps the buzzer for exactly one second, independent of any
   real emergency - send it over Serial, or trigger it remotely from the
   admin web's Sensores page ("Probar sirena" button). The remote trigger
@@ -303,3 +321,22 @@ pins and a driver transistor, the firmware would need to duty-cycle the
 heater (~60s at 5V, ~90s at 1.4V for the MQ-7; MQ-2 typically runs its
 heater continuously even in datasheet-correct usage) and only sample
 during the appropriate phase for accurate readings - not implemented here.
+
+## Hardening (not done yet - needs the physical device)
+
+The PIN and threshold caps stop casual retuning over USB, but the flash is
+still plaintext: anyone with the USB port can dump it with `esptool.py
+read_flash` and read the WiFi passwords, `AMBIENT_API_KEY` and
+`SERIAL_ADMIN_PIN`, or reflash firmware without the caps. Closing that needs
+ESP32 **flash encryption** plus **secure boot v2** (and NVS encryption for
+`Preferences`). Both burn eFuses, which is **irreversible**: a mistake can
+leave the board unable to accept new firmware. It also needs the ESP-IDF
+bootloader configuration (`framework = arduino, espidf` with
+`CONFIG_SECURE_FLASH_ENC_ENABLED`, `CONFIG_SECURE_BOOT_V2_ENABLED` and
+`CONFIG_NVS_ENCRYPTION` in `sdkconfig.defaults`), and should be tried on a
+spare board first. Until then, also:
+
+- put the board in a closed enclosure with the USB port not reachable
+  without tools;
+- keep a certified, standalone CO detector in the unit regardless - this
+  device is a monitoring aid, not a life-safety device.
