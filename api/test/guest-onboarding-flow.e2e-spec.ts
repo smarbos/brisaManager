@@ -97,7 +97,13 @@ describe('Full guest onboarding flow (e2e)', () => {
     // Guest confirms dates (also giving name/phone/email) and accepts the contract
     await request(app.getHttpServer())
       .post(`/public/reservations/${token}/confirm-dates`)
-      .send({ fullName: 'Onboarding E2E Guest', phone: '+54 9 223 555-0000', email: 'onboarding-e2e-guest@example.com' })
+      .send({
+        fullName: 'Onboarding E2E Guest',
+        phone: '+54 9 223 555-0000',
+        email: 'onboarding-e2e-guest@example.com',
+        documentType: 'DNI',
+        documentNumber: '30333444',
+      })
       .expect(201);
     await request(app.getHttpServer()).post(`/public/reservations/${token}/accept-contract`).expect(201);
 

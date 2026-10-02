@@ -7,6 +7,9 @@ export interface ReservationImage {
   mimeType: string;
   sizeBytes: number;
   message: string | null;
+  // Set once the retention job deleted the file after the stay — the row stays so staff can
+  // see a receipt existed, but there's nothing left to fetch.
+  deletedAt?: string | null;
   createdAt: string;
 }
 

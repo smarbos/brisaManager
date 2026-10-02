@@ -77,6 +77,8 @@ describe('guestEventTypeLabel', () => {
     expect(guestEventTypeLabel('PHONE_CHANGED')).toBe('Teléfono modificado');
     expect(guestEventTypeLabel('EMAIL_CHANGED')).toBe('Email modificado');
     expect(guestEventTypeLabel('UNSUBSCRIBED')).toBe('Se dio de baja');
+    expect(guestEventTypeLabel('CONTACT_INFO_NOT_APPLIED')).toBe('Dato de contacto no aplicado');
+    expect(guestEventTypeLabel('DOCUMENT_CHANGED')).toBe('Documento modificado');
   });
 
   it('falls back to the raw type for an unknown value', () => {

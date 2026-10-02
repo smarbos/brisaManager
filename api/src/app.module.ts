@@ -20,11 +20,13 @@ import { ExtensionErrorsModule } from './extension-errors/extension-errors.modul
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReservationImagesModule } from './reservation-images/reservation-images.module';
 import { AmbientModule } from './ambient/ambient.module';
+import { GuestDocumentsModule } from './guest-documents/guest-documents.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     PrismaModule,
+    GuestDocumentsModule,
     AuthModule,
     ReservationsModule,
     SettingsModule,

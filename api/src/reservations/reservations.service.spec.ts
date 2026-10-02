@@ -1,3 +1,4 @@
+import { DocumentCryptoService } from '../guest-documents/document-crypto.service';
 import { Test } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ReservationsService } from './reservations.service';
@@ -11,6 +12,10 @@ import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { WhatsappDeliveryService } from '../whatsapp/whatsapp-delivery.service';
 
 describe('ReservationsService', () => {
+  const originalEnv = process.env;
+  afterEach(() => {
+    process.env = originalEnv;
+  });
   let service: ReservationsService;
   let prisma: {
     reservation: {
@@ -19,6 +24,7 @@ describe('ReservationsService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+    guest: { findUnique: jest.Mock };
   };
   let eventsService: { record: jest.Mock };
   let emailService: { sendInitialConfirmationEmail: jest.Mock; sendCancellationEmail: jest.Mock; sendAlert: jest.Mock };
@@ -29,6 +35,7 @@ describe('ReservationsService', () => {
   let whatsappDeliveryService: { recordSend: jest.Mock; latestByReservation: jest.Mock };
 
   beforeEach(async () => {
+    process.env = { ...originalEnv, DOCUMENT_ENCRYPTION_KEY: '11'.repeat(32), DOCUMENT_HASH_KEY: '22'.repeat(32) };
     prisma = {
       reservation: {
         create: jest.fn(),
@@ -36,6 +43,7 @@ describe('ReservationsService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      guest: { findUnique: jest.fn() },
     };
     eventsService = { record: jest.fn() };
     emailService = {
@@ -63,6 +71,7 @@ describe('ReservationsService', () => {
         { provide: GuestsService, useValue: guestsService },
         { provide: WhatsappService, useValue: whatsappService },
         { provide: WhatsappDeliveryService, useValue: whatsappDeliveryService },
+        DocumentCryptoService,
       ],
     }).compile();
 
@@ -170,6 +179,8 @@ describe('ReservationsService', () => {
       name: created.guestName,
       phone: '+54911',
       guestId: undefined,
+      actor: undefined,
+      document: null,
     });
   });
 
@@ -193,6 +204,113 @@ describe('ReservationsService', () => {
       name: 'Updated Name',
       phone: null,
       guestId: undefined,
+      actor: undefined,
+      document: null,
+    });
+  });
+
+  describe('identity document (staff)', () => {
+    const DNI = { type: 'DNI', country: 'AR', number: '12345678' } as const;
+    let crypto: DocumentCryptoService;
+
+    beforeEach(() => {
+      crypto = new DocumentCryptoService();
+    });
+
+    it('stores a document entered at creation encrypted, never spreading the raw number into Prisma', async () => {
+      prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: '1', ...data }));
+
+      await service.create({ ...validDto, guestEmail: 'jane@example.com', documentType: 'DNI', documentNumber: '12.345.678' });
+
+      const data = prisma.reservation.create.mock.calls[0][0].data;
+      expect(data).not.toHaveProperty('documentNumber');
+      expect(data).toMatchObject({ documentType: 'DNI', documentCountry: 'AR', documentHash: crypto.hash(DNI) });
+      expect(data.documentNumberEncrypted).not.toContain('12345678');
+      expect(guestsService.syncFromReservation).toHaveBeenCalledWith('1', expect.objectContaining({ document: DNI }));
+      expect(guestsService.syncFromReservation.mock.calls[0][1]).not.toHaveProperty('fillBlanksOnly');
+    });
+
+    it('rejects an invalid staff document with the same Spanish 400 as check-in', async () => {
+      await expect(service.create({ ...validDto, documentType: 'DNI', documentNumber: '12' })).rejects.toThrow(
+        'El DNI debe tener 7 u 8 dígitos.',
+      );
+      expect(prisma.reservation.create).not.toHaveBeenCalled();
+    });
+
+    it('records a document change on edit with masked values only', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto, ...crypto.encode({ ...DNI, number: '87654321' }) });
+      prisma.reservation.update.mockImplementation(({ data }) => Promise.resolve({ id: '1', ...validDto, ...data }));
+
+      await service.update('1', { documentType: 'DNI', documentNumber: '12345678' }, 'staff@x');
+
+      expect(eventsService.record).toHaveBeenCalledWith(
+        '1',
+        'FIELD_CHANGED',
+        'Documento: "DNI ···321" → "DNI ···678"',
+        'document',
+        'DNI ···321',
+        'DNI ···678',
+        'staff@x',
+      );
+      expect(JSON.stringify(eventsService.record.mock.calls)).not.toMatch(/12345678|87654321/);
+      expect(guestsService.syncFromReservation).toHaveBeenCalledWith('1', expect.objectContaining({ document: DNI }));
+    });
+
+    it('leaves the document untouched when the edit re-submits the same one', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto, ...crypto.encode(DNI) });
+      prisma.reservation.update.mockImplementation(({ data }) => Promise.resolve({ id: '1', ...validDto, ...data }));
+
+      await service.update('1', { documentType: 'DNI', documentNumber: '12.345.678' });
+
+      expect(prisma.reservation.update.mock.calls[0][0].data).not.toHaveProperty('documentHash');
+      expect(eventsService.record).not.toHaveBeenCalledWith('1', 'FIELD_CHANGED', expect.anything(), 'document', expect.anything(), expect.anything(), undefined);
+    });
+
+    it('clears the document when the edit empties the number', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto, ...crypto.encode(DNI) });
+      prisma.reservation.update.mockImplementation(({ data }) => Promise.resolve({ id: '1', ...validDto, ...data }));
+
+      await service.update('1', { documentNumber: null });
+
+      expect(prisma.reservation.update.mock.calls[0][0].data).toMatchObject({
+        documentType: null,
+        documentCountry: null,
+        documentNumberEncrypted: null,
+        documentHash: null,
+      });
+    });
+
+    it('never clears the document when an edit carries documentType but no documentNumber', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto, ...crypto.encode(DNI) });
+      prisma.reservation.update.mockImplementation(({ data }) => Promise.resolve({ id: '1', ...validDto, ...data }));
+
+      await service.update('1', { guestName: 'Jane', documentType: 'DNI', documentCountry: 'AR' });
+
+      const data = prisma.reservation.update.mock.calls[0][0].data;
+      expect(data).not.toHaveProperty('documentHash');
+      expect(data).not.toHaveProperty('documentNumberEncrypted');
+    });
+
+    it('returns the guest\'s marketing consent on the detail view', async () => {
+      const consentAt = new Date('2026-09-01');
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto, guestId: 'g1' });
+      prisma.guest.findUnique.mockResolvedValue({ marketingConsentAt: consentAt });
+      whatsappDeliveryService.latestByReservation.mockResolvedValue(new Map());
+
+      const result = await service.findOneWithWhatsappStatus('1');
+
+      expect(result.guestMarketingConsentAt).toBe(consentAt);
+    });
+
+    it('returns the decrypted document on the detail view, without ciphertext or hash', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto, ...crypto.encode(DNI) });
+      whatsappDeliveryService.latestByReservation.mockResolvedValue(new Map());
+
+      const result = await service.findOneWithWhatsappStatus('1');
+
+      expect(result.document).toEqual(DNI);
+      expect(result).not.toHaveProperty('documentHash');
+      expect(result).not.toHaveProperty('documentNumberEncrypted');
     });
   });
 

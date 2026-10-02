@@ -102,10 +102,18 @@ describe('ConfirmationPage', () => {
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Jane Doe' } });
     fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '2235550123' } });
     fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'jane@example.com' } });
+    fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: '12.345.678' } });
     fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
 
     await waitFor(() =>
-      expect(confirmSpy).toHaveBeenCalledWith('tok-1', 'Jane Doe', '+542235550123', 'jane@example.com'),
+      expect(confirmSpy).toHaveBeenCalledWith('tok-1', {
+        fullName: 'Jane Doe',
+        phone: '+542235550123',
+        email: 'jane@example.com',
+        documentType: 'DNI',
+        documentNumber: '12.345.678',
+        marketingConsent: false,
+      }),
     );
   });
 
@@ -122,11 +130,117 @@ describe('ConfirmationPage', () => {
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'John Smith' } });
     fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '+1 202 555 0123' } });
     fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'john@example.com' } });
+    fireEvent.change(screen.getByLabelText(/tipo de documento/i), { target: { value: 'PASAPORTE' } });
+    fireEvent.change(screen.getByLabelText(/país emisor/i), { target: { value: 'US' } });
+    fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: 'X1234567' } });
     fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
 
     await waitFor(() =>
-      expect(confirmSpy).toHaveBeenCalledWith('tok-1', 'John Smith', '+12025550123', 'john@example.com'),
+      expect(confirmSpy).toHaveBeenCalledWith(
+        'tok-1',
+        expect.objectContaining({
+          fullName: 'John Smith',
+          phone: '+12025550123',
+          documentType: 'PASAPORTE',
+          documentCountry: 'US',
+          documentNumber: 'X1234567',
+        }),
+      ),
     );
+  });
+
+  it('defaults the document type to DNI, with no country select until Pasaporte is chosen', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+
+    renderAt('tok-1');
+
+    await screen.findByText(/confirmá tu reserva/i);
+
+    expect(screen.getByLabelText(/tipo de documento/i)).toHaveValue('DNI');
+    expect(screen.queryByLabelText(/país emisor/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/tipo de documento/i), { target: { value: 'PASAPORTE' } });
+
+    const countrySelect = screen.getByLabelText(/país emisor/i);
+    expect(within(countrySelect).getByRole('option', { name: 'España' })).toHaveValue('ES');
+  });
+
+  it('blocks submission without a valid document and shows the inline error', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+    const confirmSpy = vi.spyOn(publicApi, 'confirmDates');
+
+    renderAt('tok-1');
+
+    await screen.findByText(/confirmá tu reserva/i);
+
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '2235550123' } });
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'jane@example.com' } });
+    fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: '123' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('El DNI debe tener 7 u 8 dígitos.');
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the API\'s Spanish document error inline when the server rejects it', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+    vi.spyOn(publicApi, 'confirmDates').mockRejectedValue(
+      new ApiError(400, JSON.stringify({ statusCode: 400, message: 'Elegí el país emisor del pasaporte.' })),
+    );
+
+    renderAt('tok-1');
+
+    await screen.findByText(/confirmá tu reserva/i);
+
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '2235550123' } });
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'jane@example.com' } });
+    fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: '12345678' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Elegí el país emisor del pasaporte.');
+  });
+
+  it('leaves the marketing opt-in unchecked by default and sends it when ticked', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+    const confirmSpy = vi
+      .spyOn(publicApi, 'confirmDates')
+      .mockResolvedValue({ datesConfirmedAt: '2026-01-01T00:00:00.000Z' });
+
+    renderAt('tok-1');
+
+    await screen.findByText(/confirmá tu reserva/i);
+
+    const optIn = screen.getByLabelText(/novedades y promociones/i);
+    expect(optIn).not.toBeChecked();
+
+    fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '2235550123' } });
+    fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'jane@example.com' } });
+    fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: '12345678' } });
+    fireEvent.click(optIn);
+    fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
+
+    await waitFor(() =>
+      expect(confirmSpy).toHaveBeenCalledWith('tok-1', expect.objectContaining({ marketingConsent: true })),
+    );
+  });
+
+  it('shows the short privacy note and expands the full notice', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...baseReservation });
+
+    renderAt('tok-1');
+
+    await screen.findByText(/confirmá tu reserva/i);
+
+    expect(screen.getByText(/tu número de documento se guarda cifrado/i)).toBeInTheDocument();
+    expect(screen.queryByText(/AGENCIA DE ACCESO A LA INFORMACIÓN PÚBLICA/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /cómo tratamos tus datos/i }));
+
+    expect(screen.getByText(/AGENCIA DE ACCESO A LA INFORMACIÓN PÚBLICA/)).toBeInTheDocument();
+    expect(screen.getByText(/contacto@labrisa.com.ar. El acceso es gratuito/)).toBeInTheDocument();
   });
 
   it('blocks submission and shows an inline error for an invalid phone number', async () => {
@@ -140,6 +254,7 @@ describe('ConfirmationPage', () => {
     fireEvent.change(screen.getByLabelText(/nombre completo/i), { target: { value: 'Jane Doe' } });
     fireEvent.change(screen.getByLabelText(/celular/i), { target: { value: '123' } });
     fireEvent.change(screen.getByLabelText(/^email$/i), { target: { value: 'jane@example.com' } });
+    fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: '12345678' } });
     fireEvent.click(screen.getByRole('button', { name: /confirmar fechas y huéspedes/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/número de teléfono válido/i);

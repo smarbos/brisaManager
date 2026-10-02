@@ -55,6 +55,11 @@ describe('PublicReservationsController (e2e)', () => {
     await prisma.reservation.deleteMany({
       where: { guestName: 'Public E2E Guest' },
     });
+    // A guest matched by document on a later run collects CONTACT_INFO_NOT_APPLIED events,
+    // which reference it — they go first.
+    await prisma.guestEvent.deleteMany({
+      where: { guest: { email: 'public-e2e-guest@example.com' } },
+    });
     await prisma.guest.deleteMany({
       where: { email: 'public-e2e-guest@example.com' },
     });
@@ -101,7 +106,7 @@ describe('PublicReservationsController (e2e)', () => {
         }
       });
 
-    await request(app.getHttpServer())
+    const confirmResponse = await request(app.getHttpServer())
       .post(
         `/public/reservations/${reservation.confirmationToken}/confirm-dates`,
       )
@@ -109,8 +114,23 @@ describe('PublicReservationsController (e2e)', () => {
         fullName: 'Jane Doe',
         phone: '+54 9 223 555-9999',
         email: 'public-e2e-guest@example.com',
+        documentType: 'DNI',
+        documentNumber: '30.222.333',
       })
       .expect(201);
+
+    // No /public/* response ever carries the document number, its hash or its ciphertext.
+    const stored = await prisma.reservation.findUniqueOrThrow({ where: { id: reservation.id } });
+    expect(stored.documentHash).toBeTruthy();
+    const publicPage = await request(app.getHttpServer())
+      .get(`/public/reservations/${reservation.confirmationToken}`)
+      .expect(200);
+    for (const body of [confirmResponse.text, publicPage.text]) {
+      expect(body).not.toContain('30222333');
+      expect(body).not.toContain(stored.documentHash as string);
+      expect(body).not.toContain(stored.documentNumberEncrypted as string);
+      expect(body).not.toMatch(/document/i);
+    }
 
     await request(app.getHttpServer())
       .post(
@@ -126,6 +146,34 @@ describe('PublicReservationsController (e2e)', () => {
     expect(updated?.contractSnapshot).toBeTruthy();
     expect(updated?.guestPhone).toBe('+54 9 223 555-9999');
     expect(updated?.guestEmail).toBe('public-e2e-guest@example.com');
+  });
+
+  it('rejects date confirmation without a document', async () => {
+    const reservation = await prisma.reservation.create({
+      data: {
+        guestName: 'Public E2E Guest',
+        checkIn: new Date('2099-03-01'),
+        checkOut: new Date('2099-03-05'),
+        paxCount: 2,
+        source: 'DIRECT',
+        totalAmount: 100000,
+        currency: 'ARS',
+      },
+    });
+
+    await request(app.getHttpServer())
+      .post(`/public/reservations/${reservation.confirmationToken}/confirm-dates`)
+      .send({ fullName: 'Jane Doe', phone: '+54 9 223 555-9999', email: 'a@example.com' })
+      .expect(400);
+
+    const response = await request(app.getHttpServer())
+      .post(`/public/reservations/${reservation.confirmationToken}/confirm-dates`)
+      .send({ fullName: 'Jane Doe', phone: '+54 9 223 555-9999', email: 'a@example.com', documentType: 'DNI', documentNumber: '12' })
+      .expect(400);
+    expect(response.body.message).toBe('El DNI debe tener 7 u 8 dígitos.');
+
+    const unchanged = await prisma.reservation.findUniqueOrThrow({ where: { id: reservation.id } });
+    expect(unchanged.datesConfirmedAt).toBeNull();
   });
 
   it('rejects date confirmation with an empty name', async () => {

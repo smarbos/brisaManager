@@ -13,7 +13,9 @@ import { getConfig } from '../api/config';
 import { GuestReservation } from './types';
 import { Step4Confirmation } from './step4/Step4Confirmation';
 import { BankDetails } from './BankDetails';
-import { Alert, Badge, Button, FormField, Input, Lightbox, Textarea } from '../ui';
+import { COUNTRIES, DocumentType, documentError as validateDocument } from './countries';
+import { MARKETING_CONSENT_LABEL, PRIVACY_LINK_LABEL, PRIVACY_NOTICE, PRIVACY_SHORT_NOTE } from './privacyNotice';
+import { Alert, Badge, Button, FormField, Input, Lightbox, Select, Textarea } from '../ui';
 import { formatDate, formatLongDate } from '../lib/date';
 
 type Step = 1 | 2 | 3 | 4;
@@ -100,6 +102,16 @@ function PageShell({ children }: { children: ReactNode }) {
   );
 }
 
+// Nest's 400 body is JSON with a `message` string (or an array of them, from DTO validation).
+function parseApiMessage(body: string): string | null {
+  try {
+    const { message } = JSON.parse(body) as { message?: string | string[] };
+    return Array.isArray(message) ? (message[0] ?? null) : (message ?? null);
+  } catch {
+    return null;
+  }
+}
+
 export function ConfirmationPage() {
   const { token } = useParams<{ token: string }>();
   const [reservation, setReservation] = useState<GuestReservation | null>(null);
@@ -109,6 +121,12 @@ export function ConfirmationPage() {
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [documentType, setDocumentType] = useState<DocumentType>('DNI');
+  const [documentCountry, setDocumentCountry] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [documentError, setDocumentError] = useState<string | null>(null);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [rulesChecked, setRulesChecked] = useState(false);
   const [rulesRevealed, setRulesRevealed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -195,14 +213,34 @@ export function ConfirmationPage() {
       return;
     }
     setPhoneError(null);
+    const invalidDocument = validateDocument(documentType, documentCountry, documentNumber);
+    if (invalidDocument) {
+      setDocumentError(invalidDocument);
+      return;
+    }
+    setDocumentError(null);
     setError(null);
     setConfirmingDates(true);
     try {
       const normalizedPhone = parsePhoneNumberFromString(phone, DEFAULT_PHONE_COUNTRY)!.number;
-      await confirmDates(token, fullName, normalizedPhone, email);
+      await confirmDates(token, {
+        fullName,
+        phone: normalizedPhone,
+        email,
+        documentType,
+        ...(documentType === 'PASAPORTE' ? { documentCountry } : {}),
+        documentNumber,
+        marketingConsent,
+      });
       await load();
-    } catch {
-      setError('No pudimos confirmar tus datos. Por favor, intentá de nuevo.');
+    } catch (err) {
+      // The API's 400 for a rejected document carries a Spanish message meant for the form.
+      const serverMessage = err instanceof ApiError && err.status === 400 ? parseApiMessage(err.message) : null;
+      if (serverMessage) {
+        setDocumentError(serverMessage);
+      } else {
+        setError('No pudimos confirmar tus datos. Por favor, intentá de nuevo.');
+      }
     } finally {
       setConfirmingDates(false);
     }
@@ -394,6 +432,82 @@ export function ConfirmationPage() {
                   required
                 />
               </FormField>
+              <FormField label="Tipo de documento">
+                <Select
+                  value={documentType}
+                  onChange={(e) => {
+                    setDocumentType(e.target.value as DocumentType);
+                    setDocumentError(null);
+                  }}
+                >
+                  <option value="DNI">DNI</option>
+                  <option value="PASAPORTE">Pasaporte</option>
+                </Select>
+              </FormField>
+              {documentType === 'PASAPORTE' && (
+                <FormField label="País emisor">
+                  <Select
+                    value={documentCountry}
+                    onChange={(e) => {
+                      setDocumentCountry(e.target.value);
+                      setDocumentError(null);
+                    }}
+                    required
+                  >
+                    <option value="">Elegí un país</option>
+                    {COUNTRIES.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {country.name}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+              )}
+              <FormField label="Número de documento" error={documentError}>
+                <Input
+                  value={documentNumber}
+                  onChange={(e) => {
+                    setDocumentNumber(e.target.value);
+                    setDocumentError(null);
+                  }}
+                  inputMode={documentType === 'DNI' ? 'numeric' : 'text'}
+                  autoComplete="off"
+                  required
+                />
+              </FormField>
+              <label className="flex items-start gap-2 text-sm text-text">
+                <input
+                  type="checkbox"
+                  checked={marketingConsent}
+                  onChange={(e) => setMarketingConsent(e.target.checked)}
+                  className="mt-0.5"
+                />
+                {MARKETING_CONSENT_LABEL}
+              </label>
+              <div className="text-xs text-text-muted">
+                <p>
+                  {PRIVACY_SHORT_NOTE}{' '}
+                  <button
+                    type="button"
+                    className="font-medium text-accent underline"
+                    aria-expanded={privacyOpen}
+                    aria-controls="privacy-notice"
+                    onClick={() => setPrivacyOpen((open) => !open)}
+                  >
+                    {PRIVACY_LINK_LABEL}
+                  </button>
+                </p>
+                {privacyOpen && (
+                  <div id="privacy-notice" className="mt-2 flex flex-col gap-2 rounded-lg bg-bg p-3">
+                    {PRIVACY_NOTICE.map((section, i) => (
+                      <p key={i}>
+                        {section.title && <strong>{section.title}: </strong>}
+                        {section.body}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
               <Button type="submit" className="w-full" loading={confirmingDates}>
                 Confirmar fechas y huéspedes
               </Button>

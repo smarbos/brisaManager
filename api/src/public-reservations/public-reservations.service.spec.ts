@@ -9,8 +9,14 @@ import { GuestsService } from '../guests/guests.service';
 import { ReservationImagesService } from '../reservation-images/reservation-images.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AmbientService } from '../ambient/ambient.service';
+import { DocumentCryptoService } from '../guest-documents/document-crypto.service';
+import { ConfirmDatesDto } from './dto/confirm-dates.dto';
 
 describe('PublicReservationsService', () => {
+  const originalEnv = process.env;
+  afterEach(() => {
+    process.env = originalEnv;
+  });
   let service: PublicReservationsService;
   let prisma: { reservation: { findUnique: jest.Mock; update: jest.Mock } };
   let settingsService: { get: jest.Mock };
@@ -19,7 +25,7 @@ describe('PublicReservationsService', () => {
   let guestsService: { syncFromReservation: jest.Mock };
   let reservationImagesService: {
     upload: jest.Mock;
-    listForReservation: jest.Mock;
+    listAvailableForReservation: jest.Mock;
     getOne: jest.Mock;
     readFile: jest.Mock;
     assertAllowedImages: jest.Mock;
@@ -47,7 +53,18 @@ describe('PublicReservationsService', () => {
     depositReceivedAt: null,
   };
 
+  // A full check-in form submission, with a valid DNI unless overridden.
+  const checkIn = (fullName: string, phone: string, email: string, extra: Partial<ConfirmDatesDto> = {}): ConfirmDatesDto => ({
+    fullName,
+    phone,
+    email,
+    documentType: 'DNI',
+    documentNumber: '12.345.678',
+    ...extra,
+  });
+
   beforeEach(async () => {
+    process.env = { ...originalEnv, DOCUMENT_ENCRYPTION_KEY: '11'.repeat(32), DOCUMENT_HASH_KEY: '22'.repeat(32) };
     prisma = { reservation: { findUnique: jest.fn(), update: jest.fn() } };
     settingsService = {
       get: jest.fn().mockResolvedValue({
@@ -62,7 +79,7 @@ describe('PublicReservationsService', () => {
     guestsService = { syncFromReservation: jest.fn() };
     reservationImagesService = {
       upload: jest.fn(),
-      listForReservation: jest.fn(),
+      listAvailableForReservation: jest.fn(),
       getOne: jest.fn(),
       readFile: jest.fn(),
       assertAllowedImages: jest.fn(),
@@ -88,6 +105,7 @@ describe('PublicReservationsService', () => {
         },
         { provide: NotificationsService, useValue: notificationsService },
         { provide: AmbientService, useValue: ambientService },
+        DocumentCryptoService,
       ],
     }).compile();
 
@@ -207,12 +225,7 @@ describe('PublicReservationsService', () => {
       guestEmail: 'jane@example.com',
     });
 
-    await service.confirmDates(
-      'tok-1',
-      'Jane Doe',
-      '+54 9 223 555-1234',
-      'Jane@Example.com',
-    );
+    await service.confirmDates('tok-1', checkIn('Jane Doe', '+54 9 223 555-1234', 'Jane@Example.com'));
 
     expect(prisma.reservation.update).toHaveBeenCalledWith({
       where: { id: 'res-1' },
@@ -222,6 +235,10 @@ describe('PublicReservationsService', () => {
         guestPhone: '+54 9 223 555-1234',
         // Normalized to lowercase, same as every other place this app stores a guest email.
         guestEmail: 'jane@example.com',
+        documentType: 'DNI',
+        documentCountry: 'AR',
+        documentNumberEncrypted: expect.stringMatching(/^v1:/),
+        documentHash: expect.stringMatching(/^[0-9a-f]{64}$/),
       },
     });
     expect(eventsService.record).toHaveBeenCalledWith(
@@ -246,7 +263,7 @@ describe('PublicReservationsService', () => {
       guestEmail: 'jane@example.com',
     });
 
-    await service.confirmDates('tok-1', 'Jane Doe', '+54911', 'jane@example.com');
+    await service.confirmDates('tok-1', checkIn('Jane Doe', '+54911', 'jane@example.com'));
 
     expect(eventsService.record).toHaveBeenCalledWith(
       'res-1',
@@ -284,12 +301,7 @@ describe('PublicReservationsService', () => {
       datesConfirmedAt: alreadyConfirmedAt,
     });
 
-    const result = await service.confirmDates(
-      'tok-1',
-      'A Different Name',
-      '+54911',
-      'a@example.com',
-    );
+    const result = await service.confirmDates('tok-1', checkIn('A Different Name', '+54911', 'a@example.com'));
 
     expect(result).toEqual({ datesConfirmedAt: alreadyConfirmedAt });
     expect(prisma.reservation.update).not.toHaveBeenCalled();
@@ -306,19 +318,80 @@ describe('PublicReservationsService', () => {
       guestPhone: '+54911',
     });
 
-    await service.confirmDates(
-      'tok-1',
-      'Jane Q. Doe',
-      '+54911',
-      'jane@example.com',
-    );
+    await service.confirmDates('tok-1', checkIn('Jane Q. Doe', '+54911', 'jane@example.com'));
 
     expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-1', {
       email: 'jane@example.com',
       name: 'Jane Q. Doe',
       phone: '+54911',
+      guestId: undefined,
       actor: 'Huésped',
+      document: { type: 'DNI', country: 'AR', number: '12345678' },
+      fillBlanksOnly: true,
+      marketingConsent: false,
     });
+  });
+
+  it('passes the marketing opt-in through to the guest sync', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+    prisma.reservation.update.mockResolvedValue({ ...baseReservation, datesConfirmedAt: new Date() });
+
+    await service.confirmDates('tok-1', checkIn('Jane', '+54911', 'jane@example.com', { marketingConsent: true }));
+
+    expect(guestsService.syncFromReservation).toHaveBeenCalledWith('res-1', expect.objectContaining({ marketingConsent: true }));
+  });
+
+  it('records the document on the reservation as a masked FIELD_CHANGED event', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+    prisma.reservation.update.mockResolvedValue({ ...baseReservation, datesConfirmedAt: new Date() });
+
+    await service.confirmDates('tok-1', checkIn('Jane', '+54911', 'jane@example.com'));
+
+    expect(eventsService.record).toHaveBeenCalledWith(
+      'res-1',
+      'FIELD_CHANGED',
+      'Documento: "(vacío)" → "DNI ···678"',
+      'document',
+      '(vacío)',
+      'DNI ···678',
+      'Huésped',
+    );
+    expect(JSON.stringify(eventsService.record.mock.calls)).not.toContain('12345678');
+  });
+
+  it('accepts a passport with its issuing country', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+    prisma.reservation.update.mockResolvedValue({ ...baseReservation, datesConfirmedAt: new Date() });
+
+    await service.confirmDates(
+      'tok-1',
+      checkIn('Juan', '+54911', 'juan@example.es', { documentType: 'PASAPORTE', documentCountry: 'ES', documentNumber: 'xa123456' }),
+    );
+
+    expect(prisma.reservation.update.mock.calls[0][0].data).toMatchObject({ documentType: 'PASAPORTE', documentCountry: 'ES' });
+  });
+
+  it.each([
+    [{ documentNumber: '12' }, 'El DNI debe tener 7 u 8 dígitos.'],
+    [{ documentType: 'PASAPORTE' as const, documentNumber: 'XA123456' }, 'Elegí el país emisor del pasaporte.'],
+  ])('rejects an invalid document with a Spanish 400 and writes nothing', async (extra, message) => {
+    prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+
+    const attempt = service.confirmDates('tok-1', checkIn('Jane', '+54911', 'jane@example.com', extra));
+
+    await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+    await expect(attempt).rejects.toThrow(message);
+    expect(prisma.reservation.update).not.toHaveBeenCalled();
+    expect(guestsService.syncFromReservation).not.toHaveBeenCalled();
+  });
+
+  it('returns only datesConfirmedAt — never the document', async () => {
+    prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
+    prisma.reservation.update.mockResolvedValue({ ...baseReservation, datesConfirmedAt: new Date() });
+
+    const result = await service.confirmDates('tok-1', checkIn('Jane', '+54911', 'jane@example.com'));
+
+    expect(Object.keys(result)).toEqual(['datesConfirmedAt']);
   });
 
   it('does not sync a guest when dates were already confirmed', async () => {
@@ -328,12 +401,7 @@ describe('PublicReservationsService', () => {
       guestEmail: 'jane@example.com',
     });
 
-    await service.confirmDates(
-      'tok-1',
-      'A Different Name',
-      '+54911',
-      'a@example.com',
-    );
+    await service.confirmDates('tok-1', checkIn('A Different Name', '+54911', 'a@example.com'));
 
     expect(guestsService.syncFromReservation).not.toHaveBeenCalled();
   });
@@ -475,13 +543,13 @@ describe('PublicReservationsService', () => {
   describe('listImages', () => {
     it('resolves the token to a reservation id before listing', async () => {
       prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation });
-      reservationImagesService.listForReservation.mockResolvedValue([
+      reservationImagesService.listAvailableForReservation.mockResolvedValue([
         { id: 'img-1' },
       ]);
 
       const result = await service.listImages('tok-1');
 
-      expect(reservationImagesService.listForReservation).toHaveBeenCalledWith(
+      expect(reservationImagesService.listAvailableForReservation).toHaveBeenCalledWith(
         'res-1',
       );
       expect(result).toEqual([{ id: 'img-1' }]);

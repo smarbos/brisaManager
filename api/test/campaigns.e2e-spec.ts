@@ -46,7 +46,8 @@ describe('CampaignsController (e2e)', () => {
     templateId = template.id;
 
     const guest = await prisma.guest.create({
-      data: { email: 'e2e-campaign-guest@example.com', name: 'E2E Campaign Guest' },
+      // Campaigns only reach guests who opted in at check-in.
+      data: { email: 'e2e-campaign-guest@example.com', name: 'E2E Campaign Guest', marketingConsentAt: new Date() },
     });
     guestId = guest.id;
   });

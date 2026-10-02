@@ -14,6 +14,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { AmbientService } from '../ambient/ambient.service';
 import { parsePercentage, resolveFeeAmount } from '../settings/fee-value';
 import { diffReservationFields, reservationFieldLabel } from '../reservations/reservation-field-changes';
+import { DocumentCryptoService } from '../guest-documents/document-crypto.service';
+import { ConfirmDatesDto } from './dto/confirm-dates.dto';
 
 // This controller has no auth guard at all — the confirmationToken in the URL is the only
 // gate — so every write here is, by definition, the guest acting on their own reservation.
@@ -36,6 +38,7 @@ export class PublicReservationsService {
     private readonly reservationImagesService: ReservationImagesService,
     private readonly notificationsService: NotificationsService,
     private readonly ambientService: AmbientService,
+    private readonly documentCrypto: DocumentCryptoService,
   ) {}
 
   // Also used by PublicReservationTokenGuard, so an unknown or expired token is rejected
@@ -102,17 +105,25 @@ export class PublicReservationsService {
     };
   }
 
-  async confirmDates(
-    token: string,
-    fullName: string,
-    phone: string,
-    email: string,
-  ) {
+  // The response carries only datesConfirmedAt — never the document (no /public/* response
+  // ever contains a document number, hash or ciphertext).
+  async confirmDates(token: string, input: ConfirmDatesDto) {
+    const { fullName, phone, email } = input;
     const reservation = await this.findByToken(token);
 
+    // A resubmission after check-in changes nothing — including which guest this stay is
+    // linked to.
     if (reservation.datesConfirmedAt) {
       return { datesConfirmedAt: reservation.datesConfirmedAt };
     }
+
+    // Throws the Spanish 400 the form shows inline.
+    const document = this.documentCrypto.normalize({
+      type: input.documentType,
+      country: input.documentCountry,
+      number: input.documentNumber,
+    });
+    const encodedDocument = this.documentCrypto.encode(document);
 
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -126,6 +137,7 @@ export class PublicReservationsService {
         guestName: fullName,
         guestPhone: phone,
         guestEmail: normalizedEmail,
+        ...encodedDocument,
       },
     });
 
@@ -148,14 +160,33 @@ export class PublicReservationsService {
       );
     }
 
+    if (reservation.documentHash !== encodedDocument.documentHash) {
+      const previous = this.documentCrypto.maskStored(reservation) ?? '(vacío)';
+      const next = this.documentCrypto.mask(document);
+      await this.eventsService.record(
+        reservation.id,
+        'FIELD_CHANGED',
+        `${reservationFieldLabel('document')}: "${previous}" → "${next}"`,
+        'document',
+        previous,
+        next,
+        GUEST_ACTOR,
+      );
+    }
+
     await this.confirmationService.maybeAutoConfirm(reservation.id);
 
+    // fillBlanksOnly: whoever holds this link may type someone else's document, so a matched
+    // profile only gets its empty fields filled — see GuestsService.syncFromReservation.
     void this.guestsService.syncFromReservation(updated.id, {
       email: normalizedEmail,
       name: fullName,
       phone,
       guestId: updated.guestId,
       actor: GUEST_ACTOR,
+      document,
+      fillBlanksOnly: true,
+      marketingConsent: input.marketingConsent === true,
     });
 
     return { datesConfirmedAt: updated.datesConfirmedAt };
@@ -229,7 +260,7 @@ export class PublicReservationsService {
 
   async listImages(token: string) {
     const reservation = await this.findByToken(token);
-    return this.reservationImagesService.listForReservation(reservation.id);
+    return this.reservationImagesService.listAvailableForReservation(reservation.id);
   }
 
   async getImageFile(token: string, imageId: string) {

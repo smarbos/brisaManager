@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FileStorageService } from '../storage/file-storage.service';
 import { detectImageType, isServableMimeType } from './image-type';
 
-const RECEIPTS_SUBDIR = 'receipts';
+export const RECEIPTS_SUBDIR = 'receipts';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -63,9 +63,19 @@ export class ReservationImagesService {
     });
   }
 
+  // Staff see every receipt, including ones the retention job deleted (deletedAt set), so
+  // the gallery can show that a receipt existed.
   listForReservation(reservationId: string) {
     return this.prisma.reservationImage.findMany({
       where: { reservationId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // The guest's own check-in page only lists receipts that still exist.
+  listAvailableForReservation(reservationId: string) {
+    return this.prisma.reservationImage.findMany({
+      where: { reservationId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -78,7 +88,8 @@ export class ReservationImagesService {
     // guest-facing endpoint from ever serving an image that belongs to a *different*
     // reservation's token holder — see PublicReservationsService, which resolves
     // reservationId from the token before calling this.
-    if (!image || image.reservationId !== reservationId) {
+    // A receipt deleted by the retention job 404s like a missing one — its file is gone.
+    if (!image || image.reservationId !== reservationId || image.deletedAt) {
       throw new NotFoundException(
         `Image ${imageId} not found for this reservation`,
       );

@@ -15,6 +15,18 @@ import { CreateReservationDto, GUEST_CONTACT_REQUIRED_MESSAGE } from './dto/crea
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { QueryReservationDto } from './dto/query-reservation.dto';
 import { Reservation } from '@prisma/client';
+import { DocumentCryptoService, EncodedDocument } from '../guest-documents/document-crypto.service';
+import { NormalizedDocument } from '../guest-documents/guest-documents';
+
+const NO_DOCUMENT = { documentType: null, documentCountry: null, documentNumberEncrypted: null, documentHash: null };
+
+type DocumentFields = Pick<CreateReservationDto, 'documentType' | 'documentCountry' | 'documentNumber'>;
+
+// Splits the staff form's document group off the DTO, so the rest can be spread into Prisma.
+function splitDocumentFields<T extends DocumentFields>(dto: T) {
+  const { documentType, documentCountry, documentNumber, ...rest } = dto;
+  return { document: { documentType, documentCountry, documentNumber }, rest };
+}
 
 @Injectable()
 export class ReservationsService {
@@ -29,7 +41,29 @@ export class ReservationsService {
     private readonly guestsService: GuestsService,
     private readonly whatsappService: WhatsappService,
     private readonly whatsappDeliveryService: WhatsappDeliveryService,
+    private readonly documentCrypto: DocumentCryptoService,
   ) {}
+
+  // null when the form left the document empty. Throws the same Spanish 400 as check-in.
+  private normalizeStaffDocument(fields: DocumentFields): NormalizedDocument | null {
+    if (!fields.documentNumber) {
+      return null;
+    }
+    return this.documentCrypto.normalize({
+      type: fields.documentType ?? 'DNI',
+      country: fields.documentCountry,
+      number: fields.documentNumber,
+    });
+  }
+
+  // The reservation's document, for the guest sync — null if it has none or it can't be read.
+  private storedDocument(reservation: Reservation): NormalizedDocument | null {
+    try {
+      return this.documentCrypto.decode(reservation);
+    } catch {
+      return null;
+    }
+  }
 
   private validateDates(checkIn: string, checkOut: string) {
     if (new Date(checkOut) <= new Date(checkIn)) {
@@ -39,10 +73,13 @@ export class ReservationsService {
 
   async create(dto: CreateReservationDto, actor?: string | null) {
     this.validateDates(dto.checkIn, dto.checkOut);
+    const { document: documentFields, rest } = splitDocumentFields(dto);
+    const document = this.normalizeStaffDocument(documentFields);
 
     const reservation = await this.prisma.reservation.create({
       data: {
-        ...dto,
+        ...rest,
+        ...(document ? this.documentCrypto.encode(document) : {}),
         checkIn: new Date(dto.checkIn),
         checkOut: new Date(dto.checkOut),
         externalReference: dto.externalReference?.trim() ? dto.externalReference.trim() : null,
@@ -66,13 +103,14 @@ export class ReservationsService {
     // would needlessly hold the HTTP response open on every reservation create.
     void this.googleCalendarPushService.pushReservation(reservation);
 
-    if (reservation.guestEmail || reservation.guestPhone) {
+    if (reservation.guestEmail || reservation.guestPhone || document) {
       void this.guestsService.syncFromReservation(reservation.id, {
         email: reservation.guestEmail,
         name: reservation.guestName,
         phone: reservation.guestPhone,
         guestId: reservation.guestId,
         actor,
+        document,
       });
     }
 
@@ -207,8 +245,14 @@ export class ReservationsService {
   async findOneWithWhatsappStatus(id: string) {
     const reservation = await this.findOne(id);
     const whatsappMessages = (await this.whatsappDeliveryService.latestByReservation([id])).get(id) ?? [];
+    // Marketing consent belongs to the guest, but staff look for it on the reservation too.
+    const guest = reservation.guestId
+      ? await this.prisma.guest.findUnique({ where: { id: reservation.guestId }, select: { marketingConsentAt: true } })
+      : null;
     return {
-      ...reservation,
+      guestMarketingConsentAt: guest?.marketingConsentAt ?? null,
+      // The only staff reservation response that carries the decrypted document.
+      ...this.documentCrypto.toDetailView(reservation),
       whatsappMessages,
       whatsappIssues: computeWhatsappIssues(reservation, whatsappMessages),
     };
@@ -224,6 +268,8 @@ export class ReservationsService {
 
   async update(id: string, dto: UpdateReservationDto, actor?: string | null) {
     const existing = await this.findOne(id);
+    const { document: documentFields, rest } = splitDocumentFields(dto);
+    const documentData = this.documentUpdate(existing, documentFields);
 
     if (dto.checkIn && dto.checkOut) {
       this.validateDates(dto.checkIn, dto.checkOut);
@@ -250,7 +296,8 @@ export class ReservationsService {
     const updated = await this.prisma.reservation.update({
       where: { id },
       data: {
-        ...dto,
+        ...rest,
+        ...documentData,
         checkIn: dto.checkIn ? new Date(dto.checkIn) : undefined,
         checkOut: dto.checkOut ? new Date(dto.checkOut) : undefined,
         externalReference: normalizedExternalReference,
@@ -260,7 +307,7 @@ export class ReservationsService {
     // Diff against the exact same normalized values just written, not the raw dto, so a
     // no-op edit (e.g. re-submitting the same externalReference with different whitespace)
     // is never recorded as a change.
-    const changes = diffReservationFields(existing, { ...dto, externalReference: normalizedExternalReference });
+    const changes = diffReservationFields(existing, { ...rest, externalReference: normalizedExternalReference });
     for (const change of changes) {
       await this.eventsService.record(
         id,
@@ -273,20 +320,56 @@ export class ReservationsService {
       );
     }
 
+    if (documentData) {
+      const previous = this.documentCrypto.maskStored(existing) ?? '(vacío)';
+      const next = this.documentCrypto.maskStored(updated) ?? '(vacío)';
+      await this.eventsService.record(
+        id,
+        'FIELD_CHANGED',
+        `${reservationFieldLabel('document')}: "${previous}" → "${next}"`,
+        'document',
+        previous,
+        next,
+        actor,
+      );
+    }
+
     // Fire-and-forget: see the comment in create() above.
     void this.googleCalendarPushService.pushReservation(updated);
 
-    if (updated.guestEmail || updated.guestPhone) {
+    // Staff path: no fillBlanksOnly. Changing the document can move the reservation to a
+    // different guest (see GuestsService.syncFromReservation).
+    const document = this.storedDocument(updated);
+    if (updated.guestEmail || updated.guestPhone || document) {
       void this.guestsService.syncFromReservation(updated.id, {
         email: updated.guestEmail,
         name: updated.guestName,
         phone: updated.guestPhone,
         guestId: updated.guestId,
         actor,
+        document,
       });
     }
 
     return updated;
+  }
+
+  // The document columns an edit writes, or undefined when it leaves the document alone
+  // (no documentNumber in the edit, or the same document re-submitted). Only an explicitly
+  // emptied documentNumber clears it — a stray documentType/documentCountry alone (e.g. echoed
+  // back from a detail response) never does.
+  private documentUpdate(existing: Reservation, fields: DocumentFields): EncodedDocument | typeof NO_DOCUMENT | undefined {
+    if (fields.documentNumber === undefined) {
+      return undefined;
+    }
+    const document = this.normalizeStaffDocument(fields);
+    if (!document) {
+      return existing.documentHash ? NO_DOCUMENT : undefined;
+    }
+    if (this.documentCrypto.hash(document) === existing.documentHash) {
+      return undefined;
+    }
+    return this.documentCrypto.encode(document);
   }
 
   async markPaymentReceived(id: string) {

@@ -47,7 +47,7 @@ export class PublicReservationsController {
 
   @Post(':token/confirm-dates')
   confirmDates(@Param('token') token: string, @Body() dto: ConfirmDatesDto) {
-    return this.service.confirmDates(token, dto.fullName, dto.phone, dto.email);
+    return this.service.confirmDates(token, dto);
   }
 
   @Post(':token/accept-contract')

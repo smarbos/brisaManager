@@ -158,6 +158,16 @@ describe('ReservationImagesService', () => {
       expect(result).toEqual({ id: 'img-1', reservationId: 'res-1' });
     });
 
+    it('throws NotFoundException for a receipt the retention job already deleted', async () => {
+      prisma.reservationImage.findUnique.mockResolvedValue({
+        id: 'img-1',
+        reservationId: 'res-1',
+        deletedAt: new Date(),
+      });
+
+      await expect(service.getOne('res-1', 'img-1')).rejects.toThrow(NotFoundException);
+    });
+
     it('throws NotFoundException when the image does not exist', async () => {
       prisma.reservationImage.findUnique.mockResolvedValue(null);
 

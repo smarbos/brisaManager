@@ -16,6 +16,7 @@ import {
 import { formatDate, formatDateTime } from '../lib/date';
 import { shortId } from '../lib/id';
 import { sourceLabel, statusLabel, statusBadgeTone, guestEventTypeLabel } from '../lib/labels';
+import { formatDocument, formatMarketingConsent } from '../lib/document';
 
 export function GuestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -75,6 +76,14 @@ export function GuestDetailPage() {
           <div>
             <dt className="text-xs font-semibold uppercase text-text-muted">Teléfono</dt>
             <dd className="text-text">{guest.phone ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase text-text-muted">Documento</dt>
+            <dd className="text-text">{formatDocument(guest)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase text-text-muted">Promociones</dt>
+            <dd className="text-text">{formatMarketingConsent(guest.marketingConsentAt)}</dd>
           </div>
           <div>
             <dt className="text-xs font-semibold uppercase text-text-muted">Estadías totales</dt>

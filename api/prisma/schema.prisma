@@ -61,6 +61,17 @@ enum GuestEventType {
   PHONE_CHANGED
   EMAIL_CHANGED
   UNSUBSCRIBED
+  // A submitted name/phone/email was deliberately not written: the guest form tried to
+  // overwrite a non-empty field on a document-matched profile, or the value already belongs
+  // to another guest. oldValue = stored, newValue = submitted.
+  CONTACT_INFO_NOT_APPLIED
+  // oldValue/newValue hold masked values only ("DNI ···678") — this log isn't encrypted.
+  DOCUMENT_CHANGED
+}
+
+enum DocumentType {
+  DNI
+  PASAPORTE
 }
 
 enum CampaignFilterType {
@@ -142,6 +153,12 @@ model Reservation {
   outboundEmails                OutboundEmail[]
   missingFromChannelAt          DateTime?
   googleEventId                 String?
+  // The document this reservation was checked in with (or that staff entered) — same
+  // encoding as Guest's. Not unique: one guest has many reservations.
+  documentType                  DocumentType?
+  documentCountry               String?
+  documentNumberEncrypted       String?
+  documentHash                  String?
   createdAt                     DateTime           @default(now())
   updatedAt                     DateTime           @updatedAt
 
@@ -152,48 +169,48 @@ model Reservation {
 }
 
 model Settings {
-  id                        String    @id
-  houseRulesText            String
-  paymentInstructions       String
-  depositInstructions       String    @default("")
-  propertyAddress           String    @default("")
-  googleMapsUrl             String    @default("")
-  initialEmailTemplate      String    @default("")
-  finalEmailTemplate        String    @default("")
-  cancellationEmailTemplate String    @default("")
-  reservationReminderDaysBefore       Int    @default(3)
-  depositReminderDaysAfter            Int    @default(3)
+  id                            String    @id
+  houseRulesText                String
+  paymentInstructions           String
+  depositInstructions           String    @default("")
+  propertyAddress               String    @default("")
+  googleMapsUrl                 String    @default("")
+  initialEmailTemplate          String    @default("")
+  finalEmailTemplate            String    @default("")
+  cancellationEmailTemplate     String    @default("")
+  reservationReminderDaysBefore Int       @default(3)
+  depositReminderDaysAfter      Int       @default(3)
   // Rendered server-side and handed back to the Chrome extension so it can pre-fill the
   // Airbnb message compose box — Airbnb guests' real email isn't scrapeable from the host
   // messages page, so this is the primary way they receive the check-in link.
-  airbnbMessageTemplate String @default("¡Hola {{guestName}}! Para completar el check-in, por favor completá estos pasos rápidos: {{confirmationUrl}}")
-  bankAccountHolder         String    @default("")
-  bankCuil                  String    @default("")
-  bankAccountNumber         String    @default("")
-  bankCbu                   String    @default("")
-  bankAlias                 String    @default("")
-  bankName                  String    @default("")
+  airbnbMessageTemplate         String    @default("¡Hola {{guestName}}! Para completar el check-in, por favor completá estos pasos rápidos: {{confirmationUrl}}")
+  bankAccountHolder             String    @default("")
+  bankCuil                      String    @default("")
+  bankAccountNumber             String    @default("")
+  bankCbu                       String    @default("")
+  bankAlias                     String    @default("")
+  bankName                      String    @default("")
   // Either a plain ARS amount (e.g. "210000") or a percentage of the reservation's total
   // (e.g. "30%") — see api/src/settings/fee-value.ts for how this is parsed and resolved.
-  confirmationPaymentValue String @default("30%")
-  securityDepositValue     String @default("15%")
-  confirmationStepText          String @default("¡Todo listo! Completaste todos los pasos necesarios para tu estadía en La Brisa de Mar del Plata.")
-  bookingIcalUrl            String?
-  airbnbIcalUrl             String?
+  confirmationPaymentValue      String    @default("30%")
+  securityDepositValue          String    @default("15%")
+  confirmationStepText          String    @default("¡Todo listo! Completaste todos los pasos necesarios para tu estadía en La Brisa de Mar del Plata.")
+  bookingIcalUrl                String?
+  airbnbIcalUrl                 String?
   // Comma-separated "HH:MM-HH:MM" ranges (24h, Buenos Aires local time, may cross midnight) -
   // a repeated-loud-noise alert only notifies staff when the current time falls inside one of
   // these. Empty means never notify (quiet hours must be explicitly configured) - see
   // api/src/ambient/sound-alert-windows.ts. Smoke/CO alerts are unaffected by this - they're
   // always-on regardless of time.
-  soundAlertWindows         String    @default("")
-  lastChannelSyncAt         DateTime?
-  lastChannelSyncError      String?
-  googleRefreshToken        String?
-  googleCalendarId          String?
-  googleSyncToken           String?
-  lastCalendarSyncAt        DateTime?
-  lastCalendarSyncError     String?
-  updatedAt                 DateTime  @updatedAt
+  soundAlertWindows             String    @default("")
+  lastChannelSyncAt             DateTime?
+  lastChannelSyncError          String?
+  googleRefreshToken            String?
+  googleCalendarId              String?
+  googleSyncToken               String?
+  lastCalendarSyncAt            DateTime?
+  lastCalendarSyncError         String?
+  updatedAt                     DateTime  @updatedAt
 }
 
 model ReservationEvent {
@@ -222,23 +239,33 @@ model AdminUser {
 }
 
 model Guest {
-  id                 String              @id @default(uuid())
+  id                      String              @id @default(uuid())
   // Optional: Airbnb's hosting messages page never exposes the guest's email, only their
   // phone — a guest reached that way is still worth a CRM record, keyed on phone instead
   // (see GuestsService.syncFromReservation()). Postgres allows multiple NULLs in a unique
   // column, so this doesn't collide across every email-less guest.
-  email              String?             @unique
-  name               String
-  phone              String?             @unique
-  totalStays         Int                 @default(0)
-  lastStayAt         DateTime?
-  unsubscribedAt     DateTime?
-  unsubscribeToken   String              @unique @default(uuid())
-  reservations       Reservation[]
-  campaignRecipients CampaignRecipient[]
-  guestEvents        GuestEvent[]
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  email                   String?             @unique
+  name                    String
+  phone                   String?             @unique
+  // The guest's identity document — the primary way a guest is recognized across stays (see
+  // GuestsService.syncFromReservation). The number is AES-256-GCM encrypted
+  // (api/src/guest-documents); matching and search use documentHash, an HMAC, so a DB dump
+  // alone reveals no document numbers. totalStays/lastStayAt are computed on read from
+  // completed reservations, not stored.
+  documentType            DocumentType?
+  documentCountry         String?
+  documentNumberEncrypted String?
+  documentHash            String?             @unique
+  // Set when the guest ticks the check-in form's marketing opt-in. null = no consent, so
+  // campaigns skip them (Ley 25.326).
+  marketingConsentAt      DateTime?
+  unsubscribedAt          DateTime?
+  unsubscribeToken        String              @unique @default(uuid())
+  reservations            Reservation[]
+  campaignRecipients      CampaignRecipient[]
+  guestEvents             GuestEvent[]
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
 }
 
 // One row per actual change to a Guest's tracked fields — written only by
@@ -351,6 +378,9 @@ model ReservationImage {
   // as a caption wherever the image is displayed. Every image in the same submission shares
   // the same message, since the guest writes one note per batch, not per photo.
   message       String?
+  // Set by ReservationImagesRetentionService once the file itself is deleted after the stay.
+  // The row is kept so staff can see a receipt existed.
+  deletedAt     DateTime?
   createdAt     DateTime    @default(now())
 }
 
@@ -381,15 +411,15 @@ model Notification {
 // submit that never reached the point of creating one), unlike ReservationEvent above which
 // always has one.
 model ExtensionErrorLog {
-  id              String   @id @default(uuid())
-  source          String
-  resId           String?
-  operation       String
-  message         String
-  detail          String?
-  url             String
+  id               String   @id @default(uuid())
+  source           String
+  resId            String?
+  operation        String
+  message          String
+  detail           String?
+  url              String
   extensionVersion String?
-  createdAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
 }
 
 // Reported by an ambient-control ESP32 device (see /home/smarbos/dev/brisaManager/ambient-control)
