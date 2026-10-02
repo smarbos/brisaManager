@@ -10,8 +10,11 @@ With --threshold N, skips measuring and sets loudThreshold to N instead
 (the firmware's "SET_LOUD_THRESHOLD N" command) - for when the calibrated
 value flags the room's normal everyday volume as loud. Also saved to flash.
 
+Both commands require the firmware's SERIAL_ADMIN_PIN, read from
+include/secrets.h (override with --pin or the AMBIENT_SERIAL_PIN env var).
+
 Usage:
-    python3 scripts/calibrate.py [port] [--baud 115200] [--threshold N]
+    python3 scripts/calibrate.py [port] [--baud 115200] [--threshold N] [--pin PIN]
 
 If no port is given, auto-detects the first USB serial device that looks
 like an ESP32 dev board's USB-UART bridge (CP210x/CH340/FTDI).
@@ -49,6 +52,10 @@ except ImportError:
 SAMPLE_LINE = re.compile(r"^\d+,\d+$")
 CALIBRATED_LINE = re.compile(r"^CALIBRATED,(\d+),(\d+)$")
 THRESHOLD_SET_LINE = re.compile(r"^LOUD_THRESHOLD_SET,(\d+)$")
+PIN_FAILURE_LINES = ("PIN_REJECTED", "PIN_LOCKED", "PIN_REQUIRED")
+
+SECRETS_H = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "include", "secrets.h")
+SECRETS_PIN = re.compile(r'SERIAL_ADMIN_PIN\s*=\s*"([^"]*)"')
 
 READY_TIMEOUT_S = 20  # covers a worst-case WiFi connect timeout, plus margin
 CALIBRATION_TIMEOUT_S = 10  # firmware's own calibration window is 5s
@@ -71,6 +78,20 @@ def autodetect_port():
     return None
 
 
+def read_pin_from_secrets():
+    try:
+        with open(SECRETS_H) as f:
+            match = SECRETS_PIN.search(f.read())
+    except OSError:
+        return None
+    return match.group(1) if match else None
+
+
+def check_pin_failure(line):
+    if line in PIN_FAILURE_LINES:
+        sys.exit(f"\nFirmware refused the command ({line}) - check SERIAL_ADMIN_PIN matches the flashed build.")
+
+
 def read_line(ser):
     raw = ser.readline()
     if not raw:
@@ -91,15 +112,16 @@ def wait_until_ready(ser):
     return False
 
 
-def run_calibration(ser):
+def run_calibration(ser, pin):
     print("\nKeep the room quiet now.")
-    ser.write(b"CALIBRATE\n")
+    ser.write(f"CALIBRATE {pin}\n".encode())
 
     deadline = time.time() + CALIBRATION_TIMEOUT_S
     while time.time() < deadline:
         line = read_line(ser)
         if not line:
             continue
+        check_pin_failure(line)
         match = CALIBRATED_LINE.match(line)
         if match:
             threshold, ambient_level = match.groups()
@@ -109,12 +131,14 @@ def run_calibration(ser):
     return False
 
 
-def set_threshold(ser, threshold):
-    ser.write(f"SET_LOUD_THRESHOLD {threshold}\n".encode())
+def set_threshold(ser, threshold, pin):
+    ser.write(f"SET_LOUD_THRESHOLD {threshold} {pin}\n".encode())
 
     deadline = time.time() + CALIBRATION_TIMEOUT_S
     while time.time() < deadline:
         line = read_line(ser)
+        if line:
+            check_pin_failure(line)
         if line and THRESHOLD_SET_LINE.match(line):
             print(f"\nSet: loudThreshold={threshold}")
             print("Saved to flash - this survives a reboot/power-off.")
@@ -127,7 +151,12 @@ def main():
     parser.add_argument("port", nargs="?", help="Serial device, e.g. /dev/ttyUSB0 (auto-detected if omitted)")
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate (default: matches Serial.begin(115200) in main.cpp)")
     parser.add_argument("--threshold", type=int, help="Set loudThreshold to this value instead of calibrating")
+    parser.add_argument("--pin", help="SERIAL_ADMIN_PIN (default: AMBIENT_SERIAL_PIN env var, then include/secrets.h)")
     args = parser.parse_args()
+
+    pin = args.pin or os.environ.get("AMBIENT_SERIAL_PIN") or read_pin_from_secrets()
+    if not pin:
+        sys.exit("No SERIAL_ADMIN_PIN found - pass --pin, set AMBIENT_SERIAL_PIN, or define it in include/secrets.h")
 
     port = args.port or autodetect_port()
     if not port:
@@ -147,11 +176,11 @@ def main():
                 sys.exit(f"\nFirmware never looked ready within {READY_TIMEOUT_S}s - check it's flashed and running.")
 
             if args.threshold is not None:
-                if not set_threshold(ser, args.threshold):
+                if not set_threshold(ser, args.threshold, pin):
                     sys.exit(f"\nNo LOUD_THRESHOLD_SET line seen within {CALIBRATION_TIMEOUT_S}s - check the firmware has the SET_LOUD_THRESHOLD command.")
                 return
 
-            if not run_calibration(ser):
+            if not run_calibration(ser, pin):
                 sys.exit(f"\nNo CALIBRATED line seen within {CALIBRATION_TIMEOUT_S}s - check the sketch is the version with checkSerialCommand().")
     except serial.SerialException as err:
         sys.exit(f"Could not open {port}: {err}")

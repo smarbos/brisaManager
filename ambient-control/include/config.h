@@ -62,6 +62,30 @@ constexpr unsigned long DHT_SAMPLE_INTERVAL_MS = 5000; // 5 seconds
 // CALIBRATE_* command and persisted value.
 constexpr int EMERGENCY_THRESHOLD_MULTIPLIER = 2;
 
+// Hard upper bounds on the CO/smoke alert thresholds, enforced in firmware no matter what a
+// CALIBRATE_CO/CALIBRATE_SMOKE run measures or what's stored in NVS. Calibration exists to make
+// a sensor *more* sensitive than the uncalibrated default (tuning to this unit's clean-air
+// baseline), never less - without a cap, calibrating in contaminated air (or holding a gas
+// source to the sensor during the 5s window) would raise the threshold arbitrarily and
+// silently disable life-safety alerts. A calibration that would land above the cap is
+// rejected outright (the old threshold is kept), since a "clean air" peak that high means the
+// air isn't clean or the sensor is faulty. Raising these requires a reflash, not a serial
+// command.
+constexpr int MAX_CO_ALERT_THRESHOLD = 2500;
+// Higher than CO's: the living-room MQ-2 reads ~2550-2630 in normal air (measured 2026-10-01
+// after warm-up; its calibrated threshold was 2726), so a 2500 cap would sit below its own
+// baseline and raise a permanent false smoke alert.
+constexpr int MAX_SMOKE_ALERT_THRESHOLD = 3200;
+
+// The ESP32's 12-bit ADC saturates at 4095, so alertThreshold * EMERGENCY_THRESHOLD_MULTIPLIER
+// alone could land above anything the sensor can ever read (2500 * 2 = 5000) and the buzzer
+// would never sound. The emergency threshold is capped here, just under saturation.
+constexpr int MAX_EMERGENCY_THRESHOLD = 4000;
+
+// After a wrong SERIAL_ADMIN_PIN, every serial command is ignored for this long - turns a
+// brute-force of the PIN over USB from seconds into years.
+constexpr unsigned long SERIAL_PIN_FAILURE_LOCKOUT_MS = 5000;
+
 // How long a reading must stay at/above the emergency threshold before the buzzer sounds - a
 // brief spike isn't an emergency, only a sustained one.
 constexpr unsigned long EMERGENCY_SUSTAINED_MS = 60UL * 1000UL; // 1 minute
