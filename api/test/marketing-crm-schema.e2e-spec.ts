@@ -13,7 +13,7 @@ describe('Marketing/CRM schema', () => {
     });
 
     expect(guest.unsubscribeToken).toBeTruthy();
-    expect(guest.totalStays).toBe(0);
+    expect(guest.marketingConsentAt).toBeNull();
 
     const reservation = await prisma.reservation.create({
       data: {

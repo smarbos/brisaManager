@@ -33,6 +33,180 @@ describe('ReservationFormPage', () => {
     );
   });
 
+  it('sends an entered document with a new reservation, and none when left empty', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText(/nombre del huésped/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/email del huésped/i), { target: { value: 'jane@example.com' } });
+    fireEvent.change(screen.getByLabelText(/check-in/i), { target: { value: '2026-01-10' } });
+    fireEvent.change(screen.getByLabelText(/check-out/i), { target: { value: '2026-01-15' } });
+    fireEvent.change(screen.getByLabelText(/monto total/i), { target: { value: '100000' } });
+    fireEvent.change(screen.getByLabelText(/tipo de documento/i), { target: { value: 'PASAPORTE' } });
+    fireEvent.change(screen.getByLabelText(/país emisor/i), { target: { value: 'ES' } });
+    fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: 'XA123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() =>
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ documentType: 'PASAPORTE', documentCountry: 'ES', documentNumber: 'XA123456' }),
+      ),
+    );
+  });
+
+  it('blocks saving with an invalid document and shows the inline error', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation');
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/new']}>
+        <Routes>
+          <Route path="/reservations/new" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText(/nombre del huésped/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/email del huésped/i), { target: { value: 'jane@example.com' } });
+    fireEvent.change(screen.getByLabelText(/check-in/i), { target: { value: '2026-01-10' } });
+    fireEvent.change(screen.getByLabelText(/check-out/i), { target: { value: '2026-01-15' } });
+    fireEvent.change(screen.getByLabelText(/monto total/i), { target: { value: '100000' } });
+    fireEvent.change(screen.getByLabelText(/número de documento/i), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    expect(await screen.findByText('El DNI debe tener 7 u 8 dígitos.')).toBeInTheDocument();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the decrypted document for editing and the guest\'s marketing consent', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      guestEmail: 'jane@example.com',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+      documentType: 'DNI',
+      documentCountry: 'AR',
+      documentMasked: 'DNI ···678',
+      document: { type: 'DNI', country: 'AR', number: '12345678' },
+      guestMarketingConsentAt: null,
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
+    vi.spyOn(outboundEmailsApi, 'listOutboundEmails').mockResolvedValue([]);
+    const updateSpy = vi.spyOn(reservationsApi, 'updateReservation').mockResolvedValue({ id: '1' } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByDisplayValue('12345678')).toBeInTheDocument();
+    expect(screen.getByText('DNI 12345678')).toBeInTheDocument();
+    expect(screen.getByText('Sin consentimiento')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled());
+    const payload = updateSpy.mock.calls[0][1];
+    expect(payload).toMatchObject({ documentType: 'DNI', documentNumber: '12345678', documentCountry: null });
+    expect(payload).not.toHaveProperty('document');
+    expect(payload).not.toHaveProperty('documentMasked');
+  });
+
+  it('leaves an unreadable document untouched when staff save without retyping it', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      guestEmail: 'jane@example.com',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+      documentType: 'DNI',
+      document: null,
+      documentUnreadable: true,
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
+    vi.spyOn(outboundEmailsApi, 'listOutboundEmails').mockResolvedValue([]);
+    const updateSpy = vi.spyOn(reservationsApi, 'updateReservation').mockResolvedValue({ id: '1' } as never);
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findAllByText(/no se pudo leer el documento/i)).not.toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled());
+    expect(updateSpy.mock.calls[0][1].documentNumber).toBeUndefined();
+  });
+
+  it('shows a placeholder for a receipt deleted by the retention policy, without fetching it', async () => {
+    vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({
+      id: '1',
+      guestName: 'Jane Doe',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'DIRECT',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+    } as never);
+    vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+    vi.spyOn(outboundEmailsApi, 'listOutboundEmails').mockResolvedValue([]);
+    vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([
+      {
+        id: 'img-1',
+        reservationId: '1',
+        originalName: 'comprobante.png',
+        mimeType: 'image/png',
+        sizeBytes: 123,
+        message: null,
+        deletedAt: '2026-02-20T00:00:00.000Z',
+        createdAt: '2026-01-02T00:00:00.000Z',
+      },
+    ]);
+    const blobSpy = vi.spyOn(reservationImagesApi, 'getReservationImageBlob');
+
+    render(
+      <MemoryRouter initialEntries={['/reservations/1']}>
+        <Routes>
+          <Route path="/reservations/:id" element={<ReservationFormPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Comprobante eliminado (política de retención)')).toBeInTheDocument();
+    expect(blobSpy).not.toHaveBeenCalled();
+  });
+
   it('accepts a decimal total amount (dollars and cents)', async () => {
     const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
 

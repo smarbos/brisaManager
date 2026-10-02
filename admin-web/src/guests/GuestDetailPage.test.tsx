@@ -37,6 +37,46 @@ describe('GuestDetailPage', () => {
     expect(screen.getByRole('link', { name: /volver a huéspedes/i })).toHaveAttribute('href', '/guests');
   });
 
+  it('shows the full document and the marketing consent', async () => {
+    vi.spyOn(guestsApi, 'getGuest').mockResolvedValue({
+      id: 'guest-1',
+      email: null,
+      name: 'Jane Doe',
+      phone: null,
+      totalStays: 0,
+      lastStayAt: null,
+      unsubscribedAt: null,
+      marketingConsentAt: null,
+      document: { type: 'DNI', country: 'AR', number: '12345678' },
+      documentMasked: 'DNI ···678',
+      reservations: [],
+    });
+
+    renderAt('guest-1');
+
+    expect(await screen.findByText('DNI 12345678')).toBeInTheDocument();
+    expect(screen.getByText('Sin consentimiento')).toBeInTheDocument();
+  });
+
+  it('says when the stored document could not be read', async () => {
+    vi.spyOn(guestsApi, 'getGuest').mockResolvedValue({
+      id: 'guest-1',
+      email: null,
+      name: 'Jane Doe',
+      phone: null,
+      totalStays: 0,
+      lastStayAt: null,
+      unsubscribedAt: null,
+      document: null,
+      documentUnreadable: true,
+      reservations: [],
+    });
+
+    renderAt('guest-1');
+
+    expect(await screen.findByText('No se pudo leer el documento')).toBeInTheDocument();
+  });
+
   it('lists the guest reservations with a link to each one', async () => {
     vi.spyOn(guestsApi, 'getGuest').mockResolvedValue({
       id: 'guest-1',

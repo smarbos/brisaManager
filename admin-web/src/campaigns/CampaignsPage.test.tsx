@@ -35,6 +35,19 @@ describe('CampaignsPage', () => {
     expect(await screen.findByText(/5 destinatario/i)).toBeInTheDocument();
   });
 
+  it('says how many otherwise-eligible guests are left out for lack of consent', async () => {
+    vi.spyOn(campaignsApi, 'previewCampaign').mockResolvedValue({ recipientCount: 2, excludedForConsent: 7 });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Welcome back')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText(/plantilla/i), { target: { value: 'tpl-1' } });
+    fireEvent.change(screen.getByLabelText(/filtro/i), { target: { value: 'ALL' } });
+
+    expect(await screen.findByText(/7 huésped\(es\) más quedan afuera/i)).toBeInTheDocument();
+  });
+
   it('requires confirmation before sending, then sends', async () => {
     vi.spyOn(campaignsApi, 'previewCampaign').mockResolvedValue({ recipientCount: 5 });
     const sendSpy = vi.spyOn(campaignsApi, 'sendCampaign').mockResolvedValue({

@@ -5,15 +5,21 @@ export function getReservationByToken(token: string): Promise<GuestReservation> 
   return request(`/public/reservations/${token}`);
 }
 
-export function confirmDates(
-  token: string,
-  fullName: string,
-  phone: string,
-  email: string,
-): Promise<{ datesConfirmedAt: string }> {
+export interface ConfirmDatesInput {
+  fullName: string;
+  phone: string;
+  email: string;
+  documentType: 'DNI' | 'PASAPORTE';
+  // Only sent for PASAPORTE — a DNI is always Argentine.
+  documentCountry?: string;
+  documentNumber: string;
+  marketingConsent: boolean;
+}
+
+export function confirmDates(token: string, input: ConfirmDatesInput): Promise<{ datesConfirmedAt: string }> {
   return request(`/public/reservations/${token}/confirm-dates`, {
     method: 'POST',
-    body: JSON.stringify({ fullName, phone, email }),
+    body: JSON.stringify(input),
   });
 }
 

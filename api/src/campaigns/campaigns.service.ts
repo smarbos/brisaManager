@@ -15,7 +15,12 @@ export class CampaignsService {
 
   async preview(templateId: string, filterType: CampaignFilterType, filterMonths?: number) {
     const guests = await this.guestsService.findEligibleForCampaign(filterType, filterMonths);
-    return { recipientCount: guests.length };
+    const withoutConsent = await this.guestsService.findEligibleForCampaign(filterType, filterMonths, {
+      requireConsent: false,
+    });
+    // How many guests would have been reached if consent weren't required — shown so staff
+    // understand why the list is smaller than before (existing guests have no consent yet).
+    return { recipientCount: guests.length, excludedForConsent: withoutConsent.length - guests.length };
   }
 
   async send(templateId: string, filterType: CampaignFilterType, filterMonths?: number) {

@@ -1,7 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { CampaignFilterType, Prisma } from '@prisma/client';
+import { CampaignFilterType, Guest, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { GuestEventsService } from '../guest-events/guest-events.service';
+import { DocumentCryptoService } from '../guest-documents/document-crypto.service';
+import { DocumentInput, NormalizedDocument } from '../guest-documents/guest-documents';
 
 interface SyncInput {
   email?: string | null;
@@ -14,15 +16,40 @@ interface SyncInput {
   // Guest instead of updating the one already on file.
   guestId?: string | null;
   // Who submitted this data — the staff member's email, "Huésped", or "Extensión de
-  // Chrome" — carried onto any NAME_CHANGED/PHONE_CHANGED/EMAIL_CHANGED event this sync
-  // produces.
+  // Chrome" — carried onto any event this sync produces.
   actor?: string | null;
+  // The identity document, already normalized. When present it's the primary key: same
+  // document means the same person, regardless of email/phone (see resolveByDocument).
+  document?: NormalizedDocument | null;
+  // Set only by the guest check-in form: on a document-matched profile, write only fields
+  // that are empty there — a token holder who types a stranger's DNI must not be able to
+  // overwrite that stranger's name/phone/email.
+  fillBlanksOnly?: boolean;
+  // true sets marketingConsentAt once; never cleared here (withdrawing is the unsubscribe
+  // link's job).
+  marketingConsent?: boolean;
 }
 
-interface GuestSnapshot {
-  name: string;
-  phone: string | null;
-  email: string | null;
+type ContactField = 'name' | 'phone' | 'email';
+
+const CONTACT_FIELD_LABELS: Record<ContactField, string> = { name: 'Nombre', phone: 'Teléfono', email: 'Email' };
+
+interface PendingEvent {
+  type: 'CONTACT_INFO_NOT_APPLIED' | 'DOCUMENT_CHANGED';
+  detail: string;
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+}
+
+interface Resolution {
+  target: Guest | null;
+  blanksOnly: boolean;
+}
+
+// A stay counts once it has actually happened and wasn't cancelled.
+function completedStayWhere(now: Date): Prisma.ReservationWhereInput {
+  return { status: { not: 'CANCELLED' }, checkOut: { lt: now } };
 }
 
 function formatPreviousValue(value: string | null): string {
@@ -36,6 +63,7 @@ export class GuestsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly guestEventsService: GuestEventsService,
+    private readonly documentCrypto: DocumentCryptoService,
   ) {}
 
   async syncFromReservation(reservationId: string, input: SyncInput): Promise<void> {
@@ -43,112 +71,212 @@ export class GuestsService {
       const email = input.email?.trim().toLowerCase() || null;
       const phone = input.phone?.trim() || null;
       const name = input.name.trim();
-      if (!email && !phone) {
+      const document = input.document ?? null;
+      if (!document && !email && !phone) {
         return;
       }
 
-      // Prefer the guest already linked to this reservation — only fall back to an
-      // email/phone lookup (and possibly creating a new guest) when this reservation has
-      // never been synced before.
-      let existing = input.guestId ? await this.prisma.guest.findUnique({ where: { id: input.guestId } }) : null;
+      const linked = input.guestId ? await this.prisma.guest.findUnique({ where: { id: input.guestId } }) : null;
+      const { target, blanksOnly } = document
+        ? await this.resolveByDocument(document, linked, input.fillBlanksOnly ?? false)
+        : await this.resolveByContact(linked, email, phone);
 
-      let guest;
-      if (existing) {
-        guest = await this.prisma.guest.update({
-          where: { id: existing.id },
-          data: { name, phone: phone ?? undefined, email: email ?? undefined },
-        });
-      } else {
-        // Airbnb's hosting messages page never exposes the guest's email, only their phone —
-        // key the upsert on whichever identifier is actually present.
-        existing = email
-          ? await this.prisma.guest.findUnique({ where: { email } })
-          : await this.prisma.guest.findUnique({ where: { phone: phone as string } });
+      const pending: PendingEvent[] = [];
+      const data: { name?: string; phone?: string; email?: string } = {};
 
-        guest = email
-          ? await this.prisma.guest.upsert({
-              where: { email },
-              create: { email, name, phone: phone ?? undefined },
-              update: { name, phone: phone ?? undefined },
-            })
-          : await this.prisma.guest.upsert({
-              where: { phone: phone as string },
-              create: { phone: phone as string, name },
-              update: { name },
-            });
+      const submitted: Record<ContactField, string | null> = { name, phone, email };
+      for (const field of ['name', 'phone', 'email'] as ContactField[]) {
+        const value = submitted[field];
+        if (!value) {
+          continue;
+        }
+        const stored = target ? target[field] : null;
+        if (stored === value) {
+          continue;
+        }
+        if (blanksOnly && stored) {
+          pending.push(this.notApplied(field, stored, value, 'el perfil ya tiene otro valor'));
+          continue;
+        }
+        if (field !== 'name' && (await this.belongsToAnotherGuest(field, value, target?.id))) {
+          pending.push(this.notApplied(field, stored, value, 'pertenece a otro huésped'));
+          continue;
+        }
+        data[field] = value;
       }
+
+      const documentData = document ? this.documentChange(target, document, pending) : {};
+      const consentData =
+        input.marketingConsent && !target?.marketingConsentAt ? { marketingConsentAt: new Date() } : {};
+
+      const guest = target
+        ? await this.prisma.guest.update({
+            where: { id: target.id },
+            data: { ...data, ...documentData, ...consentData },
+          })
+        : await this.prisma.guest.create({
+            // name is always present on SyncInput, so a new guest always gets one even if
+            // every other contact field was dropped above.
+            data: { ...data, name: data.name ?? name, ...documentData, ...consentData },
+          });
 
       await this.prisma.reservation.update({
         where: { id: reservationId },
         data: { guestId: guest.id },
       });
 
-      const stats = await this.prisma.reservation.aggregate({
-        where: { guestId: guest.id },
-        _count: { _all: true },
-        _max: { checkOut: true },
-      });
-
-      await this.prisma.guest.update({
-        where: { id: guest.id },
-        data: { totalStays: stats._count._all, lastStayAt: stats._max.checkOut },
-      });
-
-      if (existing) {
-        await this.recordFieldChanges(guest.id, existing, { name, phone, email }, input.actor);
+      if (target) {
+        await this.recordFieldChanges(guest.id, target, data, input.actor);
+      }
+      for (const event of pending) {
+        await this.guestEventsService.record(
+          guest.id,
+          event.type,
+          event.detail,
+          event.field,
+          event.oldValue,
+          event.newValue,
+          input.actor,
+        );
       }
     } catch (error) {
       this.logger.error(`Guest sync failed for reservation ${reservationId}: ${(error as Error).message}`);
     }
   }
 
-  // Only compares/records a field as changed when this sync's input actually supplies a
-  // value for it — when phone/email is omitted this time, Prisma's `?? undefined` in the
-  // upsert above leaves the stored value untouched, so there is nothing to diff for it.
-  // `name` is always present (required on SyncInput), so it's always compared.
+  // Spec section 4, in order. D = the guest whose documentHash matches, R = the reservation's
+  // currently linked guest.
+  private async resolveByDocument(
+    document: NormalizedDocument,
+    linked: Guest | null,
+    fillBlanksOnly: boolean,
+  ): Promise<Resolution> {
+    const matched = await this.prisma.guest.findUnique({ where: { documentHash: this.documentCrypto.hash(document) } });
+    if (matched) {
+      return { target: matched, blanksOnly: fillBlanksOnly };
+    }
+    if (linked && !linked.documentHash) {
+      // R is this reservation's own profile, just without a document yet.
+      return { target: linked, blanksOnly: false };
+    }
+    // R carries a different document (a different person), or there's no R at all.
+    return { target: null, blanksOnly: false };
+  }
+
+  // No document (imports, staff reservations entered without one): the linked guest, else
+  // the email → phone fallback.
+  private async resolveByContact(linked: Guest | null, email: string | null, phone: string | null): Promise<Resolution> {
+    if (linked) {
+      return { target: linked, blanksOnly: false };
+    }
+    // Airbnb's hosting messages page never exposes the guest's email, only their phone —
+    // look up by whichever identifier is actually present.
+    const found = email
+      ? await this.prisma.guest.findUnique({ where: { email } })
+      : await this.prisma.guest.findUnique({ where: { phone: phone as string } });
+    return { target: found, blanksOnly: false };
+  }
+
+  // Writing a value another guest already holds would hit the unique constraint and fail
+  // the whole sync, so it's dropped and logged instead.
+  private async belongsToAnotherGuest(field: 'phone' | 'email', value: string, guestId?: string): Promise<boolean> {
+    const owner =
+      field === 'email'
+        ? await this.prisma.guest.findUnique({ where: { email: value } })
+        : await this.prisma.guest.findUnique({ where: { phone: value } });
+    return owner !== null && owner.id !== guestId;
+  }
+
+  private notApplied(field: ContactField, stored: string | null, submitted: string, reason: string): PendingEvent {
+    return {
+      type: 'CONTACT_INFO_NOT_APPLIED',
+      detail: `${CONTACT_FIELD_LABELS[field]} no aplicado (${reason}): "${submitted}"`,
+      field,
+      oldValue: stored,
+      newValue: submitted,
+    };
+  }
+
+  // The document columns to write, if they differ from what the target already holds. A
+  // replaced document is logged with masked values only.
+  private documentChange(target: Guest | null, document: NormalizedDocument, pending: PendingEvent[]) {
+    const encoded = this.documentCrypto.encode(document);
+    if (target?.documentHash === encoded.documentHash) {
+      return {};
+    }
+    if (target) {
+      const previous = this.documentCrypto.maskStored(target);
+      const next = this.documentCrypto.mask(document);
+      pending.push({
+        type: 'DOCUMENT_CHANGED',
+        detail: `Documento: ${previous ?? '(vacío)'} → ${next}`,
+        field: 'document',
+        oldValue: previous,
+        newValue: next,
+      });
+    }
+    return encoded;
+  }
+
+  // Only records a field as changed when this sync actually wrote it.
   private async recordFieldChanges(
     guestId: string,
-    existing: GuestSnapshot,
-    next: { name: string; phone: string | null; email: string | null },
+    existing: Guest,
+    written: { name?: string; phone?: string; email?: string },
     actor?: string | null,
   ): Promise<void> {
-    if (existing.name !== next.name) {
+    if (written.name !== undefined) {
       await this.guestEventsService.record(
         guestId,
         'NAME_CHANGED',
-        `Nombre: "${existing.name}" → "${next.name}"`,
+        `Nombre: "${existing.name}" → "${written.name}"`,
         'name',
         existing.name,
-        next.name,
+        written.name,
         actor,
       );
     }
-    if (next.phone !== null && existing.phone !== next.phone) {
+    if (written.phone !== undefined) {
       await this.guestEventsService.record(
         guestId,
         'PHONE_CHANGED',
-        `Teléfono: ${formatPreviousValue(existing.phone)} → "${next.phone}"`,
+        `Teléfono: ${formatPreviousValue(existing.phone)} → "${written.phone}"`,
         'phone',
         existing.phone,
-        next.phone,
+        written.phone,
         actor,
       );
     }
-    if (next.email !== null && existing.email !== next.email) {
+    if (written.email !== undefined) {
       await this.guestEventsService.record(
         guestId,
         'EMAIL_CHANGED',
-        `Email: ${formatPreviousValue(existing.email)} → "${next.email}"`,
+        `Email: ${formatPreviousValue(existing.email)} → "${written.email}"`,
         'email',
         existing.email,
-        next.email,
+        written.email,
         actor,
       );
     }
   }
 
-  findAll() {
-    return this.prisma.guest.findMany({ orderBy: { lastStayAt: 'desc' } });
+  // totalStays/lastStayAt are computed from completed stays on every read. The guest table is
+  // small (one property), so sorting in memory is fine.
+  async findAll(document?: DocumentInput) {
+    const where: Prisma.GuestWhereInput = document
+      ? { documentHash: this.documentCrypto.hash(this.documentCrypto.normalize(document)) }
+      : {};
+    const guests = await this.prisma.guest.findMany({
+      where,
+      include: { reservations: { where: completedStayWhere(new Date()), select: { checkOut: true } } },
+    });
+
+    return guests
+      .map(({ reservations, ...guest }) => ({
+        ...this.documentCrypto.toListView(guest),
+        ...this.stayStats(reservations),
+      }))
+      .sort((a, b) => (b.lastStayAt?.getTime() ?? -Infinity) - (a.lastStayAt?.getTime() ?? -Infinity));
   }
 
   async findOne(id: string) {
@@ -159,22 +287,41 @@ export class GuestsService {
     if (!guest) {
       throw new NotFoundException(`Guest ${id} not found`);
     }
-    return guest;
+    const now = new Date();
+    const completed = guest.reservations.filter((r) => r.status !== 'CANCELLED' && r.checkOut < now);
+    const { reservations, ...rest } = guest;
+    return {
+      ...this.documentCrypto.toDetailView(rest),
+      ...this.stayStats(completed),
+      reservations: reservations.map((r) => this.documentCrypto.toListView(r)),
+    };
   }
 
-  findEligibleForCampaign(filterType: CampaignFilterType, filterMonths?: number) {
-    // Campaigns are email-only — phone-only guests (e.g. Airbnb imports with no scraped
-    // email) have nothing to send to.
-    const where: Prisma.GuestWhereInput = { unsubscribedAt: null, email: { not: null } };
+  private stayStats(completed: { checkOut: Date }[]) {
+    const lastStayAt = completed.reduce<Date | null>(
+      (latest, r) => (latest === null || r.checkOut > latest ? r.checkOut : latest),
+      null,
+    );
+    return { totalStays: completed.length, lastStayAt };
+  }
 
-    if (filterType === 'STAYED_WITHIN_MONTHS') {
-      const cutoff = new Date();
+  // Campaigns are email-only, and only reach guests who opted in at check-in (Ley 25.326).
+  // requireConsent: false exists solely so the campaign preview can say how many otherwise
+  // eligible guests are left out for lack of consent.
+  findEligibleForCampaign(filterType: CampaignFilterType, filterMonths?: number, { requireConsent = true } = {}) {
+    const where: Prisma.GuestWhereInput = {
+      unsubscribedAt: null,
+      email: { not: null },
+      ...(requireConsent ? { marketingConsentAt: { not: null } } : {}),
+    };
+
+    if (filterType === 'STAYED_WITHIN_MONTHS' || filterType === 'NOT_STAYED_WITHIN_MONTHS') {
+      const now = new Date();
+      const cutoff = new Date(now);
       cutoff.setMonth(cutoff.getMonth() - (filterMonths as number));
-      where.lastStayAt = { gte: cutoff };
-    } else if (filterType === 'NOT_STAYED_WITHIN_MONTHS') {
-      const cutoff = new Date();
-      cutoff.setMonth(cutoff.getMonth() - (filterMonths as number));
-      where.OR = [{ lastStayAt: { lt: cutoff } }, { lastStayAt: null }];
+      const recentStay: Prisma.ReservationWhereInput = { ...completedStayWhere(now), checkOut: { lt: now, gte: cutoff } };
+      // NOT_STAYED keeps its meaning: no stay since the cutoff, including never stayed.
+      where.reservations = filterType === 'STAYED_WITHIN_MONTHS' ? { some: recentStay } : { none: recentStay };
     }
 
     return this.prisma.guest.findMany({ where });

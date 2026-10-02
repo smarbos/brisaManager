@@ -202,6 +202,8 @@ const GUEST_EVENT_TYPE_LABELS: Record<string, string> = {
   PHONE_CHANGED: 'Teléfono modificado',
   EMAIL_CHANGED: 'Email modificado',
   UNSUBSCRIBED: 'Se dio de baja',
+  CONTACT_INFO_NOT_APPLIED: 'Dato de contacto no aplicado',
+  DOCUMENT_CHANGED: 'Documento modificado',
 };
 
 export function guestEventTypeLabel(type: string): string {

@@ -31,7 +31,13 @@ export class FileStorageService {
     return readFile(join(this.baseDir, subdir, filename));
   }
 
+  // An already-missing file counts as deleted; any other failure (permissions, I/O) throws,
+  // so a caller like the receipt retention job never records a deletion that didn't happen.
   async delete(subdir: string, filename: string): Promise<void> {
-    await unlink(join(this.baseDir, subdir, filename)).catch(() => {});
+    await unlink(join(this.baseDir, subdir, filename)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    });
   }
 }

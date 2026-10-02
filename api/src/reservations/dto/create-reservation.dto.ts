@@ -2,6 +2,7 @@ import { Transform } from 'class-transformer';
 import {
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -13,6 +14,7 @@ import {
 } from 'class-validator';
 import { ReservationSource } from '@prisma/client';
 import { IsValidPhoneNumber } from '../../common/is-valid-phone-number';
+import type { GuestDocumentType } from '../../guest-documents/guest-documents';
 
 export const GUEST_CONTACT_REQUIRED_MESSAGE = 'Cargá el email o el teléfono del huésped.';
 
@@ -72,4 +74,22 @@ export class CreateReservationDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  // The guest's identity document — optional for staff (required only at guest check-in).
+  // Validated by normalizeDocument in ReservationsService, the same rules as check-in. On
+  // edit, an empty documentNumber clears the reservation's document.
+  @Transform(emptyToNull)
+  @IsOptional()
+  @IsIn(['DNI', 'PASAPORTE'])
+  documentType?: GuestDocumentType | null;
+
+  @Transform(emptyToNull)
+  @IsOptional()
+  @IsString()
+  documentCountry?: string | null;
+
+  @Transform(emptyToNull)
+  @IsOptional()
+  @IsString()
+  documentNumber?: string | null;
 }

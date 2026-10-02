@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listGuests, Guest } from '../api/guests';
+import { listGuests, GuestDocumentSearch, GuestWithDocument } from '../api/guests';
+import { ApiError } from '../api/client';
+import type { DocumentType } from '../reservations/types';
+import { COUNTRIES, documentErrorMessage, formatDocument } from '../lib/document';
 import {
   PageContainer,
   PageHeader,
@@ -12,6 +15,8 @@ import {
   Badge,
   FormField,
   Input,
+  Select,
+  Button,
   tableThClass as thClass,
   tableTdClass as tdClass,
 } from '../ui';
@@ -19,17 +24,50 @@ import { formatDate } from '../lib/date';
 import { shortId } from '../lib/id';
 
 export function GuestListPage() {
-  const [guests, setGuests] = useState<Guest[]>([]);
+  const [guests, setGuests] = useState<GuestWithDocument[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [documentType, setDocumentType] = useState<DocumentType>('DNI');
+  const [documentCountry, setDocumentCountry] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [documentSearch, setDocumentSearch] = useState<GuestDocumentSearch | null>(null);
+  const [documentError, setDocumentError] = useState<string | null>(null);
 
+  // Document search is server-side: the API hashes the full number and matches it exactly
+  // (it never stores the number in plain form, so there's nothing to filter on here).
   useEffect(() => {
-    listGuests()
+    setLoading(true);
+    setDocumentError(null);
+    listGuests(documentSearch ?? undefined)
       .then(setGuests)
-      .catch(() => setError('No se pudieron cargar los huéspedes. Por favor, recargá la página.'))
+      .catch((err) => {
+        if (documentSearch && err instanceof ApiError && err.status === 400) {
+          setDocumentError(documentErrorMessage(err.message));
+        } else {
+          setError('No se pudieron cargar los huéspedes. Por favor, recargá la página.');
+        }
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [documentSearch]);
+
+  function handleDocumentSearch(event: FormEvent) {
+    event.preventDefault();
+    if (!documentNumber.trim()) {
+      setDocumentSearch(null);
+      return;
+    }
+    setDocumentSearch({
+      documentType,
+      document: documentNumber.trim(),
+      ...(documentType === 'PASAPORTE' ? { documentCountry } : {}),
+    });
+  }
+
+  function clearDocumentSearch() {
+    setDocumentNumber('');
+    setDocumentSearch(null);
+  }
 
   const filteredGuests = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -56,10 +94,45 @@ export function GuestListPage() {
             />
           </FormField>
         </div>
+        <form onSubmit={handleDocumentSearch} className="mb-4 flex flex-wrap items-end gap-3">
+          <FormField label="Tipo de documento">
+            <Select value={documentType} onChange={(e) => setDocumentType(e.target.value as DocumentType)}>
+              <option value="DNI">DNI</option>
+              <option value="PASAPORTE">Pasaporte</option>
+            </Select>
+          </FormField>
+          {documentType === 'PASAPORTE' && (
+            <FormField label="País emisor">
+              <Select value={documentCountry} onChange={(e) => setDocumentCountry(e.target.value)}>
+                <option value="">Elegí un país</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          )}
+          <FormField label="Buscar por documento" error={documentError}>
+            <Input
+              value={documentNumber}
+              onChange={(e) => setDocumentNumber(e.target.value)}
+              placeholder="Número completo"
+            />
+          </FormField>
+          <Button type="submit">Buscar</Button>
+          {documentSearch && (
+            <Button type="button" variant="secondary" onClick={clearDocumentSearch}>
+              Ver todos
+            </Button>
+          )}
+        </form>
         {loading ? (
           <LoadingState />
         ) : guests.length === 0 ? (
-          <EmptyState message="Todavía no hay huéspedes registrados." />
+          <EmptyState
+            message={documentSearch ? 'Ningún huésped tiene ese documento.' : 'Todavía no hay huéspedes registrados.'}
+          />
         ) : filteredGuests.length === 0 ? (
           <EmptyState message="No hay huéspedes que coincidan con la búsqueda." />
         ) : (
@@ -70,6 +143,7 @@ export function GuestListPage() {
               <th className={thClass}>Nombre</th>
               <th className={thClass}>Email</th>
               <th className={thClass}>Teléfono</th>
+              <th className={thClass}>Documento</th>
               <th className={thClass}>Estadías totales</th>
               <th className={thClass}>Última estadía</th>
               <th className={thClass}>Estado</th>
@@ -94,6 +168,7 @@ export function GuestListPage() {
                 </td>
                 <td className={tdClass}>{g.email ?? '—'}</td>
                 <td className={tdClass}>{g.phone ?? '—'}</td>
+                <td className={tdClass}>{formatDocument(g)}</td>
                 <td className={tdClass}>{g.totalStays}</td>
                 <td className={tdClass}>{g.lastStayAt ? formatDate(g.lastStayAt) : '—'}</td>
                 <td className={tdClass}>

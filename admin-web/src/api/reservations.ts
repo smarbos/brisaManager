@@ -17,6 +17,9 @@ export function listReservations(filters: ReservationFilters = {}): Promise<Rese
 
 export type ReservationInput = Omit<Reservation, 'id' | 'status' | 'confirmationToken'> & {
   status?: Reservation['status'];
+  // Write-only: the full document number. null clears the document on edit; omitted leaves it
+  // as it is.
+  documentNumber?: string | null;
 };
 
 export function getReservation(id: string): Promise<Reservation> {

@@ -16,6 +16,8 @@ const FIELD_LABELS: Record<string, string> = {
   currency: 'Moneda',
   notes: 'Notas',
   status: 'Estado',
+  // Logged with masked values only (see DocumentCryptoService.mask).
+  document: 'Documento',
 };
 
 export function reservationFieldLabel(field: string): string {

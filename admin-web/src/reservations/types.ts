@@ -12,7 +12,28 @@ export interface WhatsappMessageStatus {
   createdAt?: string;
 }
 
-export interface Reservation {
+export type DocumentType = 'DNI' | 'PASAPORTE';
+
+export interface GuestDocument {
+  type: DocumentType;
+  // ISO 3166-1 alpha-2; always AR for a DNI.
+  country: string;
+  number: string;
+}
+
+// How the API reports a stored identity document: lists only ever get the masked form
+// ("DNI ···678"); detail responses also carry the decrypted `document`.
+export interface DocumentFields {
+  documentType?: DocumentType | null;
+  documentCountry?: string | null;
+  documentMasked?: string | null;
+  // The stored value couldn't be decrypted (wrong key or corrupt data).
+  documentUnreadable?: boolean;
+  // Detail responses only.
+  document?: GuestDocument | null;
+}
+
+export interface Reservation extends DocumentFields {
   id: string;
   guestName: string;
   guestPhone?: string | null;
@@ -43,6 +64,8 @@ export interface Reservation {
   whatsappIssues?: WhatsappMessageStatus[];
   // Detail only: the latest send of each message kind.
   whatsappMessages?: WhatsappMessageStatus[];
+  // Detail only: the linked guest's marketing opt-in date, or null.
+  guestMarketingConsentAt?: string | null;
 }
 
 export interface ReservationEvent {

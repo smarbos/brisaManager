@@ -17,6 +17,7 @@ export function CampaignsPage() {
   const [filterType, setFilterType] = useState<CampaignFilterType | ''>('');
   const [filterMonths, setFilterMonths] = useState('6');
   const [recipientCount, setRecipientCount] = useState<number | null>(null);
+  const [excludedForConsent, setExcludedForConsent] = useState(0);
   const [history, setHistory] = useState<Campaign[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -57,7 +58,10 @@ export function CampaignsPage() {
     previewCampaign(query)
       .then((result) => {
         // Discard the result if a newer selection has superseded this request.
-        if (isCurrent) setRecipientCount(result.recipientCount);
+        if (isCurrent) {
+          setRecipientCount(result.recipientCount);
+          setExcludedForConsent(result.excludedForConsent ?? 0);
+        }
       })
       .catch(() => {
         if (isCurrent) setRecipientCount(null);
@@ -120,6 +124,11 @@ export function CampaignsPage() {
           )}
           {recipientCount !== null && (
             <p className="text-sm text-text-muted">{recipientCount} destinatario(s) coinciden con este filtro.</p>
+          )}
+          {recipientCount !== null && excludedForConsent > 0 && (
+            <p className="text-sm text-text-muted">
+              {excludedForConsent} huésped(es) más quedan afuera porque no aceptaron recibir promociones.
+            </p>
           )}
           <div>
             <Button type="button" loading={sending} disabled={recipientCount === null} onClick={handleSend}>

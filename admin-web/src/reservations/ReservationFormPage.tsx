@@ -19,7 +19,23 @@ import {
 import { getReservationImageBlob, listReservationImages, ReservationImage } from '../api/reservation-images';
 import { listOutboundEmails, OutboundEmail } from '../api/outbound-emails';
 import { OutboundEmailList } from '../emails/OutboundEmailList';
-import { Reservation, ReservationEvent, ReservationSource, ReservationStatus, WhatsappMessageStatus } from './types';
+import {
+  DocumentType,
+  Reservation,
+  ReservationEvent,
+  ReservationSource,
+  ReservationStatus,
+  WhatsappMessageStatus,
+} from './types';
+import {
+  COUNTRIES,
+  DOCUMENT_UNREADABLE_LABEL,
+  documentErrorMessage,
+  documentValidationError,
+  formatDocument,
+  formatMarketingConsent,
+} from '../lib/document';
+import { ApiError } from '../api/client';
 import {
   PageContainer,
   PageHeader,
@@ -50,6 +66,9 @@ const emptyForm = {
   currency: 'ARS',
   status: 'PENDING' as ReservationStatus,
   notes: '',
+  documentType: 'DNI' as DocumentType,
+  documentCountry: '',
+  documentNumber: '',
 };
 
 type ActionKey =
@@ -108,6 +127,8 @@ function ReceiptImage({ reservationId, image }: { reservationId: string; image: 
   const [viewerOpen, setViewerOpen] = useState(false);
 
   useEffect(() => {
+    // Its file is gone (retention job) — the API would 404.
+    if (image.deletedAt) return;
     let objectUrl: string | null = null;
     let cancelled = false;
     getReservationImageBlob(reservationId, image.id)
@@ -121,7 +142,18 @@ function ReceiptImage({ reservationId, image }: { reservationId: string; image: 
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [reservationId, image.id]);
+  }, [reservationId, image.id, image.deletedAt]);
+
+  if (image.deletedAt) {
+    return (
+      <div
+        className="flex h-24 w-24 items-center justify-center rounded border border-dashed border-border bg-bg p-1 text-center text-xs text-text-muted"
+        title={`Eliminado el ${formatDateTime(image.deletedAt)}`}
+      >
+        Comprobante eliminado (política de retención)
+      </div>
+    );
+  }
 
   if (!url) {
     return <div className="h-24 w-24 animate-pulse rounded border border-border bg-bg" />;
@@ -158,6 +190,7 @@ export function ReservationFormPage() {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [documentError, setDocumentError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<ActionKey | null>(null);
@@ -197,6 +230,10 @@ export function ReservationFormPage() {
           checkIn: reservation.checkIn.slice(0, 10),
           checkOut: reservation.checkOut.slice(0, 10),
           totalAmount: Number(reservation.totalAmount),
+          // The detail response carries the decrypted document — shown for editing.
+          documentType: reservation.document?.type ?? reservation.documentType ?? 'DNI',
+          documentCountry: reservation.document?.country ?? '',
+          documentNumber: reservation.document?.number ?? '',
         });
       })
       .catch((err) => {
@@ -380,19 +417,55 @@ export function ReservationFormPage() {
       return;
     }
     setPhoneError(null);
+    // The document is optional for staff, but when entered it follows the check-in rules.
+    const rawDocumentNumber = form.documentNumber.trim();
+    const invalidDocument = rawDocumentNumber
+      ? documentValidationError(form.documentType, form.documentCountry, rawDocumentNumber)
+      : null;
+    if (invalidDocument) {
+      setDocumentError(invalidDocument);
+      return;
+    }
+    setDocumentError(null);
     setError(null);
     setSubmitting(true);
     const guestEmail = rawEmail || null;
     const guestPhone = rawPhone ? parsePhoneNumberFromString(rawPhone, 'AR')!.number : null;
+    // Sent explicitly, never echoed from the detail response: an empty number clears the
+    // document — except when the stored one couldn't be decrypted and staff didn't type a new
+    // one, where it's left untouched rather than wiped.
+    const leaveUnreadableDocument = reservationRecord?.documentUnreadable && !rawDocumentNumber;
+    const {
+      document: _document,
+      documentMasked: _documentMasked,
+      documentUnreadable: _documentUnreadable,
+      ...formFields
+    } = form as typeof form & Pick<Reservation, 'document' | 'documentMasked' | 'documentUnreadable'>;
+    const payload = {
+      ...formFields,
+      guestEmail,
+      guestPhone,
+      ...(leaveUnreadableDocument
+        ? { documentType: undefined, documentCountry: undefined, documentNumber: undefined }
+        : {
+            documentType: form.documentType,
+            documentCountry: form.documentType === 'PASAPORTE' ? form.documentCountry : null,
+            documentNumber: rawDocumentNumber || null,
+          }),
+    };
     try {
       if (isEditing && id) {
-        await updateReservation(id, { ...form, guestEmail, guestPhone });
+        await updateReservation(id, payload);
       } else {
-        await createReservation({ ...form, guestEmail, guestPhone });
+        await createReservation(payload);
       }
       navigate('/');
-    } catch {
-      setError('No se pudo guardar la reserva');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400 && rawDocumentNumber) {
+        setDocumentError(documentErrorMessage(err.message));
+      } else {
+        setError('No se pudo guardar la reserva');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -421,6 +494,18 @@ export function ReservationFormPage() {
               ID de reserva: {shortId(id)}
             </p>
           )}
+          {isEditing && reservationRecord && (
+            <dl className="-mt-1 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="inline text-text-muted">Documento: </dt>
+                <dd className="inline text-text">{formatDocument(reservationRecord)}</dd>
+              </div>
+              <div>
+                <dt className="inline text-text-muted">Promociones: </dt>
+                <dd className="inline text-text">{formatMarketingConsent(reservationRecord.guestMarketingConsentAt)}</dd>
+              </div>
+            </dl>
+          )}
           {overlaps.length > 0 && (
             <Alert>
               <p>Estas fechas se superponen con otra(s) reserva(s):</p>
@@ -443,6 +528,52 @@ export function ReservationFormPage() {
               onChange={(e) => setForm({ ...form, guestEmail: e.target.value })}
             />
           </FormField>
+          <fieldset className="flex flex-col gap-3 rounded-lg border border-border p-3">
+            <legend className="px-1 text-sm font-medium text-text">Documento</legend>
+            {isEditing && reservationRecord?.documentUnreadable && (
+              <Alert>{DOCUMENT_UNREADABLE_LABEL}. Cargalo de nuevo para reemplazarlo.</Alert>
+            )}
+            <FormField label="Tipo de documento">
+              <Select
+                value={form.documentType}
+                onChange={(e) => {
+                  setForm({ ...form, documentType: e.target.value as DocumentType });
+                  setDocumentError(null);
+                }}
+              >
+                <option value="DNI">DNI</option>
+                <option value="PASAPORTE">Pasaporte</option>
+              </Select>
+            </FormField>
+            {form.documentType === 'PASAPORTE' && (
+              <FormField label="País emisor">
+                <Select
+                  value={form.documentCountry}
+                  onChange={(e) => {
+                    setForm({ ...form, documentCountry: e.target.value });
+                    setDocumentError(null);
+                  }}
+                >
+                  <option value="">Elegí un país</option>
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            )}
+            <FormField label="Número de documento" error={documentError}>
+              <Input
+                value={form.documentNumber}
+                onChange={(e) => {
+                  setForm({ ...form, documentNumber: e.target.value });
+                  setDocumentError(null);
+                }}
+                autoComplete="off"
+              />
+            </FormField>
+          </fieldset>
           <FormField label="Teléfono del huésped" error={phoneError}>
             <Input
               type="tel"

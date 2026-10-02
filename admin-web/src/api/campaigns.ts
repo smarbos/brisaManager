@@ -26,7 +26,13 @@ export interface CampaignQuery {
   filterMonths?: number;
 }
 
-export function previewCampaign(query: CampaignQuery): Promise<{ recipientCount: number }> {
+export interface CampaignPreview {
+  recipientCount: number;
+  // Guests the filter would otherwise reach but who never opted in to marketing at check-in.
+  excludedForConsent?: number;
+}
+
+export function previewCampaign(query: CampaignQuery): Promise<CampaignPreview> {
   const params = new URLSearchParams({ templateId: query.templateId, filterType: query.filterType });
   if (query.filterMonths !== undefined) {
     params.set('filterMonths', String(query.filterMonths));

@@ -68,12 +68,14 @@ describe('GuestsController (e2e)', () => {
     expect(response.body.some((g: { email: string }) => g.email === 'e2e-guest-1@example.com')).toBe(true);
   });
 
-  it('records a GuestEvent when an existing guest is re-synced with a different name', async () => {
+  it('recognizes a returning guest by document without letting the form overwrite their profile', async () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    // A's stay already ended (still inside the link's 30-day window); B is in the future.
     const reservationA = await prisma.reservation.create({
       data: {
         guestName: 'Placeholder',
-        checkIn: new Date('2099-03-01'),
-        checkOut: new Date('2099-03-05'),
+        checkIn: new Date(Date.now() - 6 * DAY),
+        checkOut: new Date(Date.now() - 2 * DAY),
         paxCount: 1,
         source: 'DIRECT',
         totalAmount: 50000,
@@ -82,7 +84,7 @@ describe('GuestsController (e2e)', () => {
     });
     const reservationB = await prisma.reservation.create({
       data: {
-        guestName: 'Placeholder',
+        guestName: 'Only A Name',
         checkIn: new Date('2099-04-01'),
         checkOut: new Date('2099-04-05'),
         paxCount: 1,
@@ -95,44 +97,79 @@ describe('GuestsController (e2e)', () => {
     // A phone distinct from public-reservations.e2e-spec.ts's '+54 9 223 555-9999' (same
     // format, different number) — Guest.phone is globally unique, and Jest runs spec files
     // in parallel workers against the same database, so sharing that literal collides here.
+    // Same for the DNI: each e2e file uses its own.
     await request(app.getHttpServer())
       .post(`/public/reservations/${reservationA.confirmationToken}/confirm-dates`)
-      .send({ fullName: 'Jane', phone: '+54 9 223 555-9998', email: 'e2e-guest-history@example.com' })
+      .send({
+        fullName: 'Jane',
+        phone: '+54 9 223 555-9998',
+        email: 'e2e-guest-history@example.com',
+        documentType: 'DNI',
+        documentNumber: '30.111.222',
+      })
       .expect(201);
 
-    // Wait for the first sync's *last* write (totalStays, set after guest upsert, event
-    // recording, and reservation.guestId) so the second confirm-dates call below diffs
-    // against a fully-settled guest row instead of racing the first sync.
-    const guestAfterFirst = await waitFor(() =>
-      prisma.guest
-        .findUnique({ where: { email: 'e2e-guest-history@example.com' } })
-        .then((g) => (g?.totalStays === 1 ? g : null)),
+    // confirm-dates syncs the guest fire-and-forget: wait for the link before the second
+    // check-in, so it sees a settled guest row.
+    const linkedA = await waitFor(() =>
+      prisma.reservation.findUnique({ where: { id: reservationA.id } }).then((r) => (r?.guestId ? r : null)),
     );
 
+    // Same DNI, typed differently, with a different name and email.
     await request(app.getHttpServer())
       .post(`/public/reservations/${reservationB.confirmationToken}/confirm-dates`)
-      .send({ fullName: 'Jane Doe', phone: '+54 9 223 555-9998', email: 'e2e-guest-history@example.com' })
+      .send({
+        fullName: 'Someone Else',
+        phone: '+54 9 223 555-9997',
+        email: 'e2e-guest-other@example.com',
+        documentType: 'DNI',
+        documentNumber: '30111222',
+      })
       .expect(201);
 
-    // Same wait for the second sync's last write, so cleanup below never races an in-flight
-    // background write over the same rows.
-    const guest = await waitFor(() =>
-      prisma.guest.findUnique({ where: { id: guestAfterFirst.id } }).then((g) => (g?.totalStays === 2 ? g : null)),
+    const linkedB = await waitFor(() =>
+      prisma.reservation.findUnique({ where: { id: reservationB.id } }).then((r) => (r?.guestId ? r : null)),
     );
+    expect(linkedB.guestId).toBe(linkedA.guestId);
+
+    const events = await waitFor(() =>
+      prisma.guestEvent
+        .findMany({ where: { guestId: linkedA.guestId as string, type: 'CONTACT_INFO_NOT_APPLIED' } })
+        .then((rows) => (rows.length === 3 ? rows : null)),
+    );
+    expect(events.map((e) => e.field).sort()).toEqual(['email', 'name', 'phone']);
 
     const response = await request(app.getHttpServer())
-      .get(`/guests/${guest.id}/events`)
+      .get(`/guests/${linkedA.guestId}`)
       .set('Authorization', `Bearer ${accessToken}`)
       .expect(200);
 
-    expect(response.body.some((e: { type: string; detail: string }) =>
-      e.type === 'NAME_CHANGED' && e.detail === 'Nombre: "Jane" → "Jane Doe"',
-    )).toBe(true);
+    expect(response.body).toMatchObject({
+      name: 'Jane',
+      phone: '+54 9 223 555-9998',
+      email: 'e2e-guest-history@example.com',
+      document: { type: 'DNI', country: 'AR', number: '30111222' },
+      documentMasked: 'DNI ···222',
+      // Only A's stay has happened.
+      totalStays: 1,
+    });
+    expect(response.body).not.toHaveProperty('documentHash');
+    expect(response.body.reservations).toHaveLength(2);
+    expect(JSON.stringify(response.body.reservations)).not.toContain('30111222');
+
+    // The list carries the masked document only, and search by document finds the guest.
+    const list = await request(app.getHttpServer())
+      .get('/guests')
+      .query({ documentType: 'DNI', document: '30.111.222' })
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+    expect(list.body.map((g: { id: string }) => g.id)).toEqual([linkedA.guestId]);
+    expect(list.text).not.toContain('30111222');
 
     await prisma.reservationEvent.deleteMany({ where: { reservationId: { in: [reservationA.id, reservationB.id] } } });
     await prisma.reservation.deleteMany({ where: { id: { in: [reservationA.id, reservationB.id] } } });
-    await prisma.guestEvent.deleteMany({ where: { guestId: guest.id } });
-    await prisma.guest.delete({ where: { id: guest.id } });
+    await prisma.guestEvent.deleteMany({ where: { guestId: linkedA.guestId as string } });
+    await prisma.guest.delete({ where: { id: linkedA.guestId as string } });
   });
 
   it('gets a single guest with their reservation history', async () => {

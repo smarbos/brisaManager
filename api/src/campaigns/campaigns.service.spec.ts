@@ -38,12 +38,15 @@ describe('CampaignsService', () => {
   });
 
   describe('preview', () => {
-    it('returns the count of eligible guests without sending anything', async () => {
-      guestsService.findEligibleForCampaign.mockResolvedValue([{ id: 'g1' }, { id: 'g2' }]);
+    it('returns the count of eligible guests, and how many lack consent, without sending anything', async () => {
+      guestsService.findEligibleForCampaign
+        .mockResolvedValueOnce([{ id: 'g1' }, { id: 'g2' }])
+        .mockResolvedValueOnce([{ id: 'g1' }, { id: 'g2' }, { id: 'g3' }]);
 
       const result = await service.preview('tpl-1', 'ALL');
 
-      expect(result).toEqual({ recipientCount: 2 });
+      expect(result).toEqual({ recipientCount: 2, excludedForConsent: 1 });
+      expect(guestsService.findEligibleForCampaign).toHaveBeenLastCalledWith('ALL', undefined, { requireConsent: false });
       expect(emailService.sendMarketingEmail).not.toHaveBeenCalled();
     });
   });
