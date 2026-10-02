@@ -30,7 +30,7 @@ even though it's triggered automatically on every push to `main`.
 
 ## 3. Add the environment secrets
 
-Still on that `production` environment's page, add these four secrets:
+Still on that `production` environment's page, add these five secrets:
 
 | Secret           | Value                                                                 |
 | ----------------- | ---------------------------------------------------------------------- |
@@ -38,6 +38,7 @@ Still on that `production` environment's page, add these four secrets:
 | `SSH_USER`        | The user from step 1                                                 |
 | `SSH_PRIVATE_KEY` | The **private** key's contents — see below for where to find it      |
 | `DEPLOY_PATH`      | Absolute path to this repo's checkout on the server, e.g. `/opt/brisaManager` |
+| `SSH_KNOWN_HOSTS` | The server's SSH host key line(s), in `known_hosts` format — see below |
 
 The private key was written locally to:
 
@@ -50,6 +51,29 @@ including the `-----BEGIN ... -----`/`-----END ... -----` lines — into the `SS
 secret. **Delete that file once it's saved in GitHub** (`rm -r` the `deploy-key` directory); it
 only needs to exist on disk long enough for you to copy it out. It was never printed into this
 conversation.
+
+### Getting `SSH_KNOWN_HOSTS` without trusting the network
+
+The workflow refuses to deploy without this secret, and it never runs `ssh-keyscan` itself —
+a scan at deploy time trusts whatever server answers, so `StrictHostKeyChecking=yes` would
+check nothing. Capture the key once, from a source you already trust:
+
+- **Best:** read it on the server itself (DigitalOcean web console, or an SSH session you
+  already trust), then format it with the hostname/IP you put in `SSH_HOST`:
+
+  ```
+  # on the server
+  awk -v h="<SSH_HOST value>" '{print h, $1, $2}' /etc/ssh/ssh_host_ed25519_key.pub
+  ```
+
+- **Or:** if your own machine has connected before, copy its existing entry:
+  `ssh-keygen -F <SSH_HOST value>` (the line after the `# Host ... found` comment), and
+  compare its fingerprint (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the server)
+  before trusting it.
+
+Paste the resulting line into the secret. If the server is rebuilt or its host keys
+regenerated, deploys will fail with `Host key verification failed` until you update the
+secret — that failure is the check doing its job.
 
 ## 4. Verify
 
