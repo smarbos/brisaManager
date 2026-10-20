@@ -16,6 +16,9 @@ ENV VITE_API_URL=$VITE_API_URL
 # context is scoped to ./guest-web, so .git isn't available here to compute it directly.
 ARG VITE_COMMIT_HASH
 ENV VITE_COMMIT_HASH=$VITE_COMMIT_HASH
+# Staff contacts shown on the check-in page — kept in the deploy's .env, not the repo.
+ARG VITE_PROPERTY_CONTACTS
+ENV VITE_PROPERTY_CONTACTS=$VITE_PROPERTY_CONTACTS
 RUN npm run build
 
 FROM nginx:alpine AS prod

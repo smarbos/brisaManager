@@ -57,6 +57,7 @@ services:
     restart: unless-stopped
     environment:
       VITE_API_URL: ${VITE_API_URL}
+      VITE_PROPERTY_CONTACTS: ${VITE_PROPERTY_CONTACTS:-}
     ports:
       - "${GUEST_WEB_PORT}:5174"
     volumes:

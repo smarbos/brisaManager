@@ -2,6 +2,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ComoLlegarTab } from './ComoLlegarTab';
 
+// The real contacts come from VITE_PROPERTY_CONTACTS at build time; tests use fictional ones.
+vi.mock('../propertyInfo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../propertyInfo')>()),
+  PROPERTY_CONTACTS: [
+    { name: 'Ana', phone: '+54 9 223 555-0101' },
+    { name: 'Lucía', phone: '+54 9 223 555-0102' },
+  ],
+}));
+
 describe('ComoLlegarTab', () => {
   it('shows the address, a Maps link, and WhatsApp contacts', () => {
     render(<ComoLlegarTab />);
@@ -11,8 +20,8 @@ describe('ComoLlegarTab', () => {
       'href',
       'https://maps.app.goo.gl/tMMvfWUcGDKKQuQh6',
     );
-    expect(screen.getByText('Johanna')).toBeInTheDocument();
-    expect(screen.getByText('Marta')).toBeInTheDocument();
+    expect(screen.getByText('Ana')).toBeInTheDocument();
+    expect(screen.getByText('Lucía')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /whatsapp/i })[0]).toHaveAttribute(
       'href',
       'https://wa.me/5492235550101',
