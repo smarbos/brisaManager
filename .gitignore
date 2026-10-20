@@ -8,3 +8,14 @@ build/
 .DS_Store
 example_images/
 *.traineddata
+
+# Local env variants (only the committed template is public)
+.env.*
+!.env.example
+
+# Local AI-assistant state and tool artifacts
+.claude/
+compile_commands.json
+
+# Guest uploads (payment receipts) must never be committed
+uploads/

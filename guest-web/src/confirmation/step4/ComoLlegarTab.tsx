@@ -82,31 +82,35 @@ export function ComoLlegarTab() {
         </div>
       </div>
 
-      <h4 className="mt-6 text-xs font-bold uppercase tracking-wide text-text-muted">¿Necesitás ayuda para entrar?</h4>
-      <div className="mt-2 flex flex-col">
-        {PROPERTY_CONTACTS.map((contact) => {
-          const digits = contact.phone.replace(/\D/g, '');
-          return (
-            <div
-              key={contact.name}
-              className="flex items-center justify-between gap-3 border-b border-border py-3 last:border-b-0"
-            >
-              <div>
-                <p className="font-semibold text-heading">{contact.name}</p>
-                <p className="text-sm text-text-muted">{contact.phone}</p>
-              </div>
-              <a
-                href={`https://wa.me/${digits}`}
-                target="_blank"
-                rel="noreferrer"
-                className="min-h-11 shrink-0 rounded-full bg-success-bg px-3 py-2 text-sm font-semibold text-success"
-              >
-                WhatsApp
-              </a>
-            </div>
-          );
-        })}
-      </div>
+      {PROPERTY_CONTACTS.length > 0 && (
+        <>
+          <h4 className="mt-6 text-xs font-bold uppercase tracking-wide text-text-muted">¿Necesitás ayuda para entrar?</h4>
+          <div className="mt-2 flex flex-col">
+            {PROPERTY_CONTACTS.map((contact) => {
+              const digits = contact.phone.replace(/\D/g, '');
+              return (
+                <div
+                  key={contact.name}
+                  className="flex items-center justify-between gap-3 border-b border-border py-3 last:border-b-0"
+                >
+                  <div>
+                    <p className="font-semibold text-heading">{contact.name}</p>
+                    <p className="text-sm text-text-muted">{contact.phone}</p>
+                  </div>
+                  <a
+                    href={`https://wa.me/${digits}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-h-11 shrink-0 rounded-full bg-success-bg px-3 py-2 text-sm font-semibold text-success"
+                  >
+                    WhatsApp
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

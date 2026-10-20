@@ -36,6 +36,11 @@
      build the guest confirmation link it shows staff. Like `VITE_API_URL`, this is baked into
      the admin-web bundle at *build* time, so changing it later also requires rebuilding the
      `admin-web` image (`--build`).
+   - **`VITE_PROPERTY_CONTACTS`:** the staff contacts guests see on the check-in page, as
+     `"Name:+54 9 ...;Other Name:+54 9 ..."`. Real people's phone numbers, so they live only in
+     the server's `.env`, never in the repo. Baked into the guest-web bundle at *build* time —
+     changing it requires rebuilding the `guest-web` image (`--build`). Left unset, the page
+     simply hides the contacts section.
    - **Email:** `RESEND_API_KEY`, `EMAIL_FROM`, `ALERT_EMAIL` — the API uses these to send the
      guest confirmation email and internal alerts via Resend. `EMAIL_FROM`'s domain must be
      verified in Resend before emails will actually send. Every email waits
