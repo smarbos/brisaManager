@@ -1,6 +1,6 @@
 import { IsInt, IsOptional, IsString, MinLength } from 'class-validator';
 
-// Sent by an ambient-control ESP32 device (see /ambient-control in the repo root) when a
+// Sent by an ambient-control ESP32 device (see the brisa-ambient-control repo) when a
 // sensor threshold rule fires — e.g. the sound sensor's repeated-loud-noise check.
 export class LogAmbientAlertDto {
   @IsString()

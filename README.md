@@ -1,5 +1,14 @@
 # La Brisa de Mar del Plata — Reservation Manager
 
+## Related repositories
+
+- [brisa-chrome-extension](https://github.com/smarbos/brisa-chrome-extension) — imports
+  reservation details from the Booking.com extranet and Airbnb host pages into this API
+  (`EXTENSION_API_KEY`).
+- [brisa-ambient-control](https://github.com/smarbos/brisa-ambient-control) — ESP32 firmware
+  for the property's sound/CO/smoke/temperature sensors, reporting to this API
+  (`AMBIENT_API_KEY`).
+
 ## Local development
 
 1. Copy environment variables: `cp .env.example .env` (adjust secrets as needed)
