@@ -422,7 +422,7 @@ model ExtensionErrorLog {
   createdAt        DateTime @default(now())
 }
 
-// Reported by an ambient-control ESP32 device (see /home/smarbos/dev/brisaManager/ambient-control)
+// Reported by an ambient-control ESP32 device (see the brisa-ambient-control repo)
 // whenever a sensor threshold rule fires. Every report lands here regardless of whether it
 // also created a Notification, so this is the full history — Notification (deduped, markable
 // read) is the actionable queue built on top of it.
