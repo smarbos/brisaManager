@@ -13,6 +13,8 @@ import { EmailsPage } from './emails/EmailsPage';
 import { ActivityLogPage } from './activity/ActivityLogPage';
 import { NotificationsPage } from './notifications/NotificationsPage';
 import { SensorsPage } from './sensors/SensorsPage';
+import { TodayPage } from './occupancy/TodayPage';
+import { TimelinePage } from './occupancy/TimelinePage';
 import { AppFooter } from './layout/AppFooter';
 
 export function App() {
@@ -23,6 +25,8 @@ export function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<ReservationListPage />} />
+            <Route path="/today" element={<TodayPage />} />
+            <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/reservations/new" element={<ReservationFormPage />} />
             <Route path="/reservations/:id" element={<ReservationFormPage />} />
             <Route path="/settings" element={<SettingsPage />} />

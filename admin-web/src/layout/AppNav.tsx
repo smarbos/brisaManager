@@ -26,6 +26,21 @@ function CalendarIcon() {
     </svg>
   );
 }
+function TodayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3.5 11 12 4l8.5 7M5.5 9.5V20h13V9.5" />
+      <path d="M10 20v-5h4v5" />
+    </svg>
+  );
+}
+function TimelineIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 5v14M3 8h8M7 12h10M13 16h8" />
+    </svg>
+  );
+}
 function GuestsIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -127,6 +142,8 @@ const groups: NavGroup[] = [
     heading: 'Gestión',
     items: [
       { to: '/', label: 'Reservas', end: true, icon: CalendarIcon },
+      { to: '/today', label: 'Hoy', icon: TodayIcon },
+      { to: '/timeline', label: 'Línea de tiempo', icon: TimelineIcon },
       { to: '/guests', label: 'Huéspedes', icon: GuestsIcon },
     ],
   },
