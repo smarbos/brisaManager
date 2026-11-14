@@ -43,16 +43,25 @@ reservation's `confirmationToken`.
 
 | Name | SID | Variables | Button |
 |---|---|---|---|
-| `checkin_link` | `HX75515c3d86147b823a36c766588c45da` | 1 guestName, 2 checkIn, 3 checkOut, 4 token | "Completar check-in" → `https://reservas.labrisa.com.ar/r/{{4}}` |
-| `reservation_reminder` | `HX70607aae1fe5be825d36018e26ff9095` | 1 guestName, 2 checkIn, 3 checkOut, 4 token | "Ver mi reserva" → `https://reservas.labrisa.com.ar/r/{{4}}` |
-| `deposit_reminder` | `HX1e26678753855e9df9cd58783b4ad771` | 1 guestName, 2 checkIn, 3 token | "Ver datos de pago" → `https://reservas.labrisa.com.ar/r/{{3}}` |
+| `checkin_link_v3` | `HX381a54514edad1df32934b8396d76f18` | 1 guestName, 2 checkIn, 3 checkOut, 4 token | "Realizar check-in" → `https://checkin.labrisa.com.ar/r/{{4}}` |
+| `reservation_reminder_v3` | `HXa05719042bd7eba8aabffe09dcc25168` | 1 guestName, 2 checkIn, 3 checkOut, 4 token | "Ver mi reserva" → `https://checkin.labrisa.com.ar/r/{{4}}` |
+| `deposit_reminder_v3` | `HXa16cbd1afd1f306ef869fc45715d6196` | 1 guestName, 2 checkIn, 3 token | "Ver datos de pago" → `https://checkin.labrisa.com.ar/r/{{3}}` |
+
+History: the original (unsuffixed) templates were submitted before the `+5492236694781`
+WhatsApp Business Account existed and never got past Twilio's `received` status. The `_v2`
+copies were approved on 2026-11-12 but their buttons pointed to `reservas.labrisa.com.ar`,
+which has no DNS record — the guest site is served at `checkin.labrisa.com.ar`. The `_v3`
+copies (submitted 2026-11-12) fix the button domain; nothing else changed. The button's
+domain is baked into the approved template, so moving the guest site to another domain means
+submitting new templates.
 
 Bodies:
-- `checkin_link`: "Hola {{1}}, ¡gracias por reservar en La Brisa de Mar del Plata! Tu estadía
+- `checkin_link_v3`: "Hola {{1}}, ¡gracias por reservar en La Brisa de Mar del Plata! Tu estadía
   del {{2}} al {{3}} ya está registrada. Para completar el check-in, tocá el botón de abajo."
-- `reservation_reminder`: "Hola {{1}}! Te recordamos tu reserva en La Brisa de Mar del Plata
-  del {{2}} al {{3}}. En el link de tu reserva tenés la dirección y cómo llegar."
-- `deposit_reminder`: "Hola {{1}}, todavía no registramos el pago de tu reserva del {{2}}.
+- `reservation_reminder_v3`: "Hola {{1}}! Te recordamos tu reserva en La Brisa de Mar del Plata
+  del {{2}} al {{3}}. En el link de tu reserva tenés la dirección y cómo llegar. Si aún no
+  hiciste el check-in, ¡hacelo!"
+- `deposit_reminder_v3`: "Hola {{1}}, todavía no registramos el pago de tu reserva del {{2}}.
   Encontrás los datos para transferir tocando el botón de abajo."
 
 The deposit reminder links to the guest page's payment step instead of embedding
@@ -69,12 +78,11 @@ New env vars, in `.env.example` and the production `.env` (the API container loa
 via `env_file`, so `docker-compose.prod.yml` needs no change):
 
 ```
-TWILIO_TEMPLATE_CHECKIN_LINK=HX75515c3d86147b823a36c766588c45da
-TWILIO_TEMPLATE_RESERVATION_REMINDER=HX70607aae1fe5be825d36018e26ff9095
-TWILIO_TEMPLATE_DEPOSIT_REMINDER=HX1e26678753855e9df9cd58783b4ad771
+TWILIO_TEMPLATE_CHECKIN_LINK=HX381a54514edad1df32934b8396d76f18
+TWILIO_TEMPLATE_RESERVATION_REMINDER=HXa05719042bd7eba8aabffe09dcc25168
+TWILIO_TEMPLATE_DEPOSIT_REMINDER=HXa16cbd1afd1f306ef869fc45715d6196
+TWILIO_WHATSAPP_FROM=whatsapp:+5492236694781
 ```
-
-`TWILIO_WHATSAPP_FROM` changes to `whatsapp:+54…` (the approved number) once it's live.
 
 Template IDs live in env vars, not Settings: they change rarely, each change needs Meta
 approval anyway, and a wrong ID pasted into Settings would silently stop all sending.

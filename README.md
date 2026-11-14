@@ -41,7 +41,7 @@
      value at *build* time into the admin-web bundle, so it is passed as a build arg; changing
      it later requires rebuilding the `admin-web` image (`--build`).
    - **`VITE_GUEST_WEB_URL`:** must be the real public guest-web origin, e.g.
-     `https://reservas.labrisa.com.ar` — **not** `http://localhost:5174`. Admin-web uses it to
+     `https://checkin.labrisa.com.ar` — **not** `http://localhost:5174`. Admin-web uses it to
      build the guest confirmation link it shows staff. Like `VITE_API_URL`, this is baked into
      the admin-web bundle at *build* time, so changing it later also requires rebuilding the
      `admin-web` image (`--build`).
@@ -75,7 +75,7 @@
      WhatsApp then silently drops — the reservation still shows it as sent. The wording lives in
      Twilio; changing it means submitting a new template for approval and updating the SID here.
    - **CORS origins:** `ADMIN_WEB_ORIGIN=https://admin.labrisa.com.ar` and
-     `GUEST_WEB_ORIGIN=https://reservas.labrisa.com.ar` — the API rejects browser requests from
+     `GUEST_WEB_ORIGIN=https://checkin.labrisa.com.ar` — the API rejects browser requests from
      any other origin, so localhost defaults will break the deployed admin app. `GUEST_WEB_ORIGIN`
      serves double duty: besides being a CORS-allowed origin, it's also the base URL the API
      embeds in the initial confirmation email sent to guests — left at its localhost default,
@@ -84,7 +84,7 @@
      (whatever `API_DOMAIN` resolves to). The API embeds it in the unsubscribe link appended to
      every marketing email — left at its localhost default, every campaign email ships a broken
      unsubscribe link, silently, with the campaign still recorded as sent.
-2. Point DNS A records for `admin.labrisa.com.ar`, `reservas.labrisa.com.ar`, and `api.labrisa.com.ar` at the server's IP
+2. Point DNS A records for `admin.labrisa.com.ar`, `checkin.labrisa.com.ar`, and `api.labrisa.com.ar` at the server's IP
 3. Start: `VITE_COMMIT_HASH=$(git rev-parse --short HEAD) docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`
    (the GitHub Actions deploy workflow sets `VITE_COMMIT_HASH` automatically — only needed by hand for a manual deploy. It's baked into guest-web's footer so staff can identify exactly which build a guest is looking at.)
 4. Run migrations and seed as above, using the same `docker compose -f ... exec` commands
