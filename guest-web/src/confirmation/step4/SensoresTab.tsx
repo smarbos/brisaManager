@@ -15,6 +15,7 @@ const AMBIENT_SENSOR_LABELS: Record<string, string> = {
 const AMBIENT_SENSOR_UNITS: Record<string, string> = {
   temperature: '°C',
   humidity: '%',
+  sound: 'dB',
 };
 
 // The gauge has no natural symmetric range for these sensors (a single "don't cross this"

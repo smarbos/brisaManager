@@ -14,11 +14,11 @@ import { ambientSensorLabel } from '../lib/labels';
 // window here doesn't hide anything meaningful.
 const REFRESH_POLL_MS = 30_000;
 
-// Real, calibrated units — only for the two sensors that actually have them (DHT22 is a real
-// digital temp/humidity sensor). sound/co/smoke are uncalibrated raw ADC counts (see
-// ambient-control's README "Note on MQ-7/MQ-2 accuracy") — showing a fake unit like "ppm" or
-// "dB" for those would misrepresent them as calibrated measurements, so they stay unitless.
-const SENSOR_UNITS: Record<string, string> = { temperature: '°C', humidity: '%' };
+// Real units — only for sensors that actually have them: the DHT22 (temperature/humidity) and
+// the INMP441 mic, whose fixed sensitivity gives an approximate dB SPL. co/smoke are
+// uncalibrated raw ADC counts (see ambient-control's README "Note on MQ-7/MQ-2 accuracy") —
+// showing a fake unit like "ppm" for those would misrepresent them, so they stay unitless.
+const SENSOR_UNITS: Record<string, string> = { temperature: '°C', humidity: '%', sound: 'dB' };
 
 // co/smoke crossing their threshold is a real safety concern (danger); sound crossing its
 // threshold just means "loud right now" (warning) — matches the severity ambient-control's
