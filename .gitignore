@@ -19,3 +19,8 @@ compile_commands.json
 
 # Guest uploads (payment receipts) must never be committed
 uploads/
+
+# Private working notes, kept out of the public repo (removed from its history too).
+TODO.md
+DEMO.md
+TODO_PUBLIC_RELEASE.md
