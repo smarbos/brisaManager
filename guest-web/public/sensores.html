@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="es">
+<!-- Public page about the ambient sensors, served at /sensores (see nginx.conf). Static on
+     purpose: no scripts, so it also works with the strict CSP and without the React app.
+     The device's own code and docs: github.com/smarbos/brisa-ambient-control -->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sensores de La Brisa</title>
+<meta name="description" content="Qué mide el aparato de sensores de La Brisa, qué no hace, qué datos envía y dónde está su código.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one calm reading column, like a printed notice. The summary sits first; the microphone
+   diagram is the one visual moment, because "it only measures volume" is the point of the page. */
+:root {
+  --bg: #F1EDE3;          /* sand, from guest-web */
+  --surface: #ffffff;
+  --ink: #1C2B30;
+  --muted: #4B5D62;
+  --line: #DCD5C3;
+  --accent: #2C4E52;      /* La Brisa teal */
+  --zone: #D6E6E3;
+  --driftwood: #B0824F;
+  --ok: #3F6B44;
+  --code-bg: #1C2B30;
+  --code-ink: #E9E4D8;
+  --f-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --f-body: "Work Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #12191B; --surface: #1A2427; --ink: #E9E4D8; --muted: #A6B3B5; --line: #2D3B3E;
+    --accent: #8FBCB7; --zone: #1F3437; --driftwood: #D3A878; --ok: #8DBA90;
+    --code-bg: #0C1214; --code-ink: #E9E4D8;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #12191B; --surface: #1A2427; --ink: #E9E4D8; --muted: #A6B3B5; --line: #2D3B3E;
+  --accent: #8FBCB7; --zone: #1F3437; --driftwood: #D3A878; --ok: #8DBA90;
+  --code-bg: #0C1214; --code-ink: #E9E4D8;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg); color: var(--ink);
+  font: 17px/1.65 var(--f-body);
+  padding-block: 40px 64px;
+  padding-left: max(18px, env(safe-area-inset-left, 0px));
+  padding-right: max(18px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 720px; margin: 0 auto; display: grid; gap: 56px; }
+section { display: grid; gap: 16px; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+p { margin: 0; max-width: 64ch; }
+.eyebrow { font: 600 13px/1 var(--f-body); letter-spacing: .12em; text-transform: uppercase; color: var(--driftwood); }
+h1 { font: 600 clamp(34px, 6vw, 52px)/1.08 var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h2 { font: 600 clamp(24px, 3.6vw, 30px)/1.2 var(--f-display); margin: 0; text-wrap: balance; }
+h3 { font: 600 17px/1.3 var(--f-body); margin: 0; }
+.lede { font-size: 19px; color: var(--muted); }
+header { display: grid; gap: 14px; }
+
+/* summary: the four promises */
+.promises { list-style: none; margin: 0; padding: 22px 24px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; display: grid; gap: 14px; }
+.promises li { display: grid; grid-template-columns: 26px 1fr; gap: 12px; align-items: start; }
+.promises b { display: block; }
+.promises span { color: var(--muted); }
+.tick { width: 22px; height: 22px; border-radius: 50%; background: var(--ok); margin-top: 3px; position: relative; }
+.tick::after { content: ""; position: absolute; left: 7.5px; top: 4px; width: 5px; height: 10px;
+  border: solid var(--surface); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+
+/* parts list */
+.parts { margin: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.parts div { display: grid; grid-template-columns: minmax(130px, 34%) 1fr; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.parts dt { font-weight: 600; }
+.parts dd { margin: 0; color: var(--muted); }
+.parts .no dt { color: var(--muted); font-weight: 500; }
+@media (max-width: 520px) { .parts div { grid-template-columns: 1fr; gap: 2px; } }
+
+/* microphone flow */
+.flow { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; counter-reset: step; }
+.flow li { background: var(--zone); border-radius: 10px; padding: 16px 14px 14px; display: grid; gap: 6px; align-content: start; position: relative; }
+.flow li::before { counter-increment: step; content: counter(step); font: 500 12px/1 var(--f-mono); color: var(--accent); }
+.flow li:not(:last-child)::after { content: ""; position: absolute; right: -9px; top: 50%; width: 8px; height: 8px;
+  border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); transform: translateY(-50%) rotate(45deg); z-index: 1; }
+.flow strong { font: 600 18px/1.25 var(--f-display); }
+.flow span { font-size: 14px; color: var(--muted); line-height: 1.45; }
+.flow .big { font: 500 26px/1 var(--f-mono); color: var(--accent); }
+.flow li.gone { background: transparent; border: 1.5px dashed var(--line); }
+@media (max-width: 640px) {
+  .flow { grid-template-columns: 1fr 1fr; }
+  .flow li:nth-child(2)::after { display: none; }
+}
+.cando { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cando > div { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; background: var(--surface); }
+.cando ul { margin: 0; padding-left: 18px; color: var(--muted); display: grid; gap: 4px; }
+@media (max-width: 560px) { .cando { grid-template-columns: 1fr; } }
+
+/* the literal message */
+.code { background: var(--code-bg); color: var(--code-ink); border-radius: 10px; padding: 18px 20px; overflow-x: auto;
+  font: 14px/1.6 var(--f-mono); margin: 0; }
+.code .k { color: #9CC8C2; }
+.code .n { color: #E2B985; }
+.code .c { color: #8A9A9C; }
+.note { font-size: 14px; color: var(--muted); }
+
+.rules { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+.rules li { display: grid; gap: 4px; padding-left: 16px; border-left: 3px solid var(--zone); }
+.rules p { color: var(--muted); }
+
+.links { display: grid; gap: 12px; }
+.repo { display: grid; gap: 4px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-decoration: none; color: inherit; }
+.repo:hover { border-color: var(--accent); }
+.repo b { color: var(--accent); font: 500 15px/1.4 var(--f-mono); word-break: break-word; }
+.repo span { color: var(--muted); font-size: 15px; }
+code { font: 0.88em var(--f-mono); background: var(--zone); padding: 1px 5px; border-radius: 4px; }
+
+details { border-top: 1px solid var(--line); padding: 14px 0; }
+details:last-child { border-bottom: 1px solid var(--line); }
+summary { cursor: pointer; font-weight: 600; list-style-position: outside; }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+details p { margin-top: 8px; color: var(--muted); }
+
+footer { border-top: 1px solid var(--line); padding-top: 20px; display: grid; gap: 6px; font-size: 15px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">La Brisa · Sensores ambientales</div>
+    <h1>Qué mide el aparato que ves en este espacio</h1>
+    <p class="lede">En La Brisa usamos un pequeño aparato para cuidar la convivencia y la seguridad. Mide el volumen del ruido, el humo, el monóxido de carbono, la temperatura y la humedad. Acá te contamos qué hay adentro, qué hace, qué no hace y dónde podés leer su código.</p>
+  </header>
+
+  <section aria-labelledby="resumen">
+    <h2 id="resumen">En resumen</h2>
+    <ul class="promises">
+      <li><i class="tick" aria-hidden="true"></i><div><b>No graba sonido ni escucha conversaciones.</b><span>El micrófono solo mide qué tan fuerte es el ruido, como el medidor de volumen de un equipo de música.</span></div></li>
+      <li><i class="tick" aria-hidden="true"></i><div><b>No tiene cámara y no identifica a nadie.</b><span>No sabe quién está en el lugar ni cuántas personas hay.</span></div></li>
+      <li><i class="tick" aria-hidden="true"></i><div><b>Solo envía números.</b><span>Volumen en decibeles, niveles de humo y monóxido de carbono, temperatura y humedad.</span></div></li>
+      <li><i class="tick" aria-hidden="true"></i><div><b>El código es público.</b><span>Cualquier persona puede leer exactamente qué hace el programa.</span></div></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="adentro">
+    <h2 id="adentro">Qué hay adentro</h2>
+    <dl class="parts">
+      <div><dt>ESP32</dt><dd>Una pequeña computadora con WiFi. Hace los cálculos y envía los resultados.</dd></div>
+      <div><dt>Micrófono INMP441</dt><dd>Mide el volumen del ruido. Se explica en detalle más abajo.</dd></div>
+      <div><dt>Sensor MQ-2</dt><dd>Detecta humo y gases combustibles.</dd></div>
+      <div><dt>Sensor MQ-7</dt><dd>Detecta monóxido de carbono (CO), un gas tóxico que no tiene olor.</dd></div>
+      <div><dt>Sensor DHT22</dt><dd>Mide la temperatura y la humedad del ambiente.</dd></div>
+      <div><dt>Alarma</dt><dd>Un zumbador que suena solo si el humo o el CO llegan a un nivel muy alto durante más de un minuto.</dd></div>
+      <div class="no"><dt>No tiene</dt><dd>Cámara, parlante para reproducir sonido, ni tarjeta de memoria.</dd></div>
+    </dl>
+  </section>
+
+  <section aria-labelledby="ruido">
+    <h2 id="ruido">Cómo mide el ruido</h2>
+    <p>Diez veces por segundo, el aparato hace esto:</p>
+    <ol class="flow">
+      <li><strong>Escucha 50 milésimas de segundo</strong><span>Menos que lo que dura una sílaba.</span></li>
+      <li><strong>Calcula el volumen</strong><span>Qué tan fuerte fue el sonido en ese instante.</span></li>
+      <li><span class="big">64 dB</span><span>Queda un solo número, el volumen en decibeles.</span></li>
+      <li class="gone"><strong>Descarta el sonido</strong><span>La muestra siguiente se escribe encima. Nunca se guarda.</span></li>
+    </ol>
+    <p>En ningún momento se guarda ni se envía una grabación. Lo único que sale del aparato es el número.</p>
+    <div class="cando">
+      <div><h3>Lo que puede saber</h3><ul><li>Si hay ruido fuerte, como música alta o gritos.</li><li>Cuánto dura ese ruido.</li></ul></div>
+      <div><h3>Lo que no puede saber</h3><ul><li>Qué se dice.</li><li>Quién habla.</li><li>Qué música suena.</li></ul></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="envia">
+    <h2 id="envia">Qué datos envía</h2>
+    <p>Cada 5 minutos, el aparato envía a nuestro servidor (<code>api.labrisa.com.ar</code>), por una conexión cifrada, un mensaje como este. Es el mensaje completo; no hay nada más.</p>
+<pre class="code" tabindex="0" aria-label="Ejemplo del mensaje que envía el aparato"><span class="c">// ejemplo con valores ilustrativos</span>
+{
+  <span class="k">"deviceId"</span>: "ambient-control-living-room",
+  <span class="k">"deviceName"</span>: "Living room",
+  <span class="k">"readings"</span>: [
+    { <span class="k">"sensor"</span>: "sound",       <span class="k">"level"</span>: <span class="n">48</span>,   <span class="k">"threshold"</span>: <span class="n">70</span> },
+    { <span class="k">"sensor"</span>: "co",          <span class="k">"level"</span>: <span class="n">1240</span>, <span class="k">"threshold"</span>: <span class="n">2500</span> },
+    { <span class="k">"sensor"</span>: "smoke",       <span class="k">"level"</span>: <span class="n">2580</span>, <span class="k">"threshold"</span>: <span class="n">3200</span> },
+    { <span class="k">"sensor"</span>: "temperature", <span class="k">"level"</span>: <span class="n">23</span> },
+    { <span class="k">"sensor"</span>: "humidity",    <span class="k">"level"</span>: <span class="n">55</span> }
+  ]
+}</pre>
+    <p class="note">«sound» es el volumen promedio de esos 5 minutos, en decibeles. «co» y «smoke» son lecturas del sensor sin unidad, que se comparan con su umbral («threshold»). La temperatura va en grados y la humedad en porcentaje.</p>
+    <p>Si detecta algo fuera de lo normal, envía además un aviso con el sensor, el nivel medido y una frase corta, por ejemplo <code>5 loud events within 30000ms</code> («5 ruidos fuertes en 30 segundos»).</p>
+  </section>
+
+  <section aria-labelledby="avisa">
+    <h2 id="avisa">Cuándo avisa</h2>
+    <ul class="rules">
+      <li><h3>Ruido</h3><p>Un ruido cuenta como fuerte cuando supera el umbral del lugar (unos 10 dB por encima del silencio normal del espacio) durante al menos un cuarto de segundo, así que un golpe o un aplauso aislado no cuentan. Hay aviso cuando se juntan 5 ruidos fuertes en 30 segundos, o con unos 20 segundos seguidos de ruido fuerte, como música alta.</p><p>El aviso queda registrado a cualquier hora, pero a la administración solo le llega en los horarios de descanso que configura La Brisa.</p></li>
+      <li><h3>Humo</h3><p>Avisa apenas el nivel supera su umbral.</p></li>
+      <li><h3>Monóxido de carbono</h3><p>Avisa si el nivel se mantiene alto durante un minuto, para no reaccionar a una lectura suelta.</p></li>
+      <li><h3>Emergencia</h3><p>Si el humo o el CO llegan a un nivel mucho más alto y se mantienen así un minuto, además suena la alarma del aparato. Se apaga sola cuando el nivel baja.</p></li>
+      <li><h3>Temperatura y humedad</h3><p>Solo se informan. No generan avisos.</p></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="quien">
+    <h2 id="quien">Quién lo ve y cuánto tiempo se guarda</h2>
+    <ul class="rules">
+      <li><h3>Solo el personal de La Brisa</h3><p>Los datos se ven en el panel de administración, que pide usuario y contraseña. Quedan en nuestro servidor y no se envían a ningún otro servicio.</p></li>
+      <li><h3>Mediciones: solo la última</h3><p>Cada medición nueva reemplaza a la anterior. No se arma un historial del volumen.</p></li>
+      <li><h3>Avisos: se guardan</h3><p>De cada aviso quedan la fecha y la hora, el sensor y el nivel medido. Por ahora este historial no se borra automáticamente.</p></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="codigo">
+    <h2 id="codigo">El código es público</h2>
+    <p>Todo el programa está publicado con licencia libre GPL-3.0, para que cualquier persona pueda revisar que hace lo que dice esta página.</p>
+    <div class="links">
+      <a class="repo" href="https://github.com/smarbos/brisa-ambient-control"><b>github.com/smarbos/brisa-ambient-control</b><span>El programa del aparato, el diseño de la placa y de la caja. La medición del ruido está en la función <code>readSoundLevel()</code>, dentro de <code>src/main.cpp</code>.</span></a>
+      <a class="repo" href="https://github.com/smarbos/brisaManager/tree/main/api/src/ambient"><b>github.com/smarbos/brisaManager · api/src/ambient</b><span>La parte del servidor que recibe y guarda los datos.</span></a>
+    </div>
+    <p>El aparato no se actualiza por WiFi. Para cambiar su programa hay que abrir la caja y conectarle un cable.</p>
+  </section>
+
+  <section aria-labelledby="preguntas">
+    <h2 id="preguntas">Preguntas</h2>
+    <div>
+      <details><summary>¿Puedo ver los valores de las mediciones?</summary><p>Sí. En el link de check-in que recibiste al hacer tu reserva vas a encontrar la pestaña «Sensores», con las últimas mediciones de volumen, humo, monóxido de carbono, temperatura y humedad. Se actualizan cada 5 minutos. La pestaña aparece una vez que completaste el check-in, desde el día de llegada hasta el día de salida inclusive.</p></details>
+      <details><summary>¿Se puede activar a distancia para grabar?</summary><p>No. El programa no tiene ninguna función para grabar ni para enviar sonido. La única orden que el aparato acepta a distancia es hacer sonar la alarma un segundo, para probar que funciona.</p></details>
+      <details><summary>¿Reemplaza a un detector de humo o de monóxido de carbono?</summary><p>No. Es un aparato de monitoreo, no un detector certificado. Sus lecturas de gas son aproximadas y sirven para avisar a tiempo, no para reemplazar a un detector homologado.</p></details>
+      <details><summary>¿Qué tan exacto es el volumen?</summary><p>Es una medición aproximada, de alrededor de 1 dB de diferencia entre un aparato y otro. Alcanza para distinguir una conversación (unos 60 dB) de música alta (80 dB o más), que es lo que importa para la convivencia.</p></details>    </div>
+  </section>
+
+  <footer>
+    <p>¿Tenés dudas sobre este aparato? Escribinos a <a href="mailto:contacto@labrisa.com.ar">contacto@labrisa.com.ar</a>.</p>
+    <p>La Brisa · Última actualización: noviembre de 2026</p>
+  </footer>
+</main>
+</body>
+</html>

@@ -69,6 +69,12 @@ function SensorCard({ reading }: { reading: AmbientDeviceReadingEntry }) {
   );
 }
 
+const ABOUT_SENSORS_LINK = (
+  <a href="/sensores" className="mt-1 inline-block text-sm text-accent underline underline-offset-2">
+    Qué mide este aparato y qué no
+  </a>
+);
+
 export function SensoresTab({ token }: { token: string }) {
   const [devices, setDevices] = useState<AmbientDeviceEntry[] | null>(null);
 
@@ -83,6 +89,7 @@ export function SensoresTab({ token }: { token: string }) {
       <div>
         <h3 className="font-heading text-lg font-semibold text-heading">Sensores de ambiente</h3>
         <p className="mt-1 text-sm text-text-muted">Todavía no hay datos de los sensores disponibles.</p>
+        {ABOUT_SENSORS_LINK}
       </div>
     );
   }
@@ -91,6 +98,7 @@ export function SensoresTab({ token }: { token: string }) {
     <div>
       <h3 className="font-heading text-lg font-semibold text-heading">Sensores de ambiente</h3>
       <p className="mt-1 text-sm text-text-muted">Cómo está el departamento en este momento.</p>
+      {ABOUT_SENSORS_LINK}
 
       {devices.map((device) => (
         <div key={device.id} className="mt-4">

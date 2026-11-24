@@ -57,6 +57,29 @@ describe('SensoresTab', () => {
     expect(screen.queryByText('Alto')).not.toBeInTheDocument();
   });
 
+  it('links to the public page about the sensors, with readings and without', async () => {
+    vi.spyOn(ambientApi, 'getAmbientReadings').mockResolvedValue([
+      {
+        id: 'dev-1',
+        name: 'Living room',
+        online: true,
+        lastSeenAt: '2026-09-27T12:00:00.000Z',
+        readings: [{ id: 'r-1', sensor: 'sound', level: 48, threshold: 70, updatedAt: '2026-09-27T12:00:00.000Z' }],
+      },
+    ]);
+    const { unmount } = render(<SensoresTab token="tok-1" />);
+    expect(await screen.findByRole('link', { name: 'Qué mide este aparato y qué no' })).toHaveAttribute(
+      'href',
+      '/sensores',
+    );
+    unmount();
+
+    vi.spyOn(ambientApi, 'getAmbientReadings').mockResolvedValue([]);
+    render(<SensoresTab token="tok-1" />);
+    expect(await screen.findByText('Todavía no hay datos de los sensores disponibles.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Qué mide este aparato y qué no' })).toHaveAttribute('href', '/sensores');
+  });
+
   it('shows an empty-state message when there are no devices', async () => {
     vi.spyOn(ambientApi, 'getAmbientReadings').mockResolvedValue([]);
 
