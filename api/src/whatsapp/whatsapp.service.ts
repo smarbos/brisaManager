@@ -75,10 +75,23 @@ export class WhatsappService {
     rawPhone: string,
     content: { body: string } | { contentSid: string; contentVariables: string },
   ): Promise<WhatsappSendOutcome> {
-    const to = normalizePhoneForWhatsapp(rawPhone);
-    if (!to) {
+    const guestAddress = normalizePhoneForWhatsapp(rawPhone);
+    if (!guestAddress) {
       this.logger.warn(`Could not normalize phone number for WhatsApp: ${rawPhone}`);
       return { accepted: false, errorCode: null, errorMessage: 'Teléfono inválido para WhatsApp' };
+    }
+
+    // Debug mode must never reach a real guest: everything goes to WHATSAPP_DEBUG_RECIPIENT, and
+    // without a usable one nothing is sent. There's no hardcoded fallback number, unlike email.
+    const debugMode = process.env.DEBUG_MODE === 'true';
+    const to = debugMode ? normalizePhoneForWhatsapp(process.env.WHATSAPP_DEBUG_RECIPIENT ?? '') : guestAddress;
+    if (!to) {
+      this.logger.warn('Debug mode is on without a valid WHATSAPP_DEBUG_RECIPIENT: WhatsApp message not sent.');
+      return {
+        accepted: false,
+        errorCode: null,
+        errorMessage: 'Modo debug: no se envió (falta un WHATSAPP_DEBUG_RECIPIENT válido)',
+      };
     }
 
     const client = this.getClient();

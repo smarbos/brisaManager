@@ -8,16 +8,18 @@ import { WhatsappService } from './whatsapp.service';
 describe('WhatsappService', () => {
   let service: WhatsappService;
   let deliveryService: { recordSend: jest.Mock };
-  const originalApiOrigin = process.env.API_ORIGIN;
+  const originalEnv = process.env;
 
-  afterAll(() => {
-    process.env.API_ORIGIN = originalApiOrigin;
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   beforeEach(() => {
     createMock.mockReset();
     mockTwilioConstructor.mockClear();
     mockTwilioConstructor.mockImplementation(() => ({ messages: { create: createMock } }));
+    process.env = { ...originalEnv, DEBUG_MODE: 'false' };
+    delete process.env.WHATSAPP_DEBUG_RECIPIENT;
     process.env.TWILIO_ACCOUNT_SID = 'ACtest';
     process.env.TWILIO_AUTH_TOKEN = 'test-token';
     process.env.TWILIO_WHATSAPP_FROM = 'whatsapp:+14155238886';
@@ -181,6 +183,58 @@ describe('WhatsappService', () => {
       await service.sendMessage('+5491122334455', 'Hola!', context);
 
       expect(createMock.mock.calls[0][0]).not.toHaveProperty('statusCallback');
+    });
+  });
+
+  describe('debug mode', () => {
+    const context = { reservationId: 'res-1', kind: 'CHECKIN_LINK' as const };
+    const message = { templateSid: 'HX123', variables: { '1': 'María' }, fallbackBody: 'Hola María' };
+
+    beforeEach(() => {
+      process.env.DEBUG_MODE = 'true';
+      createMock.mockResolvedValue({ sid: 'SM123', status: 'queued' });
+    });
+
+    it('sends to WHATSAPP_DEBUG_RECIPIENT instead of the guest', async () => {
+      process.env.WHATSAPP_DEBUG_RECIPIENT = '+54 9 223 555-0101';
+
+      const result = await service.sendTemplate('+5491122334455', message, context);
+
+      expect(result).toBe(true);
+      expect(createMock).toHaveBeenCalledTimes(1);
+      expect(createMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'whatsapp:+5492235550101' }));
+    });
+
+    it.each([undefined, '', 'not a phone'])('sends nothing when the debug recipient is %p', async (recipient) => {
+      if (recipient !== undefined) process.env.WHATSAPP_DEBUG_RECIPIENT = recipient;
+
+      const result = await service.sendTemplate('+5491122334455', message, context);
+
+      expect(result).toBe(false);
+      expect(createMock).not.toHaveBeenCalled();
+      expect(deliveryService.recordSend).toHaveBeenCalledWith(context, {
+        accepted: false,
+        errorCode: null,
+        errorMessage: expect.stringContaining('Modo debug'),
+      });
+    });
+
+    it('still rejects an invalid guest phone', async () => {
+      process.env.WHATSAPP_DEBUG_RECIPIENT = '+54 9 223 555-0101';
+
+      const result = await service.sendTemplate('not a phone number', message, context);
+
+      expect(result).toBe(false);
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('ignores the debug recipient when debug mode is off', async () => {
+      process.env.DEBUG_MODE = 'false';
+      process.env.WHATSAPP_DEBUG_RECIPIENT = '+54 9 223 555-0101';
+
+      await service.sendTemplate('+5491122334455', message, context);
+
+      expect(createMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'whatsapp:+5491122334455' }));
     });
   });
 });
