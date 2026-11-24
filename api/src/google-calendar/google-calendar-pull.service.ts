@@ -3,9 +3,18 @@ import { calendar_v3 } from '@googleapis/calendar';
 import { GoogleCalendarAuthService } from './google-calendar-auth.service';
 import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { STATUS_TAGS } from './google-calendar-push.service';
 
-function stripSourceSuffix(title: string): string {
-  return title.replace(/\s*\([^)]*\)\s*$/, '').trim();
+const STATUS_TAG_PREFIXES = new RegExp(`^(?:\\s*\\[(?:${Object.values(STATUS_TAGS).join('|')})\\])+`);
+
+// Undoes the title GoogleCalendarPushService writes, "[<status>] <guest> (<channel>)". Several
+// tags in a row are all removed: before this, each pull saved the tag into the guest's name.
+// Any other bracketed text was typed by staff and is kept.
+function guestNameFromTitle(title: string): string {
+  return title
+    .replace(STATUS_TAG_PREFIXES, '')
+    .replace(/\s*\([^)]*\)\s*$/, '')
+    .trim();
 }
 
 function eventDate(dateTime?: calendar_v3.Schema$EventDateTime | null): Date | null {
@@ -103,7 +112,7 @@ export class GoogleCalendarPullService {
     if (!checkIn || !checkOut || !event.summary) {
       return null;
     }
-    return { checkIn, checkOut, guestName: stripSourceSuffix(event.summary) };
+    return { checkIn, checkOut, guestName: guestNameFromTitle(event.summary) };
   }
 
   private async applyEvent(event: calendar_v3.Schema$Event): Promise<void> {

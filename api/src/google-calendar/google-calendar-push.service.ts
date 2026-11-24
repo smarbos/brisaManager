@@ -27,6 +27,15 @@ const STATUS_COLOR_IDS: Record<Reservation['status'], string> = {
   COMPLETED: '8', // Graphite (gray) — stay in the past, out of the way visually
 };
 
+// Exported for GoogleCalendarPullService, which has to take the tag back off the title.
+export const STATUS_TAGS = {
+  cancelled: 'Cancelada',
+  completed: 'Completada',
+  confirmed: 'Confirmada',
+  awaitingPayment: 'Esperando pago',
+  awaitingConfirmation: 'Esperando confirmación',
+};
+
 // A short bracketed tag prepended to the event title (e.g. "[Esperando pago] Jane Doe
 // (Booking.com)") so staff can tell a reservation's state at a glance without opening it.
 // CANCELLED/COMPLETED map directly from status; everything else is PENDING, where the plain
@@ -35,12 +44,12 @@ const STATUS_COLOR_IDS: Record<Reservation['status'], string> = {
 // can be CONFIRMED without ever going through the wizard at all (e.g. a DIRECT booking staff
 // mark confirmed by hand), so that check short-circuits ahead of the granular ones.
 function statusTag(reservation: Reservation): string {
-  if (reservation.status === 'CANCELLED') return 'Cancelada';
-  if (reservation.status === 'COMPLETED') return 'Completada';
-  if (reservation.status === 'CONFIRMED') return 'Confirmada';
-  if (reservation.confirmationPaymentReceivedAt) return 'Confirmada';
-  if (reservation.contractAcceptedAt) return 'Esperando pago';
-  return 'Esperando confirmación';
+  if (reservation.status === 'CANCELLED') return STATUS_TAGS.cancelled;
+  if (reservation.status === 'COMPLETED') return STATUS_TAGS.completed;
+  if (reservation.status === 'CONFIRMED') return STATUS_TAGS.confirmed;
+  if (reservation.confirmationPaymentReceivedAt) return STATUS_TAGS.confirmed;
+  if (reservation.contractAcceptedAt) return STATUS_TAGS.awaitingPayment;
+  return STATUS_TAGS.awaitingConfirmation;
 }
 
 function toDateOnly(date: Date): string {

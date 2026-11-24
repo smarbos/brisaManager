@@ -113,6 +113,36 @@ describe('GoogleCalendarPullService', () => {
     expect(prisma.reservation.create).not.toHaveBeenCalled();
   });
 
+  // The titles our own push writes: "[<status>] <guest> (<channel>)". Reading one back must give
+  // the guest's name, and undo tags a previous pull left in the name.
+  it.each([
+    ['[Esperando confirmación] Jane Doe (Directo)', 'Jane Doe'],
+    ['[Esperando pago] Jane Doe (Directo)', 'Jane Doe'],
+    ['[Confirmada] Jane Doe (Directo)', 'Jane Doe'],
+    ['[Cancelada] Jane Doe (Directo)', 'Jane Doe'],
+    ['[Completada] Jane Doe (Directo)', 'Jane Doe'],
+    ['[Confirmada] [Esperando confirmación] Jane Doe (Directo)', 'Jane Doe'],
+    ['[Familia] Jane Doe (Directo)', '[Familia] Jane Doe'],
+  ])('reads the guest name back from the title %s', async (summary, guestName) => {
+    authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
+    listMock.mockResolvedValue({
+      data: {
+        items: [
+          { id: 'event-1', status: 'confirmed', summary, start: { date: '2026-07-01' }, end: { date: '2026-07-10' } },
+        ],
+        nextSyncToken: 'sync-token-2',
+      },
+    });
+    prisma.reservation.findFirst.mockResolvedValue({ id: 'res-1', source: 'DIRECT' });
+
+    await service.pull();
+
+    expect(prisma.reservation.update).toHaveBeenCalledWith({
+      where: { id: 'res-1' },
+      data: { guestName, checkIn: new Date('2026-07-01'), checkOut: new Date('2026-07-10') },
+    });
+  });
+
   it('cancels a DIRECT reservation when its event is deleted on the calendar', async () => {
     authService.getAuthorizedCalendarClient.mockResolvedValue({ client: calendarClient, calendarId: 'cal-1' });
     listMock.mockResolvedValue({
