@@ -44,20 +44,10 @@ function normalizeArgentineDigits(input: string, hasPlus: boolean): string | nul
     digits = `54${digits}`;
   }
 
-  // Strip an internal old-style "15" mobile prefix, which appears right after the area
-  // code in locally-dialed numbers (e.g. "011 15 2233-4455") and must not appear in the
-  // WhatsApp-addressable form.
   const afterCountryCode = digits.slice(2);
-  const withoutNineIfPresent = afterCountryCode.startsWith('9') ? afterCountryCode.slice(1) : afterCountryCode;
-  const fifteenIndex = withoutNineIfPresent.indexOf('15');
-  // Only strip "15" when it appears early (area codes here run 2-4 digits), to avoid
-  // accidentally eating "15" if it happens to appear later inside a local number.
-  const withoutFifteen =
-    fifteenIndex >= 0 && fifteenIndex <= 4
-      ? withoutNineIfPresent.slice(0, fifteenIndex) + withoutNineIfPresent.slice(fifteenIndex + 2)
-      : withoutNineIfPresent;
+  const national = strip15Prefix(afterCountryCode.startsWith('9') ? afterCountryCode.slice(1) : afterCountryCode);
 
-  const result = `549${withoutFifteen}`;
+  const result = `549${national}`;
 
   // A real Argentine WhatsApp number is 54 + 9 + 10 digits = 13 digits total.
   if (result.length !== 13) {
@@ -65,4 +55,16 @@ function normalizeArgentineDigits(input: string, hasPlus: boolean): string | nul
   }
 
   return `whatsapp:+${result}`;
+}
+
+// An Argentine number is 10 digits (area code + local number). The old-style "15" mobile prefix,
+// dialed right after the 2-4 digit area code ("011 15 2233-4455"), makes it 12 — so it's only
+// removed from a 12-digit number. Plenty of complete numbers merely contain a "15" (11 5555...,
+// 351 5..., 223 515...), and those must be left alone.
+function strip15Prefix(national: string): string {
+  if (national.length !== 12) {
+    return national;
+  }
+  const index = [2, 3, 4].find((areaCodeLength) => national.startsWith('15', areaCodeLength));
+  return index === undefined ? national : national.slice(0, index) + national.slice(index + 2);
 }

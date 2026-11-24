@@ -21,6 +21,31 @@ describe('normalizePhoneForWhatsapp', () => {
     expect(normalizePhoneForWhatsapp('011 15 2233-4455')).toBe('whatsapp:+5491122334455');
   });
 
+  it.each([
+    ['+5491155550101', 'Buenos Aires, 11 5...'],
+    ['+5491141150101', 'a 15 later in the local number'],
+    ['+5492235150101', 'Mar del Plata, 223 515...'],
+    ['+5492236150101', 'Mar del Plata, 223 615...'],
+    ['+5492215550101', 'La Plata, 221 5...'],
+    ['+5493515550101', 'Córdoba, 351 5...'],
+    ['+5493415150101', 'Rosario, 341 515...'],
+    ['+5492615150101', 'Mendoza, 261 515...'],
+  ])('leaves a complete number alone when it merely contains a 15: %s (%s)', (phone) => {
+    expect(normalizePhoneForWhatsapp(phone)).toBe(`whatsapp:${phone}`);
+  });
+
+  it.each([
+    ['11 5555 0101', 'whatsapp:+5491155550101'],
+    ['11 15 5555 0101', 'whatsapp:+5491155550101'],
+    ['11 15 1555 0101', 'whatsapp:+5491115550101'],
+    ['221 15 555 0101', 'whatsapp:+5492215550101'],
+    ['351 15 515 0101', 'whatsapp:+5493515150101'],
+    ['2966 15 41 0101', 'whatsapp:+5492966410101'],
+    ['+54 9 11 15 5555 0101', 'whatsapp:+5491155550101'],
+  ])('drops the old-style 15 prefix only when it is an extra prefix: %s', (phone, expected) => {
+    expect(normalizePhoneForWhatsapp(phone)).toBe(expected);
+  });
+
   it('strips spaces, dashes, and parentheses', () => {
     expect(normalizePhoneForWhatsapp('+54 9 (11) 2233-4455')).toBe('whatsapp:+5491122334455');
   });
