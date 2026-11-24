@@ -73,6 +73,16 @@ services:
       - traefik.http.routers.guest-web.entrypoints=websecure
       - traefik.http.routers.guest-web.tls.certresolver=leresolver
       - traefik.http.services.guest-web.loadbalancer.server.port=80
+      # sensores.labrisa.com.ar: the same container, with "/" rewritten to the static /sensores page
+      # (see guest-web/nginx.conf). Fixed here, not in .env: it's a public address printed on the
+      # devices' enclosures, not a per-deployment setting. "$$" is compose's escape for a literal "$".
+      - traefik.http.routers.sensores.rule=Host(`sensores.labrisa.com.ar`)
+      - traefik.http.routers.sensores.entrypoints=websecure
+      - traefik.http.routers.sensores.tls.certresolver=leresolver
+      - traefik.http.routers.sensores.service=guest-web
+      - traefik.http.routers.sensores.middlewares=sensores-root
+      - traefik.http.middlewares.sensores-root.replacepathregex.regex=^/$$
+      - traefik.http.middlewares.sensores-root.replacepathregex.replacement=/sensores
 
 volumes:
   traefik_letsencrypt:
