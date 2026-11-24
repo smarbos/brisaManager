@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsIn,
@@ -92,4 +93,10 @@ export class CreateReservationDto {
   @IsOptional()
   @IsString()
   documentNumber?: string | null;
+
+  // false saves the reservation without the initial email/WhatsApp, for loading one the guest
+  // already knows about. Only those: reminders and later emails are unaffected. Never stored.
+  @IsOptional()
+  @IsBoolean()
+  notifyGuest?: boolean;
 }

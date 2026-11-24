@@ -26,7 +26,10 @@ export function getReservation(id: string): Promise<Reservation> {
   return apiClient.request(`/reservations/${id}`);
 }
 
-export function createReservation(input: ReservationInput): Promise<Reservation> {
+export function createReservation(
+  // notifyGuest false skips the initial email/WhatsApp with the check-in link.
+  input: ReservationInput & { notifyGuest?: boolean },
+): Promise<Reservation> {
   return apiClient.request('/reservations', { method: 'POST', body: JSON.stringify(input) });
 }
 

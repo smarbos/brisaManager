@@ -271,6 +271,27 @@ describe('ReservationFormPage', () => {
     fireEvent.change(screen.getByLabelText(/monto total/i), { target: { value: '100000' } });
   }
 
+  it('notifies the guest by default when creating a reservation', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+    renderNewReservation();
+    fireEvent.change(screen.getByLabelText(/email del huésped/i), { target: { value: 'jane@example.com' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() => expect(createSpy).toHaveBeenLastCalledWith(expect.objectContaining({ notifyGuest: true })));
+  });
+
+  it('creates the reservation without notifying the guest when the box is unticked', async () => {
+    const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+    renderNewReservation();
+    fireEvent.change(screen.getByLabelText(/email del huésped/i), { target: { value: 'jane@example.com' } });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /avisar al huésped/i }));
+    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() => expect(createSpy).toHaveBeenLastCalledWith(expect.objectContaining({ notifyGuest: false })));
+  });
+
   it('saves with only an email, sending the empty phone as none', async () => {
     const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
     renderNewReservation();

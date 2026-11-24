@@ -197,6 +197,7 @@ export function ReservationFormPage() {
   const [reservationRecord, setReservationRecord] = useState<Reservation | null>(null);
   const [events, setEvents] = useState<ReservationEvent[]>([]);
   const [outboundEmails, setOutboundEmails] = useState<OutboundEmail[]>([]);
+  const [notifyGuest, setNotifyGuest] = useState(true);
   const [overlaps, setOverlaps] = useState<Reservation[]>([]);
   const [images, setImages] = useState<ReservationImage[]>([]);
   const guestWebUrl = import.meta.env.VITE_GUEST_WEB_URL as string;
@@ -457,7 +458,7 @@ export function ReservationFormPage() {
       if (isEditing && id) {
         await updateReservation(id, payload);
       } else {
-        await createReservation(payload);
+        await createReservation({ ...payload, notifyGuest });
       }
       navigate('/');
     } catch (err) {
@@ -649,6 +650,18 @@ export function ReservationFormPage() {
           <FormField label="Notas">
             <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </FormField>
+          {!isEditing && (
+            <div className="flex flex-col gap-1 text-sm">
+              <label className="flex items-center gap-2 font-medium text-text">
+                <input type="checkbox" checked={notifyGuest} onChange={(e) => setNotifyGuest(e.target.checked)} />
+                Avisar al huésped al guardar
+              </label>
+              <p className="text-text-muted">
+                Le manda el link de check-in por email y WhatsApp. Destildalo para cargar una reserva existente sin
+                avisarle. Los recordatorios y emails posteriores no cambian.
+              </p>
+            </div>
+          )}
           {error && <Alert>{error}</Alert>}
           <div>
             <Button type="submit" loading={submitting}>

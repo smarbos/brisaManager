@@ -73,7 +73,8 @@ export class ReservationsService {
 
   async create(dto: CreateReservationDto, actor?: string | null) {
     this.validateDates(dto.checkIn, dto.checkOut);
-    const { document: documentFields, rest } = splitDocumentFields(dto);
+    const { notifyGuest = true, ...reservationFields } = dto;
+    const { document: documentFields, rest } = splitDocumentFields(reservationFields);
     const document = this.normalizeStaffDocument(documentFields);
 
     const reservation = await this.prisma.reservation.create({
@@ -86,15 +87,19 @@ export class ReservationsService {
       },
     });
 
-    await this.eventsService.record(reservation.id, 'RESERVATION_CREATED', 'Creada manualmente por el personal');
+    await this.eventsService.record(
+      reservation.id,
+      'RESERVATION_CREATED',
+      notifyGuest ? 'Creada manualmente por el personal' : 'Creada manualmente por el personal, sin notificar al huésped',
+    );
 
-    if (reservation.guestEmail) {
+    if (notifyGuest && reservation.guestEmail) {
       await this.sendInitialEmail(reservation);
     }
 
     // Awaited like the email above (rather than fire-and-forget), so its event row is
     // written before the response — same reason the email is.
-    if (reservation.guestPhone) {
+    if (notifyGuest && reservation.guestPhone) {
       await this.sendInitialWhatsapp(reservation);
     }
 
@@ -190,7 +195,7 @@ export class ReservationsService {
         await this.eventsService.record(
           reservation.id,
           'INITIAL_WHATSAPP_FAILED',
-          'Twilio no aceptó el mensaje (ver los logs del API)',
+          'El mensaje no se envió (ver los logs del API)',
         );
         return false;
       }

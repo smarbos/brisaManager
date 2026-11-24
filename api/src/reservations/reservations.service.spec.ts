@@ -811,6 +811,43 @@ describe('ReservationsService', () => {
     });
   });
 
+  describe('notifyGuest on create', () => {
+    const contactDto = { ...validDto, guestEmail: 'jane@example.com', guestPhone: '+5491122334455' };
+
+    it('with notifyGuest false, saves the reservation without messaging the guest', async () => {
+      const created = { id: '1', ...contactDto };
+      prisma.reservation.create.mockResolvedValue(created);
+
+      await service.create({ ...contactDto, notifyGuest: false });
+
+      expect(emailService.sendInitialConfirmationEmail).not.toHaveBeenCalled();
+      expect(whatsappService.sendTemplate).not.toHaveBeenCalled();
+      expect(prisma.reservation.create.mock.calls[0][0].data).not.toHaveProperty('notifyGuest');
+      expect(eventsService.record).toHaveBeenCalledWith(
+        '1',
+        'RESERVATION_CREATED',
+        'Creada manualmente por el personal, sin notificar al huésped',
+      );
+      expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(created);
+      expect(guestsService.syncFromReservation).toHaveBeenCalled();
+    });
+
+    it('with notifyGuest true, messages the guest and does not store the flag', async () => {
+      prisma.reservation.create.mockResolvedValue({
+        id: '1',
+        ...contactDto,
+        checkIn: new Date(contactDto.checkIn),
+        checkOut: new Date(contactDto.checkOut),
+      });
+
+      await service.create({ ...contactDto, notifyGuest: true });
+
+      expect(emailService.sendInitialConfirmationEmail).toHaveBeenCalled();
+      expect(whatsappService.sendTemplate).toHaveBeenCalled();
+      expect(prisma.reservation.create.mock.calls[0][0].data).not.toHaveProperty('notifyGuest');
+    });
+  });
+
   describe('sendInitialWhatsappById', () => {
     it('rejects a reservation with no phone', async () => {
       prisma.reservation.findUnique.mockResolvedValue({ id: '1', guestPhone: null });
