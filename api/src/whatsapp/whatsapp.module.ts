@@ -4,6 +4,7 @@ import { WhatsappService } from './whatsapp.service';
 import { WhatsappReminderSchedulerService } from './whatsapp-reminder.scheduler';
 import { WhatsappDeliveryService } from './whatsapp-delivery.service';
 import { TwilioWebhooksController } from './twilio-webhooks.controller';
+import { WhatsappIncomingService } from './whatsapp-incoming.service';
 import { SettingsModule } from '../settings/settings.module';
 
 // ThrottlerModule is scoped to this module (not global), same reasoning as
@@ -21,6 +22,7 @@ import { SettingsModule } from '../settings/settings.module';
     WhatsappService,
     WhatsappReminderSchedulerService,
     WhatsappDeliveryService,
+    WhatsappIncomingService,
   ],
   exports: [WhatsappService, WhatsappDeliveryService],
 })

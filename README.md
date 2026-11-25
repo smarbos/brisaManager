@@ -75,6 +75,11 @@
      empty in production:** an empty value sends freeform text instead, which Twilio accepts and
      WhatsApp then silently drops — the reservation still shows it as sent. The wording lives in
      Twilio; changing it means submitting a new template for approval and updating the SID here.
+     **Guest replies:** in Twilio, set the WhatsApp sender's incoming-message webhook to
+     `POST https://api.labrisa.com.ar/webhooks/twilio/whatsapp-incoming`. Each reply is then
+     emailed to `EMAIL_INBOUND_ADDRESS` (or `ALERT_EMAIL` if that's empty) with the guest's
+     reservation; requests without a valid Twilio signature get 403. Without the webhook, replies
+     are lost.
    - **CORS origins:** `ADMIN_WEB_ORIGIN=https://admin.labrisa.com.ar` and
      `GUEST_WEB_ORIGIN=https://checkin.labrisa.com.ar` — the API rejects browser requests from
      any other origin, so localhost defaults will break the deployed admin app. `GUEST_WEB_ORIGIN`

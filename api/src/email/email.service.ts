@@ -111,6 +111,13 @@ export class EmailService {
     });
   }
 
+  // A notice for staff that isn't an error (e.g. a guest's WhatsApp reply): sent right away,
+  // through the outbox so it shows on the Emails page and can be retried. html must already be
+  // escaped by the caller.
+  sendStaffNotice(to: string, subject: string, html: string, reservationId: string | null): Promise<OutboundEmail> {
+    return this.outbox.enqueue({ kind: 'ALERT', to, subject, html, reservationId, sendAt: new Date() });
+  }
+
   // Never throws — alerts are called from failure paths that must not fail themselves.
   async sendAlert(subject: string, message: string): Promise<void> {
     const alert = buildAlert(subject, message);

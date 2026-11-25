@@ -13,12 +13,14 @@ describe('TwilioWebhooksController', () => {
   const originalToken = process.env.TWILIO_AUTH_TOKEN;
   let controller: TwilioWebhooksController;
   let deliveryService: { applyStatus: jest.Mock };
+  let incomingService: { forwardReply: jest.Mock };
 
   beforeEach(() => {
     process.env.API_ORIGIN = 'https://api.labrisa.com.ar';
     process.env.TWILIO_AUTH_TOKEN = 'test-auth-token';
     deliveryService = { applyStatus: jest.fn() };
-    controller = new TwilioWebhooksController(deliveryService as never);
+    incomingService = { forwardReply: jest.fn() };
+    controller = new TwilioWebhooksController(deliveryService as never, incomingService as never);
   });
 
   afterAll(() => {
@@ -105,5 +107,29 @@ describe('TwilioWebhooksController', () => {
     await expect(
       controller.whatsappStatus(signature, params),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+  describe('incoming WhatsApp messages', () => {
+    const incomingUrl = 'https://api.labrisa.com.ar/webhooks/twilio/whatsapp-incoming';
+    const incoming = { MessageSid: 'SM2', From: 'whatsapp:+5492235550101', Body: 'Hola' };
+
+    it('forwards the reply when the signature is valid, and answers with empty TwiML', async () => {
+      const signature = getExpectedTwilioSignature('test-auth-token', incomingUrl, incoming);
+
+      const response = await controller.whatsappIncoming(signature, incoming);
+
+      expect(incomingService.forwardReply).toHaveBeenCalledWith(incoming);
+      expect(response).toBe('<Response></Response>');
+    });
+
+    it('rejects a missing signature', async () => {
+      await expect(controller.whatsappIncoming(undefined, incoming)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(incomingService.forwardReply).not.toHaveBeenCalled();
+    });
+
+    it('rejects a signature made for the status URL', async () => {
+      const signature = getExpectedTwilioSignature('test-auth-token', url, incoming);
+
+      await expect(controller.whatsappIncoming(signature, incoming)).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 });

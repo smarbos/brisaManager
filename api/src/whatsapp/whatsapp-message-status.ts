@@ -55,3 +55,10 @@ export function whatsappStatusCallbackUrl(): string | null {
   }
   return `${origin}/webhooks/twilio/whatsapp-status`;
 }
+
+// Where Twilio posts incoming WhatsApp messages (guest replies). Configured on the WhatsApp
+// sender in Twilio; same https-only rule as the status callback.
+export function whatsappIncomingUrl(): string | null {
+  const status = whatsappStatusCallbackUrl();
+  return status ? status.replace(/whatsapp-status$/, 'whatsapp-incoming') : null;
+}

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Header,
   Headers,
   HttpCode,
   HttpStatus,
@@ -11,7 +12,8 @@ import {
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { validateRequest } from 'twilio';
 import { WhatsappDeliveryService } from './whatsapp-delivery.service';
-import { whatsappStatusCallbackUrl } from './whatsapp-message-status';
+import { whatsappIncomingUrl, whatsappStatusCallbackUrl } from './whatsapp-message-status';
+import { WhatsappIncomingService } from './whatsapp-incoming.service';
 
 // Called by Twilio, not by a logged-in user, so there's no JWT guard — the X-Twilio-Signature
 // check below is the only gate, and it fails closed: no configured callback URL, no auth
@@ -21,7 +23,17 @@ import { whatsappStatusCallbackUrl } from './whatsapp-message-status';
 @UseGuards(ThrottlerGuard)
 @Controller('webhooks/twilio')
 export class TwilioWebhooksController {
-  constructor(private readonly deliveryService: WhatsappDeliveryService) {}
+  constructor(
+    private readonly deliveryService: WhatsappDeliveryService,
+    private readonly incomingService: WhatsappIncomingService,
+  ) {}
+
+  private assertSigned(url: string | null, signature: string | undefined, params: Record<string, string>): void {
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!url || !authToken || !signature || !validateRequest(authToken, signature, url, params)) {
+      throw new ForbiddenException('Invalid Twilio signature');
+    }
+  }
 
   // Twilio posts application/x-www-form-urlencoded; the signature covers the URL plus every
   // posted param, so the body is validated as-is (a plain object, no DTO — the global
@@ -32,16 +44,7 @@ export class TwilioWebhooksController {
     @Headers('x-twilio-signature') signature: string | undefined,
     @Body() params: Record<string, string>,
   ): Promise<void> {
-    const url = whatsappStatusCallbackUrl();
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    if (
-      !url ||
-      !authToken ||
-      !signature ||
-      !validateRequest(authToken, signature, url, params)
-    ) {
-      throw new ForbiddenException('Invalid Twilio signature');
-    }
+    this.assertSigned(whatsappStatusCallbackUrl(), signature, params);
 
     const { MessageSid, MessageStatus, ErrorCode } = params;
     if (!MessageSid || !MessageStatus) {
@@ -52,5 +55,19 @@ export class TwilioWebhooksController {
       MessageStatus,
       ErrorCode || null,
     );
+  }
+
+  // A guest's reply to one of our WhatsApp messages. Answered with empty TwiML (no automatic
+  // reply to the guest); the message is emailed to staff.
+  @Post('whatsapp-incoming')
+  @HttpCode(HttpStatus.OK)
+  @Header('Content-Type', 'text/xml')
+  async whatsappIncoming(
+    @Headers('x-twilio-signature') signature: string | undefined,
+    @Body() params: Record<string, string>,
+  ): Promise<string> {
+    this.assertSigned(whatsappIncomingUrl(), signature, params);
+    await this.incomingService.forwardReply(params);
+    return '<Response></Response>';
   }
 }
