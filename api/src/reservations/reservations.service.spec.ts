@@ -635,6 +635,61 @@ describe('ReservationsService', () => {
     });
   });
 
+  describe('cancelling from the edit form', () => {
+    const checkIn = new Date('2026-11-06');
+    const checkOut = new Date('2026-11-08');
+    const existing = { id: '1', ...validDto, status: 'CONFIRMED', guestName: 'Jane Doe', guestEmail: 'jane@example.com', checkIn, checkOut };
+
+    async function flush() {
+      for (let i = 0; i < 4; i++) await Promise.resolve();
+    }
+
+    it('records the cancellation and sends the same email as the Cancelar button', async () => {
+      prisma.reservation.findUnique.mockResolvedValue(existing);
+      prisma.reservation.update.mockResolvedValue({ ...existing, status: 'CANCELLED' });
+      emailService.sendCancellationEmail.mockResolvedValue(undefined);
+
+      await service.update('1', { status: 'CANCELLED' } as never, 'staff@x');
+      await flush();
+
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'RESERVATION_CANCELLED');
+      expect(emailService.sendCancellationEmail).toHaveBeenCalledWith('jane@example.com', 'Jane Doe', checkIn, checkOut, '1');
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'CANCELLATION_EMAIL_QUEUED');
+    });
+
+    it('sends nothing when the reservation was already cancelled', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...existing, status: 'CANCELLED' });
+      prisma.reservation.update.mockResolvedValue({ ...existing, status: 'CANCELLED', notes: 'x' });
+
+      await service.update('1', { status: 'CANCELLED', notes: 'x' } as never);
+      await flush();
+
+      expect(eventsService.record).not.toHaveBeenCalledWith('1', 'RESERVATION_CANCELLED');
+      expect(emailService.sendCancellationEmail).not.toHaveBeenCalled();
+    });
+
+    it('records the cancellation but sends no email when there is no guest email', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...existing, guestEmail: null });
+      prisma.reservation.update.mockResolvedValue({ ...existing, guestEmail: null, status: 'CANCELLED' });
+
+      await service.update('1', { status: 'CANCELLED' } as never);
+      await flush();
+
+      expect(eventsService.record).toHaveBeenCalledWith('1', 'RESERVATION_CANCELLED');
+      expect(emailService.sendCancellationEmail).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for other status changes', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...existing, status: 'PENDING' });
+      prisma.reservation.update.mockResolvedValue({ ...existing, status: 'CONFIRMED' });
+
+      await service.update('1', { status: 'CONFIRMED' } as never);
+      await flush();
+
+      expect(emailService.sendCancellationEmail).not.toHaveBeenCalled();
+    });
+  });
+
   describe('resendCancellationEmail', () => {
     const checkIn = new Date('2026-11-06');
     const checkOut = new Date('2026-11-08');

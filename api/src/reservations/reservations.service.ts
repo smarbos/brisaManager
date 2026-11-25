@@ -381,6 +381,15 @@ export class ReservationsService {
     // Fire-and-forget: see the comment in create() above.
     void this.googleCalendarPushService.pushReservation(updated);
 
+    // Setting the status to Cancelada in the form is a cancellation like the Cancelar button:
+    // same event and same email to the guest.
+    if (existing.status !== 'CANCELLED' && updated.status === 'CANCELLED') {
+      await this.eventsService.record(id, 'RESERVATION_CANCELLED');
+      if (updated.guestEmail) {
+        void this.sendCancellationEmail(updated);
+      }
+    }
+
     // Staff path: no fillBlanksOnly. Changing the document can move the reservation to a
     // different guest (see GuestsService.syncFromReservation).
     const document = this.storedDocument(updated);

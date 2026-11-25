@@ -1262,6 +1262,25 @@ describe('ReservationFormPage', () => {
       );
     });
 
+    it('warns that saving as Cancelada emails the guest', async () => {
+      renderSaved({ status: 'CONFIRMED' });
+      await screen.findByDisplayValue('Jane Doe');
+      expect(screen.queryByText(/se le avisa al huésped por email/i)).not.toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'CANCELLED' } });
+
+      expect(screen.getByText(/al guardar se le avisa al huésped por email que la reserva se canceló/i)).toBeInTheDocument();
+    });
+
+    it('says nobody is emailed when a guest without email is set to Cancelada', async () => {
+      renderSaved({ status: 'CONFIRMED', guestEmail: null });
+      await screen.findByDisplayValue('Jane Doe');
+
+      fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'CANCELLED' } });
+
+      expect(screen.getByText(/no tiene email: no se le avisa/i)).toBeInTheDocument();
+    });
+
     it('never changes the boxes of an existing reservation when its channel changes', async () => {
       renderSaved();
       await screen.findByDisplayValue('Jane Doe');

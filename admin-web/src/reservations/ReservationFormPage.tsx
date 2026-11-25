@@ -718,6 +718,13 @@ export function ReservationFormPage() {
                 <option value="CANCELLED">Cancelada</option>
                 <option value="COMPLETED">Completada</option>
               </Select>
+              {form.status === 'CANCELLED' && reservationRecord && reservationRecord.status !== 'CANCELLED' && (
+                <span className="text-sm font-normal text-text-muted">
+                  {reservationRecord.guestEmail
+                    ? 'Al guardar se le avisa al huésped por email que la reserva se canceló.'
+                    : 'No tiene email: no se le avisa al guardar.'}
+                </span>
+              )}
             </FormField>
           )}
           <FormField label="Notas">
