@@ -78,6 +78,7 @@ export class WhatsappReminderSchedulerService {
       where: {
         status: { notIn: ['CANCELLED', 'COMPLETED'] },
         guestPhone: { not: null },
+        askForPayment: true,
         confirmationPaymentReceivedAt: null,
         depositReminderSentAt: null,
         confirmationEmailSentAt: { not: null, lte: cutoff },

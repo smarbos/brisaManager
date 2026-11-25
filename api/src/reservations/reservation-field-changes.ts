@@ -16,6 +16,8 @@ const FIELD_LABELS: Record<string, string> = {
   currency: 'Moneda',
   notes: 'Notas',
   status: 'Estado',
+  askForPayment: 'Pedir pago',
+  askForDeposit: 'Pedir depósito',
   // Logged with masked values only (see DocumentCryptoService.mask).
   document: 'Documento',
 };
@@ -45,6 +47,8 @@ export interface ReservationSnapshot {
   currency: string;
   notes: string | null;
   status: string;
+  askForPayment: boolean;
+  askForDeposit: boolean;
 }
 
 // What's actually changing — undefined means "not part of this update, leave it out of the
@@ -63,6 +67,8 @@ export interface ReservationFieldInput {
   currency?: string;
   notes?: string | null;
   status?: string;
+  askForPayment?: boolean;
+  askForDeposit?: boolean;
 }
 
 export function diffReservationFields(
@@ -85,6 +91,14 @@ export function diffReservationFields(
   addString('notes', existing.notes, next.notes);
   addString('source', existing.source, next.source);
   addString('status', existing.status, next.status);
+
+  const yesNo = (value: boolean) => (value ? 'Sí' : 'No');
+  for (const field of ['askForPayment', 'askForDeposit'] as const) {
+    const value = next[field];
+    if (value !== undefined && value !== existing[field]) {
+      changes.push({ field, oldValue: yesNo(existing[field]), newValue: yesNo(value) });
+    }
+  }
 
   if (next.checkIn !== undefined) {
     const oldIso = existing.checkIn.toISOString().slice(0, 10);

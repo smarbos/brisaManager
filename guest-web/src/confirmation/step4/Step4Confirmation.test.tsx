@@ -14,6 +14,8 @@ const reservation: GuestReservation = {
   confirmationPaymentAmount: 30000,
   confirmationPaymentPercentage: 30,
   currency: 'ARS',
+  askForPayment: true,
+  askForDeposit: true,
   datesConfirmedAt: '2026-01-01T00:00:00.000Z',
   contractAcceptedAt: '2026-01-01T00:00:00.000Z',
   contractAcceptedName: 'Jane Doe',
@@ -87,5 +89,21 @@ describe('Step4Confirmation', () => {
     rerender(<Step4Confirmation reservation={reservation} token="tok-1" showAmbient={true} stepHeadingRef={createRef<HTMLHeadingElement>()} />);
 
     expect(screen.getByRole('tab', { name: /sensores/i })).toBeInTheDocument();
+  });
+
+  it('has no Pago tab when nothing is asked for, and opens on Cómo llegar', () => {
+    render(
+      <Step4Confirmation
+        reservation={{ ...reservation, askForPayment: false, askForDeposit: false }}
+        token="tok-1"
+        showAmbient={false}
+        stepHeadingRef={createRef<HTMLHeadingElement>()}
+      />,
+    );
+
+    expect(screen.queryByRole('tab', { name: /pago/i })).not.toBeInTheDocument();
+    expect(document.querySelector('#panel-pago')).toBeNull();
+    expect(screen.getByRole('tab', { name: /cómo llegar/i })).toHaveAttribute('aria-selected', 'true');
+    expect(document.querySelector('#panel-llegar')).toBeVisible();
   });
 });

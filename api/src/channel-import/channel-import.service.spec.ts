@@ -981,4 +981,91 @@ describe('ChannelImportService', () => {
       });
     });
   });
+
+  describe('operator choices from the review panel', () => {
+    const contactDto: ImportReservationDto = {
+      ...baseDto,
+      guest_name: 'Jane Doe',
+      guest_email: 'jane@guest.booking.com',
+      guest_phone: '+5491122334455',
+      check_in: '2099-01-10',
+      check_out: '2099-01-15',
+    };
+    const airbnb = { source: 'airbnb' as const, hotel_id: undefined };
+
+    beforeEach(() => {
+      prisma.reservation.findUnique.mockResolvedValue(null);
+      prisma.reservation.create.mockImplementation(({ data }) => Promise.resolve({ id: 'res-1', ...data }));
+    });
+
+    const createdData = () => prisma.reservation.create.mock.calls[0][0].data;
+
+    it('asks for both payments on a Booking.com import by default', async () => {
+      await service.import(contactDto);
+
+      expect(createdData()).toMatchObject({ askForPayment: true, askForDeposit: true });
+    });
+
+    it('asks for nothing on an Airbnb import by default', async () => {
+      await service.import({ ...contactDto, ...airbnb });
+
+      expect(createdData()).toMatchObject({ askForPayment: false, askForDeposit: false });
+    });
+
+    it('uses the operator choice over the channel default', async () => {
+      await service.import({ ...contactDto, ...airbnb, ask_for_payment: true, ask_for_deposit: false });
+      expect(createdData()).toMatchObject({ askForPayment: true, askForDeposit: false });
+
+      prisma.reservation.create.mockClear();
+      await service.import({ ...contactDto, ask_for_payment: false, ask_for_deposit: true });
+      expect(createdData()).toMatchObject({ askForPayment: false, askForDeposit: true });
+    });
+
+    it('messages the guest by default', async () => {
+      await service.import(contactDto);
+
+      expect(reservationsService.sendInitialEmail).toHaveBeenCalled();
+      expect(reservationsService.sendInitialWhatsapp).toHaveBeenCalled();
+    });
+
+    it('does not message the guest when notify_guest is false, and says so in the history', async () => {
+      await service.import({ ...contactDto, notify_guest: false });
+
+      expect(reservationsService.sendInitialEmail).not.toHaveBeenCalled();
+      expect(reservationsService.sendInitialWhatsapp).not.toHaveBeenCalled();
+      expect(eventsService.record).toHaveBeenCalledWith(
+        'res-1',
+        'RESERVATION_CREATED',
+        expect.stringContaining('Sin notificar al huésped.'),
+      );
+    });
+
+    it('leaves the payment requests alone when re-scanning an existing reservation', async () => {
+      const existing = {
+        id: 'res-1',
+        guestName: 'Jane Doe',
+        guestPhone: null,
+        guestEmail: null,
+        checkIn: new Date('2099-01-10'),
+        checkOut: new Date('2099-01-15'),
+        paxCount: 1,
+        source: 'BOOKING',
+        externalReference: 'booking-extranet-5000000607',
+        totalAmount: 0,
+        currency: 'ARS',
+        notes: null,
+        status: 'PENDING',
+        askForPayment: false,
+        askForDeposit: false,
+      };
+      prisma.reservation.findUnique.mockResolvedValue(existing);
+      prisma.reservation.update.mockResolvedValue(existing);
+
+      await service.import({ ...contactDto, ask_for_payment: true, ask_for_deposit: true });
+
+      const { data } = prisma.reservation.update.mock.calls[0][0];
+      expect(data).not.toHaveProperty('askForPayment');
+      expect(data).not.toHaveProperty('askForDeposit');
+    });
+  });
 });

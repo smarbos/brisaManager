@@ -1,4 +1,4 @@
-import { IsArray, IsEmail, IsIn, IsInt, IsISO8601, IsOptional, IsPositive, IsString, MinLength } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsISO8601, IsOptional, IsPositive, IsString, MinLength } from 'class-validator';
 
 // Field names are snake_case to match exactly what the Chrome extension sends (see
 // chrome-extension/README.md) — the extension scrapes Booking.com's/Airbnb's own host UI, an
@@ -72,6 +72,21 @@ export class ImportReservationDto {
   @IsOptional()
   @IsString()
   status: string | null;
+
+  // The operator's choices in the extension's review panel. Left out (an older extension), the
+  // channel's defaults apply and the guest is notified. Only used when the reservation is
+  // created: a re-scan never overrides what staff set in the admin.
+  @IsOptional()
+  @IsBoolean()
+  ask_for_payment?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  ask_for_deposit?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  notify_guest?: boolean;
 
   @IsArray()
   @IsString({ each: true })

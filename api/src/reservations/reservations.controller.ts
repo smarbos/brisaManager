@@ -72,6 +72,11 @@ export class ReservationsController {
     return this.reservationsService.sendInitialWhatsappById(id);
   }
 
+  @Post(':id/send-payment-request')
+  sendPaymentRequest(@Param('id') id: string) {
+    return this.reservationsService.sendPaymentRequest(id);
+  }
+
   @Post(':id/resend-final-email')
   resendFinalEmail(@Param('id') id: string) {
     return this.confirmationService.resendFinalEmail(id);

@@ -7,6 +7,7 @@ const now = new Date('2026-10-01T12:00:00Z');
 const futureStay = {
   checkIn: new Date('2026-10-10'),
   datesConfirmedAt: null,
+  askForPayment: true,
   confirmationPaymentReceivedAt: null,
 };
 
@@ -72,6 +73,16 @@ describe('computeWhatsappIssues', () => {
     const issues = computeWhatsappIssues(
       { ...futureStay, checkIn: new Date('2026-09-28') },
       [message('RESERVATION_REMINDER', 'undelivered')],
+      now,
+    );
+
+    expect(issues).toEqual([]);
+  });
+
+  it('does not flag a failed payment reminder once the payment is no longer asked for', () => {
+    const issues = computeWhatsappIssues(
+      { ...futureStay, askForPayment: false },
+      [message('DEPOSIT_REMINDER', 'undelivered', '63016')],
       now,
     );
 

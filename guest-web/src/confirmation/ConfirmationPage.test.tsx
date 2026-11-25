@@ -17,6 +17,8 @@ const baseReservation = {
   confirmationPaymentAmount: 30000,
   confirmationPaymentPercentage: 30,
   currency: 'ARS',
+  askForPayment: true,
+  askForDeposit: true,
   datesConfirmedAt: null,
   contractAcceptedAt: null,
   contractAcceptedName: null,
@@ -312,6 +314,78 @@ describe('ConfirmationPage', () => {
     // The rules recap shouldn't be buried in the final step only — a guest deciding whether
     // to pay should be able to re-check what they agreed to right here, on step 3.
     expect(screen.getByRole('button', { name: /ver reglas de la casa/i })).toBeInTheDocument();
+  });
+
+  describe('payments that are not asked for', () => {
+    const rulesAccepted = {
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+    };
+
+    it('skips the payment step when nothing is asked for', async () => {
+      vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+        ...rulesAccepted,
+        askForPayment: false,
+        askForDeposit: false,
+      });
+
+      renderAt('tok-1');
+
+      expect(await screen.findByText('All done, see you soon!')).toBeInTheDocument();
+      expect(screen.getByText(/check-in completo/i)).toBeInTheDocument();
+      expect(screen.queryByText(/pago confirmado/i)).not.toBeInTheDocument();
+      expect(screen.queryByText('Pago')).not.toBeInTheDocument();
+      expect(screen.getByText('Paso 3 de 3: Confirmación')).toBeInTheDocument();
+    });
+
+    it('leaves the payment step out of the progress bar from the start', async () => {
+      vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+        ...baseReservation,
+        askForPayment: false,
+        askForDeposit: false,
+      });
+
+      renderAt('tok-1');
+
+      expect(await screen.findByText('Paso 1 de 3: Reserva')).toBeInTheDocument();
+      expect(screen.queryByText('Pago')).not.toBeInTheDocument();
+    });
+
+    it('asks only for the deposit, still showing the account to transfer it to', async () => {
+      vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...rulesAccepted, askForPayment: false });
+
+      renderAt('tok-1');
+
+      expect(await screen.findByText(/depósito de garantía/i)).toBeInTheDocument();
+      expect(screen.queryByText(/confirmación de reserva/i)).not.toBeInTheDocument();
+      expect(screen.getByText('LABRISA.DEMO.ARS')).toBeInTheDocument();
+      expect(screen.getAllByText(/pendiente/i)).toHaveLength(1);
+    });
+
+    it('asks only for the payment', async () => {
+      vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({ ...rulesAccepted, askForDeposit: false });
+
+      renderAt('tok-1');
+
+      expect(await screen.findByText(/confirmación de reserva/i)).toBeInTheDocument();
+      expect(screen.queryByText(/depósito de garantía/i)).not.toBeInTheDocument();
+      expect(screen.getAllByText('LABRISA.DEMO.ARS')).toHaveLength(1);
+    });
+
+    it('reaches the last step with only the asked payment received', async () => {
+      vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+        ...rulesAccepted,
+        askForDeposit: false,
+        confirmationPaymentReceivedAt: '2026-01-02T00:00:00.000Z',
+      });
+
+      renderAt('tok-1');
+
+      expect(await screen.findByText('All done, see you soon!')).toBeInTheDocument();
+      expect(screen.getAllByText('✓ Confirmado')).toHaveLength(1);
+    });
   });
 
   it('disables "Actualizar datos de pagos" until a file is selected or a message is typed', async () => {

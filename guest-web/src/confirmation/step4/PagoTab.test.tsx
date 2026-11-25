@@ -12,6 +12,8 @@ const reservation: GuestReservation = {
   confirmationPaymentAmount: 30000,
   confirmationPaymentPercentage: 30,
   currency: 'ARS',
+  askForPayment: true,
+  askForDeposit: true,
   datesConfirmedAt: '2026-01-01T00:00:00.000Z',
   contractAcceptedAt: '2026-01-01T00:00:00.000Z',
   contractAcceptedName: 'Jane Doe',
@@ -58,5 +60,22 @@ describe('PagoTab', () => {
     fireEvent.click(screen.getByText('Datos de la cuenta para transferir'));
 
     expect(screen.getByText('LABRISA.DEMO.ARS')).toBeInTheDocument();
+  });
+
+  it('shows only the deposit when the reservation payment is not asked for', () => {
+    render(<PagoTab reservation={{ ...reservation, askForPayment: false }} />);
+
+    expect(screen.getByText('Depósito de garantía')).toBeInTheDocument();
+    expect(screen.queryByText('Total a pagar')).not.toBeInTheDocument();
+    expect(screen.queryByText(/pago de reserva/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Restante a pagar en el lugar')).not.toBeInTheDocument();
+    expect(screen.getAllByText('✓ Confirmado')).toHaveLength(1);
+  });
+
+  it('leaves the deposit out when it is not asked for', () => {
+    render(<PagoTab reservation={{ ...reservation, askForDeposit: false }} />);
+
+    expect(screen.getByText('Total a pagar')).toBeInTheDocument();
+    expect(screen.queryByText('Depósito de garantía')).not.toBeInTheDocument();
   });
 });

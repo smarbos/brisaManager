@@ -17,13 +17,15 @@ describe('AppController (e2e)', () => {
   });
 
   it('/health (GET) returns ok', () => {
-    return request(app.getHttpServer()).get('/health').expect(200).expect({ status: 'ok' });
+    return request(app.getHttpServer()).get('/health').expect(200).expect((res) => expect(res.body).toEqual({ status: 'ok', version: expect.any(String) }));
   });
 
   it('/config (GET) reports debug mode', () => {
     return request(app.getHttpServer())
       .get('/config')
       .expect(200)
-      .expect({ debugMode: process.env.DEBUG_MODE === 'true' });
+      .expect((res) =>
+        expect(res.body).toEqual({ debugMode: process.env.DEBUG_MODE === 'true', version: expect.any(String) }),
+      );
   });
 });

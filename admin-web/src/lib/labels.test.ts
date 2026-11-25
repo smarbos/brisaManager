@@ -144,5 +144,7 @@ describe('whatsappStatusLabel', () => {
 describe('eventTypeLabel — WhatsApp delivery', () => {
   it('labels the undelivered event', () => {
     expect(eventTypeLabel('WHATSAPP_UNDELIVERED')).toBe('WhatsApp no entregado');
+    expect(eventTypeLabel('PAYMENT_REQUEST_SENT')).toBe('Pedido de pago enviado');
+    expect(eventTypeLabel('PAYMENT_REQUEST_FAILED')).toBe('Falló el pedido de pago');
   });
 });

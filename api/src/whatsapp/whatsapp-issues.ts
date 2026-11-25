@@ -17,6 +17,7 @@ export interface WhatsappIssue {
 interface ReservationForIssues {
   checkIn: Date;
   datesConfirmedAt: Date | null;
+  askForPayment: boolean;
   confirmationPaymentReceivedAt: Date | null;
 }
 
@@ -34,7 +35,7 @@ function isMoot(
     case 'DEPOSIT_REMINDER':
       // Despite its name, this reminder chases the confirmation payment — it's only sent
       // while confirmationPaymentReceivedAt is null (see WhatsappReminderSchedulerService).
-      return reservation.confirmationPaymentReceivedAt != null;
+      return !reservation.askForPayment || reservation.confirmationPaymentReceivedAt != null;
     case 'RESERVATION_REMINDER':
       return reservation.checkIn <= now;
   }

@@ -29,6 +29,8 @@ describe('GoogleCalendarPushService', () => {
     status: 'PENDING',
     notes: null,
     confirmationToken: 'token-1',
+    askForPayment: true,
+    askForDeposit: true,
     datesConfirmedAt: null,
     contractAcceptedAt: null,
     contractAcceptedName: null,
@@ -221,6 +223,12 @@ describe('GoogleCalendarPushService', () => {
           contractAcceptedAt: new Date(),
           confirmationPaymentReceivedAt: new Date(),
         }),
+      ).toBe('[Confirmada] Jane Doe (Directo)');
+    });
+
+    it('does not tag "Esperando pago" when the payment is not asked for', async () => {
+      expect(
+        await summaryFor({ askForPayment: false, datesConfirmedAt: new Date(), contractAcceptedAt: new Date() }),
       ).toBe('[Confirmada] Jane Doe (Directo)');
     });
 

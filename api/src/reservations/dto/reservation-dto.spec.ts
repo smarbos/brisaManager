@@ -35,3 +35,18 @@ describe('notifyGuest', () => {
     expect(dto.guestName).toBe('Jane');
   });
 });
+
+describe('askForPayment and askForDeposit', () => {
+  it('are accepted on create and edit', async () => {
+    const flags = { askForPayment: true, askForDeposit: false };
+
+    expect(await pipe.transform({ ...createBody, ...flags }, { type: 'body', metatype: CreateReservationDto })).toMatchObject(flags);
+    expect(await pipe.transform(flags, { type: 'body', metatype: UpdateReservationDto })).toMatchObject(flags);
+  });
+
+  it.each(['askForPayment', 'askForDeposit'])('%s must be a boolean', async (field) => {
+    await expect(
+      pipe.transform({ ...createBody, [field]: 'yes' }, { type: 'body', metatype: CreateReservationDto }),
+    ).rejects.toThrow();
+  });
+});

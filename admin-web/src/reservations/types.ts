@@ -48,6 +48,9 @@ export interface Reservation extends DocumentFields {
   status: ReservationStatus;
   notes?: string;
   confirmationToken: string;
+  // What the guest is asked to transfer to us.
+  askForPayment: boolean;
+  askForDeposit: boolean;
   datesConfirmedAt?: string | null;
   contractAcceptedAt?: string | null;
   contractAcceptedName?: string | null;

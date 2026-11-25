@@ -71,6 +71,8 @@ describe('Full guest onboarding flow (e2e)', () => {
         checkOut: '2099-05-05',
         paxCount: 2,
         source: 'DIRECT',
+        askForPayment: true,
+        askForDeposit: true,
         totalAmount: 150000,
         currency: 'ARS',
       })
@@ -159,5 +161,43 @@ describe('Full guest onboarding flow (e2e)', () => {
 
     const paymentEvents = eventsResponse.body.filter((event: { type: string }) => event.type === 'PAYMENT_RECEIVED');
     expect(paymentEvents).toHaveLength(1);
+  });
+
+  it('confirms a reservation with nothing to pay once the guest checks in, without showing bank details', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post('/reservations')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        guestName: 'Onboarding E2E Guest',
+        guestEmail: 'onboarding-e2e-guest@example.com',
+        checkIn: '2099-07-01',
+        checkOut: '2099-07-05',
+        paxCount: 2,
+        source: 'AIRBNB',
+        totalAmount: 150000,
+        currency: 'ARS',
+        notifyGuest: false,
+      })
+      .expect(201);
+    const { id, confirmationToken: token, askForPayment, askForDeposit } = createResponse.body;
+    expect({ askForPayment, askForDeposit }).toEqual({ askForPayment: false, askForDeposit: false });
+
+    const publicResponse = await request(app.getHttpServer()).get(`/public/reservations/${token}`).expect(200);
+    expect(publicResponse.body).toMatchObject({ askForPayment: false, askForDeposit: false, bankCbu: '', bankAlias: '' });
+
+    await request(app.getHttpServer())
+      .post(`/public/reservations/${token}/confirm-dates`)
+      .send({
+        fullName: 'Onboarding E2E Guest',
+        phone: '+54 9 223 555-0000',
+        email: 'onboarding-e2e-guest@example.com',
+        documentType: 'DNI',
+        documentNumber: '30333444',
+      })
+      .expect(201);
+    expect((await prisma.reservation.findUnique({ where: { id } }))?.status).toBe('PENDING');
+    await request(app.getHttpServer()).post(`/public/reservations/${token}/accept-contract`).expect(201);
+
+    expect((await prisma.reservation.findUnique({ where: { id } }))?.status).toBe('CONFIRMED');
   });
 });

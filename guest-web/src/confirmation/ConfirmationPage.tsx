@@ -34,7 +34,9 @@ function currentStep(reservation: GuestReservation): Step {
   if (!reservation.contractAcceptedAt) {
     return 2;
   }
-  if (!(reservation.confirmationPaymentReceivedAt && reservation.depositReceivedAt)) {
+  const paymentMissing = reservation.askForPayment && !reservation.confirmationPaymentReceivedAt;
+  const depositMissing = reservation.askForDeposit && !reservation.depositReceivedAt;
+  if (paymentMissing || depositMissing) {
     return 3;
   }
   return 4;
@@ -59,10 +61,11 @@ function WaveIcon() {
   );
 }
 
-function StepIndicator({ step }: { step: Step }) {
+function StepIndicator({ step, hasPaymentStep }: { step: Step; hasPaymentStep: boolean }) {
+  const steps: Step[] = hasPaymentStep ? [1, 2, 3, 4] : [1, 2, 4];
   return (
     <nav aria-label="Progreso del check-in" className="mx-auto mt-6 flex max-w-md gap-2 px-4">
-      {([1, 2, 3, 4] as Step[]).map((s) => (
+      {steps.map((s) => (
         <div key={s} className="flex-1" aria-current={s === step ? 'step' : undefined}>
           <div className={`h-1 rounded-full ${s <= step ? 'bg-accent' : 'bg-border'}`} />
           <p className={`mt-1 text-xs ${s === step ? 'font-semibold text-heading' : 'text-text-muted'}`}>
@@ -71,7 +74,7 @@ function StepIndicator({ step }: { step: Step }) {
         </div>
       ))}
       <p role="status" aria-live="polite" className="sr-only">
-        Paso {step} de 4: {STEP_LABELS[step]}
+        Paso {steps.indexOf(step) + 1} de {steps.length}: {STEP_LABELS[step]}
       </p>
     </nav>
   );
@@ -323,7 +326,7 @@ export function ConfirmationPage() {
   }
 
   const step = currentStep(reservation);
-  const isFullyConfirmed = Boolean(reservation.confirmationPaymentReceivedAt) && Boolean(reservation.depositReceivedAt);
+  const isFullyConfirmed = step === 4;
   const now = new Date();
   // checkIn/checkOut are stored as midnight-UTC dates with no time component — "inclusive of
   // the check-out day" means extending the window through the end of that day, matching the
@@ -331,6 +334,30 @@ export function ConfirmationPage() {
   const stayEnd = new Date(new Date(reservation.checkOut).getTime() + 24 * 60 * 60 * 1000);
   const isDuringStay = now >= new Date(reservation.checkIn) && now < stayEnd;
   const showAmbient = debugMode || (isFullyConfirmed && isDuringStay);
+  // Shown once: in the payment's card, or in the deposit's when that's all that's asked for.
+  const transferDetails = (
+    <>
+      {/* Always stacked (label above, value below) rather than a viewport-based
+          breakpoint: this card sits in a fixed max-w-md container regardless of
+          device, so a long value like the CBU can overlap the label on any screen
+          width, not just narrow ones. */}
+      <div className="mt-4">
+        <BankDetails
+          accountHolder={reservation.bankAccountHolder}
+          cuil={reservation.bankCuil}
+          accountNumber={reservation.bankAccountNumber}
+          cbu={reservation.bankCbu}
+          alias={reservation.bankAlias}
+          bankName={reservation.bankName}
+        />
+      </div>
+      <p className="mt-4 rounded bg-surface p-3 text-xs text-text-muted">
+        Una vez transferido, subí el comprobante acá abajo (o mandalo por WhatsApp o email) para que
+        actualicemos el estado del pago.
+      </p>
+    </>
+  );
+
   const ruleLines = reservation.houseRulesText
     .split('\n')
     .map((line) => line.trim())
@@ -338,7 +365,7 @@ export function ConfirmationPage() {
 
   return (
     <PageShell>
-      <StepIndicator step={step} />
+      <StepIndicator step={step} hasPaymentStep={reservation.askForPayment || reservation.askForDeposit} />
 
       <div className="mx-auto mt-6 max-w-md rounded-xl bg-surface p-6 shadow-sm">
         {error && <Alert>{error}</Alert>}
@@ -587,56 +614,45 @@ export function ConfirmationPage() {
               cada pago.
             </p>
 
-            <div className="mt-4 rounded-lg bg-bg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-heading">
-                    Confirmación de reserva
-                    {reservation.confirmationPaymentPercentage !== null &&
-                      ` (${reservation.confirmationPaymentPercentage}%)`}
-                  </p>
-                  <p className="text-sm text-text-muted">
-                    {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
-                  </p>
+            {reservation.askForPayment && (
+              <div className="mt-4 rounded-lg bg-bg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-heading">
+                      Confirmación de reserva
+                      {reservation.confirmationPaymentPercentage !== null &&
+                        ` (${reservation.confirmationPaymentPercentage}%)`}
+                    </p>
+                    <p className="text-sm text-text-muted">
+                      {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
+                    </p>
+                  </div>
+                  <Badge tone={reservation.confirmationPaymentReceivedAt ? 'success' : 'warning'}>
+                    {reservation.confirmationPaymentReceivedAt ? 'Recibido' : 'Pendiente'}
+                  </Badge>
                 </div>
-                <Badge tone={reservation.confirmationPaymentReceivedAt ? 'success' : 'warning'}>
-                  {reservation.confirmationPaymentReceivedAt ? 'Recibido' : 'Pendiente'}
-                </Badge>
+                {transferDetails}
               </div>
-              {/* Always stacked (label above, value below) rather than a viewport-based
-                  breakpoint: this card sits in a fixed max-w-md container regardless of
-                  device, so a long value like the CBU can overlap the label on any screen
-                  width, not just narrow ones. */}
-              <div className="mt-4">
-                <BankDetails
-                  accountHolder={reservation.bankAccountHolder}
-                  cuil={reservation.bankCuil}
-                  accountNumber={reservation.bankAccountNumber}
-                  cbu={reservation.bankCbu}
-                  alias={reservation.bankAlias}
-                  bankName={reservation.bankName}
-                />
-              </div>
-              <p className="mt-4 rounded bg-surface p-3 text-xs text-text-muted">
-                Una vez transferido, subí el comprobante acá abajo (o mandalo por WhatsApp o email) para que
-                actualicemos el estado del pago.
-              </p>
-            </div>
+            )}
 
-            <div className="mt-4 rounded-lg bg-bg p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-heading">Depósito de garantía</p>
-                  <p className="text-sm text-text-muted">
-                    {formatMoney(reservation.currency, reservation.securityDepositAmount)} · por transferencia a la misma cuenta
-                  </p>
+            {reservation.askForDeposit && (
+              <div className="mt-4 rounded-lg bg-bg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-heading">Depósito de garantía</p>
+                    <p className="text-sm text-text-muted">
+                      {formatMoney(reservation.currency, reservation.securityDepositAmount)} ·{' '}
+                      {reservation.askForPayment ? 'por transferencia a la misma cuenta' : 'por transferencia'}
+                    </p>
+                  </div>
+                  <Badge tone={reservation.depositReceivedAt ? 'success' : 'warning'}>
+                    {reservation.depositReceivedAt ? 'Recibido' : 'Pendiente'}
+                  </Badge>
                 </div>
-                <Badge tone={reservation.depositReceivedAt ? 'success' : 'warning'}>
-                  {reservation.depositReceivedAt ? 'Recibido' : 'Pendiente'}
-                </Badge>
+                <p className="mt-3 whitespace-pre-wrap text-sm text-text-muted">{reservation.depositInstructions}</p>
+                {!reservation.askForPayment && transferDetails}
               </div>
-              <p className="mt-3 whitespace-pre-wrap text-sm text-text-muted">{reservation.depositInstructions}</p>
-            </div>
+            )}
 
             <div
               tabIndex={0}

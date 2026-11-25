@@ -3,6 +3,7 @@ import { Reservation } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationEventsService } from '../reservation-events/reservation-events.service';
 import { EmailService } from '../email/email.service';
+import { isOnboardingComplete } from '../reservations/payment-requests';
 
 @Injectable()
 export class ReservationConfirmationService {
@@ -17,14 +18,7 @@ export class ReservationConfirmationService {
       where: { id: reservationId },
     });
 
-    const allStepsComplete = Boolean(
-      reservation.datesConfirmedAt &&
-      reservation.contractAcceptedAt &&
-      reservation.confirmationPaymentReceivedAt &&
-      reservation.depositReceivedAt,
-    );
-
-    if (!allStepsComplete || reservation.status !== 'PENDING') {
+    if (!isOnboardingComplete(reservation) || reservation.status !== 'PENDING') {
       return;
     }
 

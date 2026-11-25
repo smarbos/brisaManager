@@ -52,6 +52,8 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   CANCELLATION_EMAIL_ABORTED: 'Email de cancelación abortado',
   INITIAL_WHATSAPP_SENT: 'WhatsApp con el link enviado',
   INITIAL_WHATSAPP_FAILED: 'Falló el WhatsApp con el link',
+  PAYMENT_REQUEST_SENT: 'Pedido de pago enviado',
+  PAYMENT_REQUEST_FAILED: 'Falló el pedido de pago',
   WHATSAPP_UNDELIVERED: 'WhatsApp no entregado',
   FINAL_EMAIL_SENT: 'Email final enviado',
   FINAL_EMAIL_FAILED: 'Falló el email final',

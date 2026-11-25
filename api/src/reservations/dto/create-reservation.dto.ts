@@ -94,6 +94,16 @@ export class CreateReservationDto {
   @IsString()
   documentNumber?: string | null;
 
+  // What to ask the guest to transfer. Left out on create, the channel's default applies (see
+  // payment-requests.ts).
+  @IsOptional()
+  @IsBoolean()
+  askForPayment?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  askForDeposit?: boolean;
+
   // false saves the reservation without the initial email/WhatsApp, for loading one the guest
   // already knows about. Only those: reminders and later emails are unaffected. Never stored.
   @IsOptional()

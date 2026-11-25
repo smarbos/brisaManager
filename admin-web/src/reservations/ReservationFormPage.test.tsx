@@ -97,6 +97,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
       documentType: 'DNI',
       documentCountry: 'AR',
       documentMasked: 'DNI ···678',
@@ -142,6 +144,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
       documentType: 'DNI',
       document: null,
       documentUnreadable: true,
@@ -178,6 +182,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(outboundEmailsApi, 'listOutboundEmails').mockResolvedValue([]);
@@ -350,6 +356,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -386,6 +394,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([
       {
@@ -438,6 +448,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([
@@ -493,6 +505,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([
@@ -541,6 +555,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -570,6 +586,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -605,6 +623,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'CONFIRMED',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -640,6 +660,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'CANCELLED',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -675,6 +697,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -706,6 +730,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -735,6 +761,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -766,6 +794,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -794,6 +824,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -825,6 +857,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
       missingFromChannelAt: '2026-01-01T00:00:00.000Z',
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
@@ -873,6 +907,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -908,6 +944,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -939,6 +977,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'CANCELLED',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -966,6 +1006,8 @@ describe('ReservationFormPage', () => {
     currency: 'ARS',
     status: 'PENDING',
     confirmationToken: 'tok-1',
+    askForPayment: true,
+    askForDeposit: true,
   };
 
   function renderReservationPage() {
@@ -1034,6 +1076,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
     vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
@@ -1085,6 +1129,8 @@ describe('ReservationFormPage', () => {
       currency: 'ARS',
       status: 'PENDING',
       confirmationToken: 'tok-1',
+      askForPayment: true,
+      askForDeposit: true,
       confirmationEmailSentAt: null,
     } as never);
     vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
@@ -1121,5 +1167,143 @@ describe('ReservationFormPage', () => {
     expect(await screen.findByText(/programado para las \d{2}:\d{2}/i)).toBeInTheDocument();
     expect(screen.queryByText('No enviado')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /reenviar email de confirmación$/i })).not.toBeInTheDocument();
+  });
+
+  describe('payment requests', () => {
+    const paymentBox = () => screen.getByRole('checkbox', { name: 'Pedir pago de la reserva' });
+    const depositBox = () => screen.getByRole('checkbox', { name: 'Pedir depósito de garantía' });
+    const channel = () => screen.getByLabelText('Canal');
+
+    it('asks for nothing by default on a direct reservation, and for both on a Booking.com one', () => {
+      renderNewReservation();
+
+      expect(paymentBox()).not.toBeChecked();
+      expect(depositBox()).not.toBeChecked();
+
+      fireEvent.change(channel(), { target: { value: 'BOOKING' } });
+      expect(paymentBox()).toBeChecked();
+      expect(depositBox()).toBeChecked();
+
+      fireEvent.change(channel(), { target: { value: 'AIRBNB' } });
+      expect(paymentBox()).not.toBeChecked();
+      expect(depositBox()).not.toBeChecked();
+    });
+
+    it('keeps a box staff already changed when the channel changes', () => {
+      renderNewReservation();
+      fireEvent.click(paymentBox());
+
+      fireEvent.change(channel(), { target: { value: 'AIRBNB' } });
+
+      expect(paymentBox()).toBeChecked();
+      expect(depositBox()).not.toBeChecked();
+    });
+
+    it('sends the choice when creating a reservation', async () => {
+      const createSpy = vi.spyOn(reservationsApi, 'createReservation').mockResolvedValue({ id: '1' } as never);
+      renderNewReservation();
+      fireEvent.change(screen.getByLabelText(/email del huésped/i), { target: { value: 'jane@example.com' } });
+      fireEvent.click(paymentBox());
+
+      fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+      await waitFor(() =>
+        expect(createSpy).toHaveBeenLastCalledWith(expect.objectContaining({ askForPayment: true, askForDeposit: false })),
+      );
+    });
+
+    const saved = {
+      id: '1',
+      guestName: 'Jane Doe',
+      guestEmail: 'jane@example.com',
+      guestPhone: '+5491122334455',
+      checkIn: '2026-01-10',
+      checkOut: '2026-01-15',
+      paxCount: 2,
+      source: 'AIRBNB',
+      totalAmount: 100000,
+      currency: 'ARS',
+      status: 'PENDING',
+      confirmationToken: 'tok-1',
+      askForPayment: false,
+      askForDeposit: false,
+    };
+
+    function renderSaved(overrides: object = {}) {
+      vi.spyOn(reservationsApi, 'getReservation').mockResolvedValue({ ...saved, ...overrides } as never);
+      vi.spyOn(reservationsApi, 'listReservationEvents').mockResolvedValue([]);
+      vi.spyOn(reservationImagesApi, 'listReservationImages').mockResolvedValue([]);
+      vi.spyOn(outboundEmailsApi, 'listOutboundEmails').mockResolvedValue([]);
+      render(
+        <MemoryRouter initialEntries={['/reservations/1']}>
+          <Routes>
+            <Route path="/reservations/:id" element={<ReservationFormPage />} />
+            <Route path="/" element={<div>List</div>} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    }
+
+    it('turns a payment on for an existing reservation', async () => {
+      const updateSpy = vi.spyOn(reservationsApi, 'updateReservation').mockResolvedValue({ id: '1' } as never);
+      renderSaved();
+      await screen.findByDisplayValue('Jane Doe');
+      fireEvent.click(paymentBox());
+
+      fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
+
+      await waitFor(() =>
+        expect(updateSpy).toHaveBeenLastCalledWith('1', expect.objectContaining({ askForPayment: true, askForDeposit: false })),
+      );
+    });
+
+    it('never changes the boxes of an existing reservation when its channel changes', async () => {
+      renderSaved();
+      await screen.findByDisplayValue('Jane Doe');
+
+      fireEvent.change(channel(), { target: { value: 'BOOKING' } });
+
+      expect(paymentBox()).not.toBeChecked();
+    });
+
+    it('shows what is not asked for, without buttons to mark it as received', async () => {
+      renderSaved();
+
+      expect(await screen.findByText('Pago de la reserva: no se pide')).toBeInTheDocument();
+      expect(screen.getByText('Depósito: no se pide')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /marcar pago/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /marcar depósito/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /enviar pedido de pago/i })).not.toBeInTheDocument();
+    });
+
+    it('sends a payment request over WhatsApp on demand', async () => {
+      const requestSpy = vi.spyOn(reservationsApi, 'sendPaymentRequest').mockResolvedValue({ sent: true } as never);
+      renderSaved({ askForPayment: true });
+
+      fireEvent.click(await screen.findByRole('button', { name: /enviar pedido de pago/i }));
+
+      await waitFor(() => expect(requestSpy).toHaveBeenCalledWith('1'));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('says so when the payment request could not be sent', async () => {
+      vi.spyOn(reservationsApi, 'sendPaymentRequest').mockResolvedValue({ sent: false } as never);
+      renderSaved({ askForPayment: true });
+
+      fireEvent.click(await screen.findByRole('button', { name: /enviar pedido de pago/i }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/no pudo enviarse/i);
+    });
+
+    it.each([
+      ['it is already paid', { confirmationPaymentReceivedAt: '2026-01-02T00:00:00.000Z' }],
+      ['there is no phone', { guestPhone: null }],
+      ['the reservation is cancelled', { status: 'CANCELLED' }],
+    ])('offers no payment request when %s', async (_, overrides) => {
+      renderSaved({ askForPayment: true, ...overrides });
+      await screen.findByText('Progreso del onboarding');
+
+      expect(screen.queryByRole('button', { name: /enviar pedido de pago/i })).not.toBeInTheDocument();
+    });
   });
 });

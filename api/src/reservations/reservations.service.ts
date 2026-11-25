@@ -8,9 +8,10 @@ import { GuestsService } from '../guests/guests.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { WhatsappDeliveryService } from '../whatsapp/whatsapp-delivery.service';
 import { computeWhatsappIssues } from '../whatsapp/whatsapp-issues';
-import { checkinLinkMessage } from '../whatsapp/whatsapp-templates';
+import { checkinLinkMessage, depositReminderMessage } from '../whatsapp/whatsapp-templates';
 import { normalizePhoneForWhatsapp } from '../whatsapp/phone-normalizer';
 import { diffReservationFields, reservationFieldLabel } from './reservation-field-changes';
+import { defaultPaymentRequests } from './payment-requests';
 import { CreateReservationDto, GUEST_CONTACT_REQUIRED_MESSAGE } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
 import { QueryReservationDto } from './dto/query-reservation.dto';
@@ -79,6 +80,7 @@ export class ReservationsService {
 
     const reservation = await this.prisma.reservation.create({
       data: {
+        ...defaultPaymentRequests(dto.source),
         ...rest,
         ...(document ? this.documentCrypto.encode(document) : {}),
         checkIn: new Date(dto.checkIn),
@@ -225,6 +227,35 @@ export class ReservationsService {
     return { sent, reservation: await this.findOne(id) };
   }
 
+  // Staff-triggered: asks the guest for the payment over WhatsApp, with the same template as the
+  // daily payment reminder (it links to the guest page, which shows the bank details). Turning
+  // "ask for payment" on never sends anything by itself — this does. Counts as that reminder, so
+  // the daily job doesn't repeat it.
+  async sendPaymentRequest(id: string): Promise<{ sent: boolean; reservation: Reservation }> {
+    const reservation = await this.findOne(id);
+    if (!reservation.guestPhone) {
+      throw new BadRequestException('This reservation has no guest phone to send to');
+    }
+    if (!reservation.askForPayment || reservation.confirmationPaymentReceivedAt) {
+      throw new BadRequestException('This reservation has no payment to ask for');
+    }
+    if (reservation.status === 'CANCELLED' || reservation.status === 'COMPLETED') {
+      throw new BadRequestException('This reservation is no longer active');
+    }
+
+    const sent = await this.whatsappService.sendTemplate(reservation.guestPhone, depositReminderMessage(reservation), {
+      reservationId: id,
+      kind: 'DEPOSIT_REMINDER',
+    });
+    if (sent) {
+      await this.prisma.reservation.update({ where: { id }, data: { depositReminderSentAt: new Date() } });
+      await this.eventsService.record(id, 'PAYMENT_REQUEST_SENT');
+    } else {
+      await this.eventsService.record(id, 'PAYMENT_REQUEST_FAILED', 'El mensaje no se envió (ver los logs del API)');
+    }
+    return { sent, reservation: await this.findOne(id) };
+  }
+
   // Each reservation carries `whatsappIssues`: the WhatsApp messages whose latest send was
   // rejected or undelivered and still matter — what the list's warning icon shows.
   async findAll(query: QueryReservationDto) {
@@ -298,7 +329,7 @@ export class ReservationsService {
           : null
         : undefined;
 
-    const updated = await this.prisma.reservation.update({
+    let updated = await this.prisma.reservation.update({
       where: { id },
       data: {
         ...rest,
@@ -337,6 +368,14 @@ export class ReservationsService {
         next,
         actor,
       );
+    }
+
+    // No longer asking for a payment can be the last thing a guest was waiting on.
+    const stoppedAsking =
+      (existing.askForPayment && dto.askForPayment === false) || (existing.askForDeposit && dto.askForDeposit === false);
+    if (stoppedAsking) {
+      await this.confirmationService.maybeAutoConfirm(id);
+      updated = await this.findOne(id);
     }
 
     // Fire-and-forget: see the comment in create() above.

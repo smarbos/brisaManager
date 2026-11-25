@@ -26,6 +26,8 @@ describe('ReservationListPage', () => {
         currency: 'ARS',
         status: 'PENDING',
         confirmationToken: 'tok-1',
+        askForPayment: false,
+        askForDeposit: false,
       },
     ]);
 
@@ -57,6 +59,8 @@ describe('ReservationListPage', () => {
         currency: 'ARS',
         status: 'PENDING',
         confirmationToken: 'tok-1',
+        askForPayment: false,
+        askForDeposit: false,
       },
       {
         id: '2',
@@ -69,6 +73,8 @@ describe('ReservationListPage', () => {
         currency: 'ARS',
         status: 'PENDING',
         confirmationToken: 'tok-2',
+        askForPayment: false,
+        askForDeposit: false,
       },
     ]);
 
@@ -115,6 +121,8 @@ describe('ReservationListPage', () => {
         currency: 'ARS',
         status: 'PENDING',
         confirmationToken: 'tok-1',
+        askForPayment: false,
+        askForDeposit: false,
       },
     ]);
 
@@ -136,6 +144,8 @@ describe('ReservationListPage', () => {
         currency: 'ARS',
         status: 'PENDING',
         confirmationToken: 'tok-1',
+        askForPayment: false,
+        askForDeposit: false,
       },
     ]);
 

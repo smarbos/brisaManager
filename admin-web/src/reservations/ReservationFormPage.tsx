@@ -14,6 +14,7 @@ import {
   resendFinalEmail,
   resendInitialEmail,
   sendInitialWhatsapp,
+  sendPaymentRequest,
   updateReservation,
 } from '../api/reservations';
 import { getReservationImageBlob, listReservationImages, ReservationImage } from '../api/reservation-images';
@@ -50,6 +51,7 @@ import {
   useTwoStepConfirm,
 } from '../ui';
 import { formatDate, formatDateTime, formatTime } from '../lib/date';
+import { defaultPaymentRequests } from '../lib/payment-requests';
 import { shortId } from '../lib/id';
 import { sourceLabel, eventTypeLabel, whatsappKindTitle, whatsappStatusLabel } from '../lib/labels';
 
@@ -65,6 +67,7 @@ const emptyForm = {
   totalAmount: 0,
   currency: 'ARS',
   status: 'PENDING' as ReservationStatus,
+  ...defaultPaymentRequests('DIRECT'),
   notes: '',
   documentType: 'DNI' as DocumentType,
   documentCountry: '',
@@ -74,6 +77,7 @@ const emptyForm = {
 type ActionKey =
   | 'resendEmail'
   | 'sendWhatsapp'
+  | 'sendPaymentRequest'
   | 'resendFinalEmail'
   | 'resendCancellationEmail'
   | 'markPayment'
@@ -197,6 +201,9 @@ export function ReservationFormPage() {
   const [reservationRecord, setReservationRecord] = useState<Reservation | null>(null);
   const [events, setEvents] = useState<ReservationEvent[]>([]);
   const [outboundEmails, setOutboundEmails] = useState<OutboundEmail[]>([]);
+  // The payment boxes staff ticked or unticked by hand: changing the channel of a new reservation
+  // re-applies its defaults to the others only.
+  const [touchedRequests, setTouchedRequests] = useState<Partial<Record<'askForPayment' | 'askForDeposit', boolean>>>({});
   const [notifyGuest, setNotifyGuest] = useState(true);
   const [overlaps, setOverlaps] = useState<Reservation[]>([]);
   const [images, setImages] = useState<ReservationImage[]>([]);
@@ -344,6 +351,23 @@ export function ReservationFormPage() {
     }
   }
 
+  async function handleSendPaymentRequest() {
+    if (!id) return;
+    setActionError(null);
+    setActionLoading('sendPaymentRequest');
+    try {
+      const { sent } = await sendPaymentRequest(id);
+      loadReservation();
+      if (!sent) {
+        setActionError('El pedido de pago no pudo enviarse. Revisá el historial de eventos para más detalles.');
+      }
+    } catch {
+      setActionError('No se pudo enviar el pedido de pago. Por favor, intentá de nuevo.');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   async function handleResendFinalEmail() {
     if (!id) return;
     setActionError(null);
@@ -398,6 +422,25 @@ export function ReservationFormPage() {
   }
 
   const cancelConfirm = useTwoStepConfirm(handleCancel, { armedLabel: '¿Cancelar? Tocá de nuevo' });
+
+  function handleSourceChange(source: ReservationSource) {
+    if (isEditing) {
+      setForm({ ...form, source });
+      return;
+    }
+    const defaults = defaultPaymentRequests(source);
+    setForm({
+      ...form,
+      source,
+      askForPayment: touchedRequests.askForPayment ? form.askForPayment : defaults.askForPayment,
+      askForDeposit: touchedRequests.askForDeposit ? form.askForDeposit : defaults.askForDeposit,
+    });
+  }
+
+  function handleRequestChange(field: 'askForPayment' | 'askForDeposit', checked: boolean) {
+    setForm({ ...form, [field]: checked });
+    setTouchedRequests({ ...touchedRequests, [field]: true });
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -472,6 +515,13 @@ export function ReservationFormPage() {
     }
   }
 
+  const canRequestPayment =
+    reservationRecord != null &&
+    reservationRecord.askForPayment &&
+    !reservationRecord.confirmationPaymentReceivedAt &&
+    Boolean(reservationRecord.guestPhone) &&
+    reservationRecord.status !== 'CANCELLED' &&
+    reservationRecord.status !== 'COMPLETED';
   const whatsappMessages = reservationRecord?.whatsappMessages ?? [];
   const checkinWhatsapp = whatsappMessages.find((message) => message.kind === 'CHECKIN_LINK');
   const reminderWhatsapps = whatsappMessages.filter((message) => message.kind !== 'CHECKIN_LINK');
@@ -611,7 +661,7 @@ export function ReservationFormPage() {
             />
           </FormField>
           <FormField label="Canal">
-            <Select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value as ReservationSource })}>
+            <Select value={form.source} onChange={(e) => handleSourceChange(e.target.value as ReservationSource)}>
               <option value="BOOKING">Booking.com</option>
               <option value="AIRBNB">Airbnb</option>
               <option value="DIRECT">Directo</option>
@@ -637,6 +687,29 @@ export function ReservationFormPage() {
           <FormField label="Moneda">
             <Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} required />
           </FormField>
+          <fieldset className="flex flex-col gap-2 rounded-lg border border-border p-3 text-sm">
+            <legend className="px-1 text-sm font-medium text-text">Qué se le pide al huésped</legend>
+            <label className="flex items-center gap-2 font-medium text-text">
+              <input
+                type="checkbox"
+                checked={form.askForPayment}
+                onChange={(e) => handleRequestChange('askForPayment', e.target.checked)}
+              />
+              Pedir pago de la reserva
+            </label>
+            <label className="flex items-center gap-2 font-medium text-text">
+              <input
+                type="checkbox"
+                checked={form.askForDeposit}
+                onChange={(e) => handleRequestChange('askForDeposit', e.target.checked)}
+              />
+              Pedir depósito de garantía
+            </label>
+            <p className="text-text-muted">
+              Lo que no se pide no aparece en la página del huésped ni hace falta para confirmar la reserva. Cambiarlo no
+              le avisa nada.
+            </p>
+          </fieldset>
           {isEditing && (
             <FormField label="Estado">
               <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ReservationStatus })}>
@@ -685,7 +758,7 @@ export function ReservationFormPage() {
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
-                {!reservationRecord.confirmationPaymentReceivedAt && (
+                {reservationRecord.askForPayment && !reservationRecord.confirmationPaymentReceivedAt && (
                   <Button
                     type="button"
                     variant="secondary"
@@ -695,7 +768,7 @@ export function ReservationFormPage() {
                     Marcar pago del 30% como recibido
                   </Button>
                 )}
-                {!reservationRecord.depositReceivedAt && (
+                {reservationRecord.askForDeposit && !reservationRecord.depositReceivedAt && (
                   <Button
                     type="button"
                     variant="secondary"
@@ -806,28 +879,44 @@ export function ReservationFormPage() {
                 <div className="flex items-center gap-3">
                   <StepIcon done={Boolean(reservationRecord.confirmationPaymentReceivedAt)} />
                   <p className="font-medium text-text">
-                    Pago del 30% recibido: {reservationRecord.confirmationPaymentReceivedAt ? 'Sí' : 'No'}
+                    {reservationRecord.askForPayment || reservationRecord.confirmationPaymentReceivedAt
+                      ? `Pago del 30% recibido: ${reservationRecord.confirmationPaymentReceivedAt ? 'Sí' : 'No'}`
+                      : 'Pago de la reserva: no se pide'}
                   </p>
                 </div>
-                {!reservationRecord.confirmationPaymentReceivedAt && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    loading={actionLoading === 'markPayment'}
-                    onClick={handleMarkPaymentReceived}
-                  >
-                    Marcar pago del 30% como recibido
-                  </Button>
-                )}
+                <div className="flex flex-wrap justify-end gap-2">
+                  {reservationRecord.askForPayment && !reservationRecord.confirmationPaymentReceivedAt && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={actionLoading === 'markPayment'}
+                      onClick={handleMarkPaymentReceived}
+                    >
+                      Marcar pago del 30% como recibido
+                    </Button>
+                  )}
+                  {canRequestPayment && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={actionLoading === 'sendPaymentRequest'}
+                      onClick={handleSendPaymentRequest}
+                    >
+                      Enviar pedido de pago por WhatsApp
+                    </Button>
+                  )}
+                </div>
               </li>
               <li className="flex items-center justify-between gap-4 py-3">
                 <div className="flex items-center gap-3">
                   <StepIcon done={Boolean(reservationRecord.depositReceivedAt)} />
                   <p className="font-medium text-text">
-                    Depósito recibido: {reservationRecord.depositReceivedAt ? 'Sí' : 'No'}
+                    {reservationRecord.askForDeposit || reservationRecord.depositReceivedAt
+                      ? `Depósito recibido: ${reservationRecord.depositReceivedAt ? 'Sí' : 'No'}`
+                      : 'Depósito: no se pide'}
                   </p>
                 </div>
-                {!reservationRecord.depositReceivedAt && (
+                {reservationRecord.askForDeposit && !reservationRecord.depositReceivedAt && (
                   <Button
                     type="button"
                     variant="secondary"
@@ -838,24 +927,26 @@ export function ReservationFormPage() {
                   </Button>
                 )}
               </li>
-              <li className="flex items-center justify-between gap-4 py-3">
-                <div className="flex items-center gap-3">
-                  <StepIcon done={Boolean(reservationRecord.depositReturnedAt)} />
-                  <p className="font-medium text-text">
-                    Depósito devuelto: {reservationRecord.depositReturnedAt ? 'Sí' : 'No'}
-                  </p>
-                </div>
-                {!reservationRecord.depositReturnedAt && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    loading={actionLoading === 'returnDeposit'}
-                    onClick={handleMarkDepositReturned}
-                  >
-                    Marcar depósito como devuelto
-                  </Button>
-                )}
-              </li>
+              {(reservationRecord.askForDeposit || reservationRecord.depositReceivedAt) && (
+                <li className="flex items-center justify-between gap-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <StepIcon done={Boolean(reservationRecord.depositReturnedAt)} />
+                    <p className="font-medium text-text">
+                      Depósito devuelto: {reservationRecord.depositReturnedAt ? 'Sí' : 'No'}
+                    </p>
+                  </div>
+                  {!reservationRecord.depositReturnedAt && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={actionLoading === 'returnDeposit'}
+                      onClick={handleMarkDepositReturned}
+                    >
+                      Marcar depósito como devuelto
+                    </Button>
+                  )}
+                </li>
+              )}
               {reservationRecord.status === 'CONFIRMED' && reservationRecord.guestEmail && (
                 <li className="flex items-start justify-between gap-4 py-3">
                   <div className="flex items-start gap-3">

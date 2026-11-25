@@ -34,41 +34,47 @@ export function PagoTab({ reservation }: { reservation: GuestReservation }) {
       <h3 className="font-heading text-lg font-semibold text-heading">Información de pago</h3>
       <p className="mt-1 text-sm text-text-muted">Así está el estado de cada pago de tu estadía.</p>
 
-      {/* Both badges below are unconditional, not gated on confirmationPaymentReceivedAt/depositReceivedAt - safe because ConfirmationPage's currentStep() only reaches step 4 (the only place this component renders) once both are already set. */}
+      {/* Each badge is unconditional within its row: step 4 is only reached once everything asked for was received. */}
       <dl className="mt-4 flex flex-col gap-3 text-sm">
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <dt className="font-semibold text-heading">Total a pagar</dt>
-          <dd className="font-heading text-lg font-bold text-accent">
-            {formatMoney(reservation.currency, reservation.totalAmount)}
-          </dd>
-        </div>
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <dt className="text-text-muted">
-            Pago de reserva
-            {reservation.confirmationPaymentPercentage !== null && ` (${reservation.confirmationPaymentPercentage}%)`}
-          </dt>
-          <dd className="flex items-center gap-2 font-semibold text-heading">
-            {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
-            <Badge tone="success">✓ Confirmado</Badge>
-          </dd>
-        </div>
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <div>
-            <dt className="text-text-muted">Restante a pagar en el lugar</dt>
-            <p className="text-xs text-text-muted">Se abona al momento del check-in.</p>
+        {reservation.askForPayment && (
+          <>
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <dt className="font-semibold text-heading">Total a pagar</dt>
+              <dd className="font-heading text-lg font-bold text-accent">
+                {formatMoney(reservation.currency, reservation.totalAmount)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <dt className="text-text-muted">
+                Pago de reserva
+                {reservation.confirmationPaymentPercentage !== null && ` (${reservation.confirmationPaymentPercentage}%)`}
+              </dt>
+              <dd className="flex items-center gap-2 font-semibold text-heading">
+                {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
+                <Badge tone="success">✓ Confirmado</Badge>
+              </dd>
+            </div>
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div>
+                <dt className="text-text-muted">Restante a pagar en el lugar</dt>
+                <p className="text-xs text-text-muted">Se abona al momento del check-in.</p>
+              </div>
+              <dd className="font-semibold text-heading">{formatMoney(reservation.currency, remainingAtProperty)}</dd>
+            </div>
+          </>
+        )}
+        {reservation.askForDeposit && (
+          <div className="flex items-center justify-between">
+            <div>
+              <dt className="text-text-muted">Depósito de garantía</dt>
+              <p className="whitespace-pre-wrap text-xs text-text-muted">{reservation.depositInstructions}</p>
+            </div>
+            <dd className="flex items-center gap-2 font-semibold text-heading">
+              {formatMoney(reservation.currency, reservation.securityDepositAmount)}
+              <Badge tone="success">✓ Confirmado</Badge>
+            </dd>
           </div>
-          <dd className="font-semibold text-heading">{formatMoney(reservation.currency, remainingAtProperty)}</dd>
-        </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <dt className="text-text-muted">Depósito de garantía</dt>
-            <p className="whitespace-pre-wrap text-xs text-text-muted">{reservation.depositInstructions}</p>
-          </div>
-          <dd className="flex items-center gap-2 font-semibold text-heading">
-            {formatMoney(reservation.currency, reservation.securityDepositAmount)}
-            <Badge tone="success">✓ Confirmado</Badge>
-          </dd>
-        </div>
+        )}
       </dl>
 
       <div className="mt-4 overflow-hidden rounded-lg border border-border">

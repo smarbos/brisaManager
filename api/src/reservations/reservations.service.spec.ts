@@ -915,4 +915,118 @@ describe('ReservationsService', () => {
       await expect(service.update('1', { paxCount: 3 })).resolves.toBeDefined();
     });
   });
+
+  describe('payment requests', () => {
+    it.each([
+      ['BOOKING' as const, true],
+      ['DIRECT' as const, false],
+      ['AIRBNB' as const, false],
+      ['OTHER' as const, false],
+    ])('a new %s reservation asks for both payments by default: %s', async (source, asked) => {
+      prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto, source });
+
+      await service.create({ ...validDto, source });
+
+      expect(prisma.reservation.create.mock.calls[0][0].data).toMatchObject({ askForPayment: asked, askForDeposit: asked });
+    });
+
+    it('uses the staff choice over the channel default', async () => {
+      prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto });
+
+      await service.create({ ...validDto, askForPayment: true, askForDeposit: false });
+
+      expect(prisma.reservation.create.mock.calls[0][0].data).toMatchObject({ askForPayment: true, askForDeposit: false });
+    });
+
+    it('records a change of what is asked for', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto, askForPayment: false, askForDeposit: false });
+      prisma.reservation.update.mockResolvedValue({ id: '1', ...validDto, askForPayment: true, askForDeposit: false });
+
+      await service.update('1', { askForPayment: true, askForDeposit: false }, 'staff@labrisa.com.ar');
+
+      const changes = eventsService.record.mock.calls.filter(([, type]) => type === 'FIELD_CHANGED');
+      expect(changes).toEqual([
+        ['1', 'FIELD_CHANGED', 'Pedir pago: "No" → "Sí"', 'askForPayment', 'No', 'Sí', 'staff@labrisa.com.ar'],
+      ]);
+      expect(confirmationService.maybeAutoConfirm).not.toHaveBeenCalled();
+    });
+
+    it.each(['askForPayment', 'askForDeposit'])('checks for auto-confirmation when %s is turned off', async (field) => {
+      prisma.reservation.findUnique.mockResolvedValue({ id: '1', ...validDto, askForPayment: true, askForDeposit: true });
+      prisma.reservation.update.mockResolvedValue({ id: '1', ...validDto, askForPayment: true, askForDeposit: true });
+
+      await service.update('1', { [field]: false });
+
+      expect(confirmationService.maybeAutoConfirm).toHaveBeenCalledWith('1');
+    });
+
+    it('returns and pushes the confirmed reservation when turning a payment off confirms it', async () => {
+      const before = { id: '1', ...validDto, status: 'PENDING', askForPayment: true, askForDeposit: false };
+      const confirmed = { ...before, status: 'CONFIRMED', askForPayment: false };
+      prisma.reservation.findUnique.mockResolvedValueOnce(before).mockResolvedValue(confirmed);
+      prisma.reservation.update.mockResolvedValue({ ...before, askForPayment: false });
+
+      const result = await service.update('1', { askForPayment: false });
+
+      expect(result).toEqual(confirmed);
+      expect(googleCalendarPushService.pushReservation).toHaveBeenCalledWith(confirmed);
+    });
+  });
+
+  describe('sendPaymentRequest', () => {
+    const reservation = {
+      id: 'res-1',
+      guestName: 'María',
+      guestPhone: '+5491122334455',
+      checkIn: new Date('2099-01-10'),
+      checkOut: new Date('2099-01-15'),
+      confirmationToken: 'tok-1',
+      status: 'PENDING',
+      askForPayment: true,
+      askForDeposit: false,
+      confirmationPaymentReceivedAt: null,
+    };
+
+    it('sends the payment template, records it and keeps the daily reminder from repeating it', async () => {
+      prisma.reservation.findUnique.mockResolvedValue(reservation);
+
+      const result = await service.sendPaymentRequest('res-1');
+
+      expect(result.sent).toBe(true);
+      expect(whatsappService.sendTemplate).toHaveBeenCalledWith(
+        '+5491122334455',
+        expect.objectContaining({ variables: { '1': 'María', '2': '10/01/2099', '3': 'tok-1' } }),
+        { reservationId: 'res-1', kind: 'DEPOSIT_REMINDER' },
+      );
+      expect(prisma.reservation.update).toHaveBeenCalledWith({
+        where: { id: 'res-1' },
+        data: { depositReminderSentAt: expect.any(Date) },
+      });
+      expect(eventsService.record).toHaveBeenCalledWith('res-1', 'PAYMENT_REQUEST_SENT');
+    });
+
+    it('records a failure without stamping the reminder', async () => {
+      prisma.reservation.findUnique.mockResolvedValue(reservation);
+      whatsappService.sendTemplate.mockResolvedValue(false);
+
+      const result = await service.sendPaymentRequest('res-1');
+
+      expect(result.sent).toBe(false);
+      expect(prisma.reservation.update).not.toHaveBeenCalled();
+      expect(eventsService.record).toHaveBeenCalledWith('res-1', 'PAYMENT_REQUEST_FAILED', expect.any(String));
+    });
+
+    it.each([
+      ['has no phone', { guestPhone: null }],
+      ['does not ask for the payment', { askForPayment: false }],
+      ['is already paid', { confirmationPaymentReceivedAt: new Date() }],
+      ['is cancelled', { status: 'CANCELLED' }],
+      ['is completed', { status: 'COMPLETED' }],
+    ])('refuses when the reservation %s', async (_, overrides) => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...reservation, ...overrides });
+
+      await expect(service.sendPaymentRequest('res-1')).rejects.toThrow(BadRequestException);
+      expect(whatsappService.sendTemplate).not.toHaveBeenCalled();
+    });
+  });
 });

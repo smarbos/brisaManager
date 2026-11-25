@@ -8,6 +8,9 @@ export interface GuestReservation {
   // null when the admin configured a fixed amount instead of a percentage for this fee.
   confirmationPaymentPercentage: number | null;
   currency: string;
+  // What the guest is asked to transfer; nothing else about a payment is shown.
+  askForPayment: boolean;
+  askForDeposit: boolean;
   datesConfirmedAt: string | null;
   contractAcceptedAt: string | null;
   contractAcceptedName: string | null;

@@ -16,6 +16,7 @@ import { GoogleCalendarPushService } from '../google-calendar/google-calendar-pu
 import { GuestsService } from '../guests/guests.service';
 import { ReservationsService } from '../reservations/reservations.service';
 import { diffReservationFields, reservationFieldLabel } from '../reservations/reservation-field-changes';
+import { defaultPaymentRequests } from '../reservations/payment-requests';
 import { ImportReservationDto } from './dto/import-reservation.dto';
 
 export interface ImportStatusResult {
@@ -202,6 +203,8 @@ export class ChannelImportService {
     // file-header comment), so mapStatus(null) already returns PENDING anyway; this makes
     // that invariant explicit and intentional rather than an accident of today's data gap.
     const status = guestEmail ? 'PENDING' : mapStatus(dto.status);
+    const notifyGuest = dto.notify_guest ?? true;
+    const paymentDefaults = defaultPaymentRequests(source);
 
     const reservation = await this.prisma.reservation.create({
       data: {
@@ -220,6 +223,8 @@ export class ChannelImportService {
         totalAmount: parseAmount(dto.total_price),
         currency: dto.currency?.trim() || 'ARS',
         status,
+        askForPayment: dto.ask_for_payment ?? paymentDefaults.askForPayment,
+        askForDeposit: dto.ask_for_deposit ?? paymentDefaults.askForDeposit,
         notes: buildNotes(dto),
       },
     });
@@ -227,7 +232,7 @@ export class ChannelImportService {
     await this.eventsService.record(
       reservation.id,
       'RESERVATION_CREATED',
-      buildNotes(dto),
+      notifyGuest ? buildNotes(dto) : `${buildNotes(dto)} Sin notificar al huésped.`,
     );
 
     // Link to (or create) the Guest record whenever we have an email or phone — this is
@@ -251,7 +256,7 @@ export class ChannelImportService {
     // whatever's still missing or wrong (dates, pax count, etc.) gets reviewed and
     // corrected, by the guest or by staff afterward. It's not a claim that the data is
     // already right, just an invitation to complete it.
-    if (guestEmail) {
+    if (notifyGuest && guestEmail) {
       void this.reservationsService.sendInitialEmail(reservation);
     }
 
@@ -263,7 +268,7 @@ export class ChannelImportService {
     // once they've filled those in. Never for a stay that has already ended: an old thread
     // re-imported, or a year the Airbnb script inferred wrong (it never sees the year), would
     // otherwise invite the guest to check in for a finished stay.
-    if (guestPhone && dto.guest_name?.trim() && dto.check_in && dto.check_out && checkOut > now) {
+    if (notifyGuest && guestPhone && dto.guest_name?.trim() && dto.check_in && dto.check_out && checkOut > now) {
       void this.reservationsService.sendInitialWhatsapp(reservation);
     }
 

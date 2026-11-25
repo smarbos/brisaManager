@@ -48,7 +48,9 @@ function statusTag(reservation: Reservation): string {
   if (reservation.status === 'COMPLETED') return STATUS_TAGS.completed;
   if (reservation.status === 'CONFIRMED') return STATUS_TAGS.confirmed;
   if (reservation.confirmationPaymentReceivedAt) return STATUS_TAGS.confirmed;
-  if (reservation.contractAcceptedAt) return STATUS_TAGS.awaitingPayment;
+  if (reservation.contractAcceptedAt) {
+    return reservation.askForPayment ? STATUS_TAGS.awaitingPayment : STATUS_TAGS.confirmed;
+  }
   return STATUS_TAGS.awaitingConfirmation;
 }
 

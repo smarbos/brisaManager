@@ -47,6 +47,8 @@ describe('PublicReservationsService', () => {
     paxCount: 2,
     totalAmount: 100000,
     currency: 'ARS',
+    askForPayment: true,
+    askForDeposit: true,
     datesConfirmedAt: null,
     contractAcceptedAt: null,
     confirmationPaymentReceivedAt: null,
@@ -128,6 +130,46 @@ describe('PublicReservationsService', () => {
     expect(result.guestName).toBe('Jane Doe');
     expect(result.houseRulesText).toBe('No parties.');
     expect(result.paymentInstructions).toBe('Bank X.');
+  });
+
+  describe('payment requests', () => {
+    const bankSettings = {
+      houseRulesText: 'No parties.',
+      paymentInstructions: 'Bank X.',
+      confirmationPaymentValue: '30%',
+      securityDepositValue: '15%',
+      bankAccountHolder: 'Ana Pérez',
+      bankCuil: '20123456789',
+      bankAccountNumber: '0001234567',
+      bankCbu: '0000003100012345678901',
+      bankAlias: 'LABRISA.DEMO.ARS',
+      bankName: 'Banco Ejemplo',
+    };
+    const BANK_FIELDS = ['bankAccountHolder', 'bankCuil', 'bankAccountNumber', 'bankCbu', 'bankAlias', 'bankName'] as const;
+
+    beforeEach(() => settingsService.get.mockResolvedValue(bankSettings));
+
+    it('never sends the bank details when nothing is asked for', async () => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation, askForPayment: false, askForDeposit: false });
+
+      const result = await service.getByToken('tok-1');
+
+      expect(result.askForPayment).toBe(false);
+      expect(result.askForDeposit).toBe(false);
+      expect(BANK_FIELDS.map((field) => result[field])).toEqual(['', '', '', '', '', '']);
+      expect(result.paymentInstructions).toBe('');
+    });
+
+    it.each([
+      [true, false],
+      [false, true],
+    ])('sends the bank details when asking for payment %s / deposit %s', async (askForPayment, askForDeposit) => {
+      prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation, askForPayment, askForDeposit });
+
+      const result = await service.getByToken('tok-1');
+
+      expect(result).toMatchObject({ askForPayment, askForDeposit, bankCbu: '0000003100012345678901' });
+    });
   });
 
   it('computes confirmationPaymentAmount as 30% of totalAmount', async () => {
@@ -649,6 +691,8 @@ describe('PublicReservationsService', () => {
         ...baseReservation,
         checkIn: yesterday,
         checkOut: tomorrow,
+        datesConfirmedAt: new Date('2026-01-01'),
+        contractAcceptedAt: new Date('2026-01-01'),
         confirmationPaymentReceivedAt: new Date('2026-01-01'),
         depositReceivedAt: new Date('2026-01-01'),
       });
@@ -668,6 +712,8 @@ describe('PublicReservationsService', () => {
         ...baseReservation,
         checkIn: yesterdayDateOnly,
         checkOut: todayDateOnly,
+        datesConfirmedAt: new Date('2026-01-01'),
+        contractAcceptedAt: new Date('2026-01-01'),
         confirmationPaymentReceivedAt: new Date('2026-01-01'),
         depositReceivedAt: new Date('2026-01-01'),
       });
@@ -687,6 +733,8 @@ describe('PublicReservationsService', () => {
         ...baseReservation,
         checkIn: future,
         checkOut: farFuture,
+        datesConfirmedAt: new Date('2026-01-01'),
+        contractAcceptedAt: new Date('2026-01-01'),
         confirmationPaymentReceivedAt: new Date('2026-01-01'),
         depositReceivedAt: new Date('2026-01-01'),
       });
@@ -704,6 +752,8 @@ describe('PublicReservationsService', () => {
         ...baseReservation,
         checkIn: past1,
         checkOut: past2,
+        datesConfirmedAt: new Date('2026-01-01'),
+        contractAcceptedAt: new Date('2026-01-01'),
         confirmationPaymentReceivedAt: new Date('2026-01-01'),
         depositReceivedAt: new Date('2026-01-01'),
       });
@@ -725,6 +775,36 @@ describe('PublicReservationsService', () => {
       });
 
       await expect(service.getAmbientReadings('tok-1')).rejects.toThrow(ForbiddenException);
+    });
+
+    describe('when no payment is asked for', () => {
+      const duringStay = { checkIn: inDays(-1), checkOut: inDays(1), askForPayment: false, askForDeposit: false };
+
+      beforeEach(() => {
+        process.env.DEBUG_MODE = 'false';
+        ambientService.listDevices.mockResolvedValue([]);
+      });
+
+      it('returns readings once the guest checked in and accepted the rules', async () => {
+        prisma.reservation.findUnique.mockResolvedValue({
+          ...baseReservation,
+          ...duringStay,
+          datesConfirmedAt: new Date(),
+          contractAcceptedAt: new Date(),
+        });
+
+        await expect(service.getAmbientReadings('tok-1')).resolves.toEqual([]);
+      });
+
+      it.each([
+        ['has not checked in', { datesConfirmedAt: null, contractAcceptedAt: null }],
+        ['has not accepted the rules', { datesConfirmedAt: new Date(), contractAcceptedAt: null }],
+      ])('refuses a guest who %s', async (_, progress) => {
+        prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation, ...duringStay, ...progress });
+
+        await expect(service.getAmbientReadings('tok-1')).rejects.toThrow(ForbiddenException);
+        expect(ambientService.listDevices).not.toHaveBeenCalled();
+      });
     });
 
     it('returns device readings regardless of confirmation/dates when DEBUG_MODE is on', async () => {

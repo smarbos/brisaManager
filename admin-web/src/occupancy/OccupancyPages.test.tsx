@@ -18,6 +18,8 @@ function stay(id: string, guestName: string, checkIn: string, checkOut: string, 
     currency: 'ARS',
     status: 'CONFIRMED',
     confirmationToken: `tok-${id}`,
+    askForPayment: false,
+    askForDeposit: false,
     ...overrides,
   };
 }

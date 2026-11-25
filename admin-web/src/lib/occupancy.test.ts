@@ -22,6 +22,8 @@ function stay(id: string, checkIn: string, checkOut: string, overrides: Partial<
     currency: 'ARS',
     status: 'CONFIRMED',
     confirmationToken: `tok-${id}`,
+    askForPayment: false,
+    askForDeposit: false,
     ...overrides,
   };
 }

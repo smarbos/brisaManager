@@ -98,6 +98,8 @@ describe('GuestDetailPage', () => {
           currency: 'ARS',
           status: 'CONFIRMED',
           confirmationToken: 'tok-1',
+          askForPayment: false,
+          askForDeposit: false,
         },
       ],
     });

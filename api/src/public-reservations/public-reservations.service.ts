@@ -15,6 +15,7 @@ import { AmbientService } from '../ambient/ambient.service';
 import { parsePercentage, resolveFeeAmount } from '../settings/fee-value';
 import { diffReservationFields, reservationFieldLabel } from '../reservations/reservation-field-changes';
 import { DocumentCryptoService } from '../guest-documents/document-crypto.service';
+import { isOnboardingComplete } from '../reservations/payment-requests';
 import { ConfirmDatesDto } from './dto/confirm-dates.dto';
 
 // This controller has no auth guard at all — the confirmationToken in the URL is the only
@@ -62,6 +63,8 @@ export class PublicReservationsService {
   async getByToken(token: string) {
     const reservation = await this.findByToken(token);
     const settings = await this.settingsService.get();
+    // Bank details only reach a guest who is asked to transfer something.
+    const asksForMoney = reservation.askForPayment || reservation.askForDeposit;
 
     return {
       guestName: reservation.guestName,
@@ -82,6 +85,8 @@ export class PublicReservationsService {
         settings.confirmationPaymentValue,
       ),
       currency: reservation.currency,
+      askForPayment: reservation.askForPayment,
+      askForDeposit: reservation.askForDeposit,
       datesConfirmedAt: reservation.datesConfirmedAt,
       contractAcceptedAt: reservation.contractAcceptedAt,
       contractAcceptedName: reservation.contractAcceptedName,
@@ -89,15 +94,15 @@ export class PublicReservationsService {
       confirmationPaymentReceivedAt: reservation.confirmationPaymentReceivedAt,
       depositReceivedAt: reservation.depositReceivedAt,
       houseRulesText: settings.houseRulesText,
-      paymentInstructions: settings.paymentInstructions,
+      paymentInstructions: asksForMoney ? settings.paymentInstructions : '',
       depositInstructions: settings.depositInstructions,
       confirmationStepText: settings.confirmationStepText,
-      bankAccountHolder: settings.bankAccountHolder,
-      bankCuil: settings.bankCuil,
-      bankAccountNumber: settings.bankAccountNumber,
-      bankCbu: settings.bankCbu,
-      bankAlias: settings.bankAlias,
-      bankName: settings.bankName,
+      bankAccountHolder: asksForMoney ? settings.bankAccountHolder : '',
+      bankCuil: asksForMoney ? settings.bankCuil : '',
+      bankAccountNumber: asksForMoney ? settings.bankAccountNumber : '',
+      bankCbu: asksForMoney ? settings.bankCbu : '',
+      bankAlias: asksForMoney ? settings.bankAlias : '',
+      bankName: asksForMoney ? settings.bankName : '',
       securityDepositAmount: resolveFeeAmount(
         settings.securityDepositValue,
         Number(reservation.totalAmount),
@@ -277,8 +282,8 @@ export class PublicReservationsService {
     };
   }
 
-  // A guest sees the property's current ambient sensor readings only once they're fully
-  // confirmed (both the reservation payment and the security deposit received) and only while
+  // A guest sees the property's current ambient sensor readings only once they've completed
+  // every step (check-in, house rules, and whatever payments were asked for) and only while
   // their stay is actually happening (now falls within checkIn..checkOut) — or, in a debug
   // environment, always, so this is easy to test without waiting for a real reservation
   // window. This is a real, server-side gate: whether a client renders the section is a UX
@@ -287,7 +292,6 @@ export class PublicReservationsService {
     const reservation = await this.findByToken(token);
 
     const isDebugMode = process.env.DEBUG_MODE === 'true';
-    const isFullyConfirmed = reservation.confirmationPaymentReceivedAt != null && reservation.depositReceivedAt != null;
     const now = new Date();
     // checkIn/checkOut are stored as midnight-UTC dates with no time component (see
     // guest-web/src/lib/date.ts's header comment) — "inclusive of the check-out day" means
@@ -295,7 +299,7 @@ export class PublicReservationsService {
     const stayEnd = new Date(reservation.checkOut.getTime() + 24 * 60 * 60 * 1000);
     const isDuringStay = now >= reservation.checkIn && now < stayEnd;
 
-    if (!isDebugMode && !(isFullyConfirmed && isDuringStay)) {
+    if (!isDebugMode && !(isOnboardingComplete(reservation) && isDuringStay)) {
       throw new ForbiddenException('Ambient sensor data is not available for this reservation right now');
     }
 

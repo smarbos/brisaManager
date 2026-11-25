@@ -101,6 +101,7 @@ describe('WhatsappReminderSchedulerService', () => {
       where: expect.objectContaining({
         status: { notIn: ['CANCELLED', 'COMPLETED'] },
         guestPhone: { not: null },
+        askForPayment: true,
         confirmationPaymentReceivedAt: null,
         depositReminderSentAt: null,
         confirmationEmailSentAt: { not: null, lte: expect.any(Date) },

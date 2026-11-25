@@ -22,6 +22,8 @@ describe('ReservationConfirmationService', () => {
     guestEmail: 'jane@example.com',
     confirmationToken: 'tok-1',
     status: 'PENDING',
+    askForPayment: true,
+    askForDeposit: true,
     datesConfirmedAt: null,
     contractAcceptedAt: null,
     confirmationPaymentReceivedAt: null,
@@ -184,5 +186,45 @@ describe('ReservationConfirmationService', () => {
 
       await expect(service.resendFinalEmail('res-1')).rejects.toBeInstanceOf(BadRequestException);
     });
+  });
+
+  it('confirms without waiting for payments that are not asked for', async () => {
+    prisma.reservation.findUniqueOrThrow.mockResolvedValue({
+      ...baseReservation,
+      askForPayment: false,
+      askForDeposit: false,
+      datesConfirmedAt: new Date(),
+      contractAcceptedAt: new Date(),
+    });
+
+    await service.maybeAutoConfirm('res-1');
+
+    expect(prisma.reservation.update).toHaveBeenCalledWith({ where: { id: 'res-1' }, data: { status: 'CONFIRMED' } });
+  });
+
+  it('still waits for the deposit when only the payment is not asked for', async () => {
+    prisma.reservation.findUniqueOrThrow.mockResolvedValue({
+      ...baseReservation,
+      askForPayment: false,
+      datesConfirmedAt: new Date(),
+      contractAcceptedAt: new Date(),
+    });
+
+    await service.maybeAutoConfirm('res-1');
+
+    expect(prisma.reservation.update).not.toHaveBeenCalled();
+  });
+
+  it('never confirms before the guest checked in and accepted the rules, even with nothing to pay', async () => {
+    prisma.reservation.findUniqueOrThrow.mockResolvedValue({
+      ...baseReservation,
+      askForPayment: false,
+      askForDeposit: false,
+      datesConfirmedAt: new Date(),
+    });
+
+    await service.maybeAutoConfirm('res-1');
+
+    expect(prisma.reservation.update).not.toHaveBeenCalled();
   });
 });

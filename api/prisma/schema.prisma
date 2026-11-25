@@ -38,6 +38,9 @@ enum ReservationEventType {
   CANCELLATION_EMAIL_FAILED
   INITIAL_WHATSAPP_SENT
   INITIAL_WHATSAPP_FAILED
+  // Staff-triggered WhatsApp asking for the payment (ReservationsService.sendPaymentRequest).
+  PAYMENT_REQUEST_SENT
+  PAYMENT_REQUEST_FAILED
   // Twilio accepted a WhatsApp message but later reported it failed/undelivered (via its
   // status callback — see WhatsappDeliveryService). Covers every WhatsappMessageKind.
   WHATSAPP_UNDELIVERED
@@ -133,6 +136,11 @@ model Reservation {
   status                        ReservationStatus  @default(PENDING)
   notes                         String?
   confirmationToken             String             @unique @default(uuid())
+  // Whether the guest is asked to transfer the reservation payment / the security deposit to
+  // us. What isn't asked for is hidden, not waited for and not reminded about — see
+  // api/src/reservations/payment-requests.ts for the per-channel starting values.
+  askForPayment                 Boolean            @default(false)
+  askForDeposit                 Boolean            @default(false)
   datesConfirmedAt              DateTime?
   contractAcceptedAt            DateTime?
   contractAcceptedName          String?

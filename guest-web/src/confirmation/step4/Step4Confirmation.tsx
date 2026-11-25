@@ -72,11 +72,12 @@ interface Step4ConfirmationProps {
 }
 
 export function Step4Confirmation({ reservation, token, showAmbient, stepHeadingRef }: Step4ConfirmationProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('pago');
+  const hasPayments = reservation.askForPayment || reservation.askForDeposit;
+  const [activeTab, setActiveTab] = useState<TabId>(hasPayments ? 'pago' : 'llegar');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const tabs: Tab[] = [
-    { id: 'pago', label: 'Pago', icon: <PagoIcon /> },
+    ...(hasPayments ? [{ id: 'pago' as const, label: 'Pago', icon: <PagoIcon /> }] : []),
     { id: 'llegar', label: 'Cómo llegar', icon: <LlegarIcon /> },
     { id: 'zona', label: 'La zona', icon: <ZonaIcon /> },
   ];
@@ -109,7 +110,7 @@ export function Step4Confirmation({ reservation, token, showAmbient, stepHeading
 
   return (
     <>
-      <Badge tone="success">✓ Pago confirmado</Badge>
+      <Badge tone="success">{hasPayments ? '✓ Pago confirmado' : '✓ Check-in completo'}</Badge>
       <h2 ref={stepHeadingRef} tabIndex={-1} className="mt-2 font-heading text-xl font-bold text-heading outline-none">
         Confirmación
       </h2>
@@ -144,9 +145,11 @@ export function Step4Confirmation({ reservation, token, showAmbient, stepHeading
         ))}
       </div>
 
-      <div role="tabpanel" id="panel-pago" aria-labelledby="tab-pago" hidden={activeTab !== 'pago'} className="mt-4">
-        <PagoTab reservation={reservation} />
-      </div>
+      {hasPayments && (
+        <div role="tabpanel" id="panel-pago" aria-labelledby="tab-pago" hidden={activeTab !== 'pago'} className="mt-4">
+          <PagoTab reservation={reservation} />
+        </div>
+      )}
       <div role="tabpanel" id="panel-llegar" aria-labelledby="tab-llegar" hidden={activeTab !== 'llegar'} className="mt-4">
         <ComoLlegarTab />
       </div>
