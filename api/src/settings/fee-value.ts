@@ -27,3 +27,10 @@ export function parsePercentage(raw: string): number | null {
   const percentage = Number(trimmed.slice(0, -1));
   return Number.isNaN(percentage) ? null : percentage;
 }
+
+// The currency a resolved fee is shown in: a percentage is part of the total, so it's in the
+// reservation's currency; a fixed amount is always typed in pesos (Settings says so), even on a
+// USD reservation.
+export function feeCurrency(raw: string, reservationCurrency: string): string {
+  return parsePercentage(raw) === null ? 'ARS' : reservationCurrency;
+}

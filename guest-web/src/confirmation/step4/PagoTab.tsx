@@ -28,6 +28,8 @@ function ChevronIcon() {
 export function PagoTab({ reservation }: { reservation: GuestReservation }) {
   const [isOpen, setIsOpen] = useState(false);
   const remainingAtProperty = reservation.totalAmount - reservation.confirmationPaymentAmount;
+  // A fixed peso fee on a USD reservation can't be subtracted from the total.
+  const showRemaining = reservation.confirmationPaymentCurrency === reservation.currency;
 
   return (
     <div>
@@ -50,17 +52,19 @@ export function PagoTab({ reservation }: { reservation: GuestReservation }) {
                 {reservation.confirmationPaymentPercentage !== null && ` (${reservation.confirmationPaymentPercentage}%)`}
               </dt>
               <dd className="flex items-center gap-2 font-semibold text-heading">
-                {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
+                {formatMoney(reservation.confirmationPaymentCurrency, reservation.confirmationPaymentAmount)}
                 <Badge tone="success">✓ Confirmado</Badge>
               </dd>
             </div>
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div>
-                <dt className="text-text-muted">Restante a pagar en el lugar</dt>
-                <p className="text-xs text-text-muted">Se abona al momento del check-in.</p>
+            {showRemaining && (
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div>
+                  <dt className="text-text-muted">Restante a pagar en el lugar</dt>
+                  <p className="text-xs text-text-muted">Se abona al momento del check-in.</p>
+                </div>
+                <dd className="font-semibold text-heading">{formatMoney(reservation.currency, remainingAtProperty)}</dd>
               </div>
-              <dd className="font-semibold text-heading">{formatMoney(reservation.currency, remainingAtProperty)}</dd>
-            </div>
+            )}
           </>
         )}
         {reservation.askForDeposit && (
@@ -70,7 +74,7 @@ export function PagoTab({ reservation }: { reservation: GuestReservation }) {
               <p className="whitespace-pre-wrap text-xs text-text-muted">{reservation.depositInstructions}</p>
             </div>
             <dd className="flex items-center gap-2 font-semibold text-heading">
-              {formatMoney(reservation.currency, reservation.securityDepositAmount)}
+              {formatMoney(reservation.securityDepositCurrency, reservation.securityDepositAmount)}
               <Badge tone="success">✓ Confirmado</Badge>
             </dd>
           </div>

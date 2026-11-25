@@ -624,7 +624,7 @@ export function ConfirmationPage() {
                         ` (${reservation.confirmationPaymentPercentage}%)`}
                     </p>
                     <p className="text-sm text-text-muted">
-                      {formatMoney(reservation.currency, reservation.confirmationPaymentAmount)}
+                      {formatMoney(reservation.confirmationPaymentCurrency, reservation.confirmationPaymentAmount)}
                     </p>
                   </div>
                   <Badge tone={reservation.confirmationPaymentReceivedAt ? 'success' : 'warning'}>
@@ -641,7 +641,7 @@ export function ConfirmationPage() {
                   <div>
                     <p className="font-semibold text-heading">Depósito de garantía</p>
                     <p className="text-sm text-text-muted">
-                      {formatMoney(reservation.currency, reservation.securityDepositAmount)} ·{' '}
+                      {formatMoney(reservation.securityDepositCurrency, reservation.securityDepositAmount)} ·{' '}
                       {reservation.askForPayment ? 'por transferencia a la misma cuenta' : 'por transferencia'}
                     </p>
                   </div>

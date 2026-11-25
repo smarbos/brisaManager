@@ -16,6 +16,7 @@ const baseReservation = {
   totalAmount: 100000,
   confirmationPaymentAmount: 30000,
   confirmationPaymentPercentage: 30,
+  confirmationPaymentCurrency: 'ARS',
   currency: 'ARS',
   askForPayment: true,
   askForDeposit: true,
@@ -36,6 +37,7 @@ const baseReservation = {
   bankAlias: 'LABRISA.DEMO.ARS',
   bankName: 'Banco Ejemplo',
   securityDepositAmount: 150000,
+  securityDepositCurrency: 'ARS',
 };
 
 function renderAt(token: string) {
@@ -289,6 +291,27 @@ describe('ConfirmationPage', () => {
     fireEvent.click(acceptButton);
 
     await waitFor(() => expect(acceptSpy).toHaveBeenCalledWith('tok-1'));
+  });
+
+  it('shows each amount on step 3 in its own currency: a fixed peso fee stays in pesos on a USD reservation', async () => {
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedName: 'Jane Doe',
+      currency: 'USD',
+      totalAmount: 1000,
+      confirmationPaymentAmount: 210000,
+      confirmationPaymentPercentage: null,
+      confirmationPaymentCurrency: 'ARS',
+      securityDepositAmount: 150,
+      securityDepositCurrency: 'USD',
+    });
+
+    renderAt('tok-1');
+
+    expect(await screen.findByText('ARS 210.000')).toBeInTheDocument();
+    expect(screen.getByText('USD 150 · por transferencia a la misma cuenta')).toBeInTheDocument();
   });
 
   it('resumes at step 3 (payment), showing the bank details and deposit info', async () => {

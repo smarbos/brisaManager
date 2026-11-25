@@ -13,6 +13,7 @@ const reservation: GuestReservation = {
   totalAmount: 100000,
   confirmationPaymentAmount: 30000,
   confirmationPaymentPercentage: 30,
+  confirmationPaymentCurrency: 'ARS',
   currency: 'ARS',
   askForPayment: true,
   askForDeposit: true,
@@ -33,6 +34,7 @@ const reservation: GuestReservation = {
   bankAlias: 'LABRISA.DEMO.ARS',
   bankName: 'Banco Ejemplo',
   securityDepositAmount: 150000,
+  securityDepositCurrency: 'ARS',
 };
 
 describe('Step4Confirmation', () => {

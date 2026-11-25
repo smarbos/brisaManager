@@ -12,7 +12,7 @@ import { GuestsService } from '../guests/guests.service';
 import { ReservationImagesService } from '../reservation-images/reservation-images.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AmbientService } from '../ambient/ambient.service';
-import { parsePercentage, resolveFeeAmount } from '../settings/fee-value';
+import { feeCurrency, parsePercentage, resolveFeeAmount } from '../settings/fee-value';
 import { diffReservationFields, reservationFieldLabel } from '../reservations/reservation-field-changes';
 import { DocumentCryptoService } from '../guest-documents/document-crypto.service';
 import { isOnboardingComplete } from '../reservations/payment-requests';
@@ -84,6 +84,7 @@ export class PublicReservationsService {
       confirmationPaymentPercentage: parsePercentage(
         settings.confirmationPaymentValue,
       ),
+      confirmationPaymentCurrency: feeCurrency(settings.confirmationPaymentValue, reservation.currency),
       currency: reservation.currency,
       askForPayment: reservation.askForPayment,
       askForDeposit: reservation.askForDeposit,
@@ -107,6 +108,7 @@ export class PublicReservationsService {
         settings.securityDepositValue,
         Number(reservation.totalAmount),
       ),
+      securityDepositCurrency: feeCurrency(settings.securityDepositValue, reservation.currency),
     };
   }
 

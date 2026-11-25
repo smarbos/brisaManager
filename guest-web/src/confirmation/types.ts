@@ -7,6 +7,8 @@ export interface GuestReservation {
   confirmationPaymentAmount: number;
   // null when the admin configured a fixed amount instead of a percentage for this fee.
   confirmationPaymentPercentage: number | null;
+  // A fixed fee is always in pesos; a percentage is in the reservation's currency.
+  confirmationPaymentCurrency: string;
   currency: string;
   // What the guest is asked to transfer; nothing else about a payment is shown.
   askForPayment: boolean;
@@ -28,4 +30,5 @@ export interface GuestReservation {
   bankAlias: string;
   bankName: string;
   securityDepositAmount: number;
+  securityDepositCurrency: string;
 }

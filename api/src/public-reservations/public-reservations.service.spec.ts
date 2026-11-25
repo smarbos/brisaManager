@@ -229,6 +229,26 @@ describe('PublicReservationsService', () => {
     expect(result.confirmationPaymentPercentage).toBeNull();
   });
 
+  it('gives each fee its currency: pesos for a fixed amount, the reservation currency for a percentage', async () => {
+    settingsService.get.mockResolvedValue({
+      houseRulesText: 'No parties.',
+      paymentInstructions: 'Bank X.',
+      confirmationPaymentValue: '210000',
+      securityDepositValue: '15%',
+    });
+    prisma.reservation.findUnique.mockResolvedValue({ ...baseReservation, totalAmount: 1000, currency: 'USD' });
+
+    const result = await service.getByToken('tok-1');
+
+    expect(result).toMatchObject({
+      currency: 'USD',
+      confirmationPaymentAmount: 210000,
+      confirmationPaymentCurrency: 'ARS',
+      securityDepositAmount: 150,
+      securityDepositCurrency: 'USD',
+    });
+  });
+
   it('resolves securityDepositAmount as a fixed amount when configured as one', async () => {
     settingsService.get.mockResolvedValue({
       houseRulesText: 'No parties.',

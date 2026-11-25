@@ -11,6 +11,7 @@ const reservation: GuestReservation = {
   totalAmount: 100000,
   confirmationPaymentAmount: 30000,
   confirmationPaymentPercentage: 30,
+  confirmationPaymentCurrency: 'ARS',
   currency: 'ARS',
   askForPayment: true,
   askForDeposit: true,
@@ -31,6 +32,7 @@ const reservation: GuestReservation = {
   bankAlias: 'LABRISA.DEMO.ARS',
   bankName: 'Banco Ejemplo',
   securityDepositAmount: 150000,
+  securityDepositCurrency: 'ARS',
 };
 
 describe('PagoTab', () => {
@@ -50,6 +52,28 @@ describe('PagoTab', () => {
 
     expect(screen.getByText('Pago de reserva')).toBeInTheDocument();
     expect(screen.queryByText(/pago de reserva \(/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a fixed peso amount in pesos on a USD reservation, without a mixed-currency remainder', () => {
+    render(
+      <PagoTab
+        reservation={{
+          ...reservation,
+          currency: 'USD',
+          totalAmount: 1000,
+          confirmationPaymentAmount: 210000,
+          confirmationPaymentPercentage: null,
+          confirmationPaymentCurrency: 'ARS',
+          securityDepositAmount: 150,
+          securityDepositCurrency: 'USD',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('USD 1.000')).toBeInTheDocument();
+    expect(screen.getByText('ARS 210.000')).toBeInTheDocument();
+    expect(screen.getByText('USD 150')).toBeInTheDocument();
+    expect(screen.queryByText('Restante a pagar en el lugar')).not.toBeInTheDocument();
   });
 
   it('reveals the bank transfer details when the accordion is opened', () => {

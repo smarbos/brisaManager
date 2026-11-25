@@ -1,4 +1,4 @@
-import { parsePercentage, resolveFeeAmount } from './fee-value';
+import { feeCurrency, parsePercentage, resolveFeeAmount } from './fee-value';
 
 describe('resolveFeeAmount', () => {
   it('resolves a percentage value against the total', () => {
@@ -35,5 +35,16 @@ describe('parsePercentage', () => {
 
   it('trims surrounding whitespace before parsing', () => {
     expect(parsePercentage(' 30% ')).toBe(30);
+  });
+});
+
+describe('feeCurrency', () => {
+  it('uses the reservation currency for a percentage', () => {
+    expect(feeCurrency('30%', 'USD')).toBe('USD');
+  });
+
+  it('is always pesos for a fixed amount, whatever the reservation currency', () => {
+    expect(feeCurrency('210000', 'USD')).toBe('ARS');
+    expect(feeCurrency(' 210000 ', 'ARS')).toBe('ARS');
   });
 });
