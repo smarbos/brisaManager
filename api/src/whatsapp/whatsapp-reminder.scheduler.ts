@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappService } from './whatsapp.service';
@@ -20,7 +20,8 @@ export class WhatsappReminderSchedulerService {
     private readonly settingsService: SettingsService,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_9AM)
+  // Pinned to Argentina: the server runs in UTC, where 9 AM was 6 AM for guests.
+  @Cron('0 10 * * *', { timeZone: 'America/Argentina/Buenos_Aires' })
   async handleDailyReminders(): Promise<void> {
     try {
       const settings = await this.settingsService.get();
@@ -81,7 +82,11 @@ export class WhatsappReminderSchedulerService {
         askForPayment: true,
         confirmationPaymentReceivedAt: null,
         depositReminderSentAt: null,
-        confirmationEmailSentAt: { not: null, lte: cutoff },
+        // Counted from the first message, email or WhatsApp, so guests with only a phone get it too.
+        OR: [
+          { confirmationEmailSentAt: { not: null, lte: cutoff } },
+          { confirmationWhatsappSentAt: { not: null, lte: cutoff } },
+        ],
         checkIn: { gte: startOfUtcDayOffset(0) },
       },
     });

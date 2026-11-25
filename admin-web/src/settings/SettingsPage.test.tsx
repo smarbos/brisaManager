@@ -168,7 +168,7 @@ describe('SettingsPage', () => {
     await waitFor(() =>
       expect(screen.getByLabelText(/días antes del check-in/i)).toHaveValue(3),
     );
-    expect(screen.getByLabelText(/días después del email inicial/i)).toHaveValue(3);
+    expect(screen.getByLabelText(/días después del primer mensaje/i)).toHaveValue(3);
     expect(screen.queryByLabelText(/mensaje de recordatorio/i)).not.toBeInTheDocument();
     expect(screen.getByText(/se edita en la consola de twilio/i)).toBeInTheDocument();
 

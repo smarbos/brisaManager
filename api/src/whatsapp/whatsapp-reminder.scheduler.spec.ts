@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { SCHEDULE_CRON_OPTIONS } from '@nestjs/schedule/dist/schedule.constants';
 import { WhatsappReminderSchedulerService } from './whatsapp-reminder.scheduler';
 import { WhatsappService } from './whatsapp.service';
 import { SettingsService } from '../settings/settings.service';
@@ -30,6 +31,12 @@ describe('WhatsappReminderSchedulerService', () => {
     }).compile();
 
     scheduler = moduleRef.get(WhatsappReminderSchedulerService);
+  });
+
+  it('runs every day at 10 AM Argentina time, not in the server time zone', () => {
+    const options = Reflect.getMetadata(SCHEDULE_CRON_OPTIONS, WhatsappReminderSchedulerService.prototype.handleDailyReminders);
+
+    expect(options).toMatchObject({ cronTime: '0 10 * * *', timeZone: 'America/Argentina/Buenos_Aires' });
   });
 
   it('sends a reservation reminder and stamps reservationReminderSentAt on success', async () => {
@@ -104,7 +111,11 @@ describe('WhatsappReminderSchedulerService', () => {
         askForPayment: true,
         confirmationPaymentReceivedAt: null,
         depositReminderSentAt: null,
-        confirmationEmailSentAt: { not: null, lte: expect.any(Date) },
+        // Counted from the first message, email or WhatsApp, so guests with only a phone get it too.
+        OR: [
+          { confirmationEmailSentAt: { not: null, lte: expect.any(Date) } },
+          { confirmationWhatsappSentAt: { not: null, lte: expect.any(Date) } },
+        ],
         checkIn: { gte: expect.any(Date) },
       }),
     });

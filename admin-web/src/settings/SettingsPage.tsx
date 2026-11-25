@@ -446,8 +446,8 @@ export function SettingsPage() {
           <h2 className="mb-1 font-heading text-lg font-semibold text-heading">Recordatorios de WhatsApp</h2>
           <p className="mb-4 text-sm text-text-muted">
             Se envían automáticamente por WhatsApp (vía Twilio) cuando el huésped tiene un número de teléfono
-            cargado. El texto de cada mensaje es una plantilla aprobada por WhatsApp y se edita en la consola de
-            Twilio, no acá.
+            cargado, todos los días a las 10 (hora de Argentina). El texto de cada mensaje es una plantilla aprobada
+            por WhatsApp y se edita en la consola de Twilio, no acá.
           </p>
           <div className="flex flex-col gap-4">
             <FormField label="Días antes del check-in para el recordatorio de reserva">
@@ -460,7 +460,7 @@ export function SettingsPage() {
                 }
               />
             </FormField>
-            <FormField label="Días después del email inicial para el recordatorio de depósito">
+            <FormField label="Días después del primer mensaje (email o WhatsApp) para el recordatorio de pago">
               <Input
                 type="number"
                 min={1}
