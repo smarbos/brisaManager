@@ -142,6 +142,7 @@ export function ConfirmationPage() {
   const [paymentUpdateError, setPaymentUpdateError] = useState<string | null>(null);
   const [viewerImageId, setViewerImageId] = useState<string | null>(null);
   const [debugMode, setDebugMode] = useState(false);
+  const [ambientControlEnabled, setAmbientControlEnabled] = useState(false);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousStepRef = useRef<Step | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -191,8 +192,14 @@ export function ConfirmationPage() {
 
   useEffect(() => {
     getConfig()
-      .then((config) => setDebugMode(config.debugMode))
-      .catch(() => setDebugMode(false));
+      .then((config) => {
+        setDebugMode(config.debugMode);
+        setAmbientControlEnabled(config.ambientControlEnabled === true);
+      })
+      .catch(() => {
+        setDebugMode(false);
+        setAmbientControlEnabled(false);
+      });
   }, []);
 
   // Move focus to the new step's heading when the guest advances (confirm dates, accept
@@ -333,7 +340,7 @@ export function ConfirmationPage() {
   // same fix in the backend's own eligibility check (the real gate this only mirrors for UX).
   const stayEnd = new Date(new Date(reservation.checkOut).getTime() + 24 * 60 * 60 * 1000);
   const isDuringStay = now >= new Date(reservation.checkIn) && now < stayEnd;
-  const showAmbient = debugMode || (isFullyConfirmed && isDuringStay);
+  const showAmbient = ambientControlEnabled && (debugMode || (isFullyConfirmed && isDuringStay));
   // Shown once: in the payment's card, or in the deposit's when that's all that's asked for.
   const transferDetails = (
     <>

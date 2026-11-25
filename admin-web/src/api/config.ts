@@ -2,6 +2,7 @@ import { apiClient } from './client';
 
 export interface AppConfig {
   debugMode: boolean;
+  ambientControlEnabled: boolean;
   version: string;
 }
 

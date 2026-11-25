@@ -12,10 +12,14 @@ const COMMIT_HASH = (import.meta.env.VITE_COMMIT_HASH as string) || 'dev';
 // unlike admin-web's semver, this is a commit hash since guest-web isn't otherwise versioned.
 export function AppFooter() {
   const [debugMode, setDebugMode] = useState(false);
+  const [ambientControlEnabled, setAmbientControlEnabled] = useState(false);
 
   useEffect(() => {
     getConfig()
-      .then((config) => setDebugMode(config.debugMode))
+      .then((config) => {
+        setDebugMode(config.debugMode);
+        setAmbientControlEnabled(config.ambientControlEnabled === true);
+      })
       .catch(() => setDebugMode(false));
   }, []);
 
@@ -24,7 +28,8 @@ export function AppFooter() {
       <span>{COMMIT_HASH}</span>
       {debugMode && (
         <span className="rounded bg-warning-bg px-2 py-0.5 font-semibold text-warning">
-          Modo debug activo: los emails y WhatsApp no se envían a los huéspedes reales y los sensores son visibles para cualquier reserva.
+          Modo debug activo: los emails y WhatsApp no se envían a los huéspedes reales
+          {ambientControlEnabled ? ' y los sensores son visibles para cualquier reserva' : ''}.
         </span>
       )}
     </footer>

@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { PrismaService } from './prisma/prisma.service';
+import { isAmbientControlEnabled } from './ambient/ambient-control';
 
 // Read from disk at request time rather than imported as a JSON module: the compiled output
 // lives at dist/src/*.js, so a relative import path resolved against the *source* file
@@ -23,6 +24,6 @@ export class AppController {
 
   @Get('config')
   config() {
-    return { debugMode: process.env.DEBUG_MODE === 'true', version };
+    return { debugMode: process.env.DEBUG_MODE === 'true', ambientControlEnabled: isAmbientControlEnabled(), version };
   }
 }

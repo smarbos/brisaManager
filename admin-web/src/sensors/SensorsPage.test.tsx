@@ -1,7 +1,8 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SensorsPage } from './SensorsPage';
 import * as ambientDevicesApi from '../api/ambient-devices';
+import * as configApi from '../api/config';
 
 const device = {
   id: 'ambient-control-living-room',
@@ -12,6 +13,29 @@ const device = {
 };
 
 describe('SensorsPage', () => {
+  beforeEach(() => {
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, ambientControlEnabled: true, version: '9.9.9' });
+  });
+
+  it('says alerts are off when ambient control is disabled', async () => {
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, ambientControlEnabled: false, version: '9.9.9' });
+    vi.spyOn(ambientDevicesApi, 'listAmbientDevices').mockResolvedValue([]);
+
+    render(<SensorsPage />);
+
+    expect(await screen.findByText(/control ambiental desactivado/i)).toBeInTheDocument();
+  });
+
+  it('does not show the disabled notice when ambient control is on', async () => {
+    vi.spyOn(ambientDevicesApi, 'listAmbientDevices').mockResolvedValue([]);
+
+    render(<SensorsPage />);
+
+    await screen.findByText(/todavía no se conectó ningún dispositivo/i);
+    await waitFor(() => expect(configApi.getConfig).toHaveBeenCalled());
+    expect(screen.queryByText(/control ambiental desactivado/i)).not.toBeInTheDocument();
+  });
+
   it('shows an empty state when no device has connected yet', async () => {
     vi.spyOn(ambientDevicesApi, 'listAmbientDevices').mockResolvedValue([]);
 

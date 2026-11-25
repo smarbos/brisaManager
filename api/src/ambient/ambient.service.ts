@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { isAmbientControlEnabled } from './ambient-control';
 import { SettingsService } from '../settings/settings.service';
 import { isWithinSoundAlertWindow, parseSoundAlertWindows } from './sound-alert-windows';
 import { LogAmbientAlertDto } from './dto/log-ambient-alert.dto';
@@ -85,6 +86,11 @@ export class AmbientService {
     // Sensors page reflects it too even between heartbeats.
     const readings = dto.level != null ? [{ sensor: dto.sensor, level: dto.level, threshold: dto.threshold }] : [];
     await this.recordDeviceActivity(dto.deviceId, undefined, readings);
+
+    // With ambient control off the event stays in the history, but nobody is alerted.
+    if (!isAmbientControlEnabled()) {
+      return event;
+    }
 
     // Repeated-loud-noise alerts are complaint-style, not safety-critical (unlike smoke/CO,
     // which always notify) - staff only wants to be paged about them during configured quiet
@@ -189,7 +195,13 @@ export class AmbientService {
       const message = `El umbral de alerta de ${label} del dispositivo ${deviceId} cambió de ${previousThreshold} a ${threshold}. Si nadie lo recalibró, revisá el dispositivo.`;
       this.logger.warn(message);
       await this.prisma.ambientEvent.create({ data: { deviceId, sensor, level: threshold, message } });
-      await this.notificationsService.create({ type: 'AMBIENT_ALERT', message });
+      if (isAmbientControlEnabled()) {
+        await this.notificationsService.create({ type: 'AMBIENT_ALERT', message });
+      }
+    }
+
+    if (!isAmbientControlEnabled()) {
+      return;
     }
 
     const max = MAX_GAS_ALERT_THRESHOLD[sensor];
@@ -225,6 +237,9 @@ export class AmbientService {
   // Run every minute by AmbientOfflineSchedulerService. Cheap regardless of the 5-minute
   // heartbeat interval - most runs will find nothing stale.
   async checkOfflineDevices() {
+    if (!isAmbientControlEnabled()) {
+      return;
+    }
     const staleBefore = new Date(Date.now() - DEVICE_OFFLINE_THRESHOLD_MS);
     const devices = await this.prisma.ambientDevice.findMany({
       where: { lastSeenAt: { lt: staleBefore } },

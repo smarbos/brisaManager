@@ -691,8 +691,21 @@ describe('PublicReservationsService', () => {
   describe('getAmbientReadings', () => {
     const originalDebugMode = process.env.DEBUG_MODE;
 
+    beforeEach(() => {
+      process.env.AMBIENT_CONTROL_ENABLED = 'true';
+    });
+
     afterEach(() => {
       process.env.DEBUG_MODE = originalDebugMode;
+    });
+
+    it('throws NotFoundException when ambient control is off, even in debug mode', async () => {
+      process.env.AMBIENT_CONTROL_ENABLED = 'false';
+      process.env.DEBUG_MODE = 'true';
+      prisma.reservation.findUnique.mockResolvedValue(baseReservation);
+
+      await expect(service.getAmbientReadings('tok-1')).rejects.toThrow(NotFoundException);
+      expect(ambientService.listDevices).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException for an unknown token', async () => {

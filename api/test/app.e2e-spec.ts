@@ -25,7 +25,11 @@ describe('AppController (e2e)', () => {
       .get('/config')
       .expect(200)
       .expect((res) =>
-        expect(res.body).toEqual({ debugMode: process.env.DEBUG_MODE === 'true', version: expect.any(String) }),
+        expect(res.body).toEqual({
+          debugMode: process.env.DEBUG_MODE === 'true',
+          ambientControlEnabled: process.env.AMBIENT_CONTROL_ENABLED === 'true',
+          version: expect.any(String),
+        }),
       );
   });
 });

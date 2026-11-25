@@ -5,6 +5,7 @@ import {
   AmbientDeviceEntry,
   AmbientDeviceReadingEntry,
 } from '../api/ambient-devices';
+import { getConfig } from '../api/config';
 import { Alert, Badge, Button, Card, EmptyState, LoadingState, PageContainer, PageHeader, useTwoStepConfirm } from '../ui';
 import { formatDateTime, formatRelativeTime } from '../lib/date';
 import { ambientSensorLabel } from '../lib/labels';
@@ -188,6 +189,8 @@ export function SensorsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
+  // null until the API answers, so the notice doesn't flash on a page where control is on.
+  const [ambientControlEnabled, setAmbientControlEnabled] = useState<boolean | null>(null);
 
   function load() {
     return listAmbientDevices()
@@ -198,6 +201,12 @@ export function SensorsPage() {
       .catch(() => setError('No se pudieron cargar los dispositivos. Por favor, recargá la página.'))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    getConfig()
+      .then((config) => setAmbientControlEnabled(config.ambientControlEnabled === true))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     load();
@@ -241,6 +250,12 @@ export function SensorsPage() {
           </Button>
         }
       />
+      {ambientControlEnabled === false && (
+        <p role="status" className="rounded-lg bg-warning-bg px-3 py-2 text-sm text-warning">
+          Control ambiental desactivado (<code>AMBIENT_CONTROL_ENABLED</code>): los dispositivos siguen reportando y se
+          guarda el historial, pero no se generan alertas ni notificaciones y los huéspedes no ven los sensores.
+        </p>
+      )}
       {error && <Alert>{error}</Alert>}
       {notice && <Alert tone="success">{notice}</Alert>}
       {loading ? (

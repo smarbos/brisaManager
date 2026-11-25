@@ -20,7 +20,15 @@ describe('AmbientService', () => {
   let notificationsService: { hasOpen: jest.Mock; create: jest.Mock; resolveOpen: jest.Mock };
   let settingsService: { get: jest.Mock };
 
+  const originalAmbientControl = process.env.AMBIENT_CONTROL_ENABLED;
+
+  afterEach(() => {
+    process.env.AMBIENT_CONTROL_ENABLED = originalAmbientControl;
+  });
+
   beforeEach(async () => {
+    // Every test below except the "ambient control off" block runs with it on.
+    process.env.AMBIENT_CONTROL_ENABLED = 'true';
     prisma = {
       ambientEvent: { create: jest.fn(), findMany: jest.fn() },
       ambientDevice: {
@@ -566,6 +574,50 @@ describe('AmbientService', () => {
       expect(prisma.ambientEvent.findMany).toHaveBeenCalledWith({
         orderBy: { createdAt: 'desc' },
       });
+    });
+  });
+
+  describe('with ambient control off', () => {
+    beforeEach(() => {
+      process.env.AMBIENT_CONTROL_ENABLED = 'false';
+    });
+
+    it('logs a smoke alert but creates no notification', async () => {
+      prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
+
+      await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'smoke', level: 900 });
+
+      expect(prisma.ambientEvent.create).toHaveBeenCalled();
+      expect(prisma.ambientDeviceReading.upsert).toHaveBeenCalled();
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('logs a changed gas threshold but creates no notification', async () => {
+      prisma.ambientDeviceReading.findUnique.mockResolvedValue({ threshold: 400 });
+
+      await service.recordHeartbeat({
+        deviceId: 'ambient-control-01',
+        readings: [{ sensor: 'co', level: 100, threshold: 9999 }],
+      });
+
+      expect(prisma.ambientEvent.create).toHaveBeenCalled();
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('treats an unset flag as off', async () => {
+      delete process.env.AMBIENT_CONTROL_ENABLED;
+      prisma.ambientEvent.create.mockResolvedValue({ id: '1' });
+
+      await service.recordAlert({ deviceId: 'ambient-control-01', sensor: 'co', level: 900 });
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('does not look for offline devices', async () => {
+      await service.checkOfflineDevices();
+
+      expect(prisma.ambientDevice.findMany).not.toHaveBeenCalled();
+      expect(notificationsService.create).not.toHaveBeenCalled();
     });
   });
 });

@@ -5,7 +5,7 @@ import * as configApi from './api/config';
 
 describe('AppFooter', () => {
   it('always shows a build identifier', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, ambientControlEnabled: false });
 
     render(<AppFooter />);
 
@@ -14,15 +14,32 @@ describe('AppFooter', () => {
   });
 
   it('shows the debug warning when email debug mode is on', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true, ambientControlEnabled: false });
 
     render(<AppFooter />);
 
     expect(await screen.findByText(/modo debug activo/i)).toBeInTheDocument();
   });
 
+  it('mentions the sensors in the debug warning only when ambient control is on', async () => {
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true, ambientControlEnabled: true });
+
+    render(<AppFooter />);
+
+    expect(await screen.findByText(/los sensores son visibles/i)).toBeInTheDocument();
+  });
+
+  it('leaves the sensors out of the debug warning when ambient control is off', async () => {
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true, ambientControlEnabled: false });
+
+    render(<AppFooter />);
+
+    expect(await screen.findByText(/modo debug activo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/sensores/i)).not.toBeInTheDocument();
+  });
+
   it('does not show the debug warning when email debug mode is off', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, ambientControlEnabled: false });
 
     render(<AppFooter />);
 

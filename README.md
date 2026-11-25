@@ -80,6 +80,9 @@
      emailed to `EMAIL_INBOUND_ADDRESS` (or `ALERT_EMAIL` if that's empty) with the guest's
      reservation; requests without a valid Twilio signature get 403. Without the webhook, replies
      are lost.
+   - **`AMBIENT_CONTROL_ENABLED`:** `true` turns the sensors on. Anything else (or unset) keeps
+     recording what the devices report, but creates no noise/CO/smoke/offline notifications and
+     hides the sensors from guests. Change it with `up -d api` (`restart` doesn't reload `.env`).
    - **CORS origins:** `ADMIN_WEB_ORIGIN=https://admin.labrisa.com.ar` and
      `GUEST_WEB_ORIGIN=https://checkin.labrisa.com.ar` — the API rejects browser requests from
      any other origin, so localhost defaults will break the deployed admin app. `GUEST_WEB_ORIGIN`

@@ -671,7 +671,7 @@ describe('ConfirmationPage', () => {
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, ambientControlEnabled: true });
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
       checkIn: yesterday,
@@ -691,7 +691,7 @@ describe('ConfirmationPage', () => {
   });
 
   it('does not show ambient sensor status outside the stay dates, even when fully confirmed', async () => {
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, ambientControlEnabled: true });
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
       datesConfirmedAt: '2026-01-01T00:00:00.000Z',
@@ -711,7 +711,7 @@ describe('ConfirmationPage', () => {
     // Ambient data now lives inside step 4's Sensores tab, which only exists once both
     // payments are received (debug mode does not bypass that) - what debug mode still bypasses
     // is the stay-date window check, tested here with dates far in the past.
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true, ambientControlEnabled: true });
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
       datesConfirmedAt: '2026-01-01T00:00:00.000Z',
@@ -730,11 +730,34 @@ describe('ConfirmationPage', () => {
     expect(await screen.findByText('Living room')).toBeInTheDocument();
   });
 
+  it('does not show ambient sensor status when ambient control is off, even in debug mode', async () => {
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: true, ambientControlEnabled: false });
+    vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
+      ...baseReservation,
+      checkIn: yesterday,
+      checkOut: tomorrow,
+      datesConfirmedAt: '2026-01-01T00:00:00.000Z',
+      contractAcceptedAt: '2026-01-01T00:00:00.000Z',
+      confirmationPaymentReceivedAt: '2026-01-02T00:00:00.000Z',
+      depositReceivedAt: '2026-01-02T00:00:00.000Z',
+    });
+    const getAmbientReadings = vi.spyOn(ambientApi, 'getAmbientReadings');
+
+    renderAt('tok-1');
+
+    await screen.findByText(/pago confirmado/i);
+    expect(screen.queryByRole('tab', { name: /sensores/i })).not.toBeInTheDocument();
+    expect(getAmbientReadings).not.toHaveBeenCalled();
+  });
+
   it('does not show ambient sensor status during the stay dates when not yet fully confirmed', async () => {
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false });
+    vi.spyOn(configApi, 'getConfig').mockResolvedValue({ debugMode: false, ambientControlEnabled: true });
     vi.spyOn(publicApi, 'getReservationByToken').mockResolvedValue({
       ...baseReservation,
       checkIn: yesterday,

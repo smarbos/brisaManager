@@ -12,6 +12,7 @@ import { GuestsService } from '../guests/guests.service';
 import { ReservationImagesService } from '../reservation-images/reservation-images.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AmbientService } from '../ambient/ambient.service';
+import { isAmbientControlEnabled } from '../ambient/ambient-control';
 import { feeCurrency, parsePercentage, resolveFeeAmount } from '../settings/fee-value';
 import { diffReservationFields, reservationFieldLabel } from '../reservations/reservation-field-changes';
 import { DocumentCryptoService } from '../guest-documents/document-crypto.service';
@@ -291,6 +292,10 @@ export class PublicReservationsService {
   // window. This is a real, server-side gate: whether a client renders the section is a UX
   // nicety, not the security boundary.
   async getAmbientReadings(token: string) {
+    // Ambient control off: there are no sensors to show, for any reservation, debug or not.
+    if (!isAmbientControlEnabled()) {
+      throw new NotFoundException('Ambient sensors are not enabled');
+    }
     const reservation = await this.findByToken(token);
 
     const isDebugMode = process.env.DEBUG_MODE === 'true';
