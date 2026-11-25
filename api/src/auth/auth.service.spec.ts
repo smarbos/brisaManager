@@ -7,11 +7,11 @@ import { PrismaService } from '../prisma/prisma.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: { adminUser: { findUnique: jest.Mock } };
+  let prisma: { adminUser: { findFirst: jest.Mock } };
   let jwtService: JwtService;
 
   beforeEach(async () => {
-    prisma = { adminUser: { findUnique: jest.fn() } };
+    prisma = { adminUser: { findFirst: jest.fn() } };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -26,25 +26,36 @@ describe('AuthService', () => {
   });
 
   it('throws UnauthorizedException when the user does not exist', async () => {
-    prisma.adminUser.findUnique.mockResolvedValue(null);
+    prisma.adminUser.findFirst.mockResolvedValue(null);
 
     await expect(service.login('missing@labrisa.com.ar', 'password')).rejects.toThrow(UnauthorizedException);
   });
 
   it('throws UnauthorizedException when the password does not match', async () => {
     const passwordHash = await bcrypt.hash('correct-password', 10);
-    prisma.adminUser.findUnique.mockResolvedValue({ id: '1', email: 'admin@labrisa.com.ar', passwordHash });
+    prisma.adminUser.findFirst.mockResolvedValue({ id: '1', email: 'admin@labrisa.com.ar', passwordHash });
 
     await expect(service.login('admin@labrisa.com.ar', 'wrong-password')).rejects.toThrow(UnauthorizedException);
   });
 
   it('returns an access token when credentials are valid', async () => {
     const passwordHash = await bcrypt.hash('correct-password', 10);
-    prisma.adminUser.findUnique.mockResolvedValue({ id: '1', email: 'admin@labrisa.com.ar', passwordHash });
+    prisma.adminUser.findFirst.mockResolvedValue({ id: '1', email: 'admin@labrisa.com.ar', passwordHash });
 
     const result = await service.login('admin@labrisa.com.ar', 'correct-password');
 
     expect(result).toEqual({ accessToken: 'signed-token' });
     expect(jwtService.signAsync).toHaveBeenCalledWith({ sub: '1', email: 'admin@labrisa.com.ar' });
+  });
+
+  it('finds the user whatever the case and surrounding spaces of the typed email', async () => {
+    const passwordHash = await bcrypt.hash('correct-password', 10);
+    prisma.adminUser.findFirst.mockResolvedValue({ id: '1', email: 'admin@labrisa.com.ar', passwordHash });
+
+    await service.login('  Admin@LaBrisa.com.ar ', 'correct-password');
+
+    expect(prisma.adminUser.findFirst).toHaveBeenCalledWith({
+      where: { email: { equals: 'Admin@LaBrisa.com.ar', mode: 'insensitive' } },
+    });
   });
 });

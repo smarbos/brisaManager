@@ -8,7 +8,7 @@ import { JwtStrategy } from './jwt.strategy';
 
 // Throttles /auth/login only (the only route in this module): a single admin account with no
 // lockout is otherwise open to unlimited password guessing. Per client IP — see the
-// 'trust proxy' setting in main.ts, which is what makes req.ip the real client behind Traefik.
+// 'trust proxy' setting in main.ts, which is what makes req.ip the real client behind Cloudflare and Traefik.
 @Module({
   imports: [
     PassportModule,

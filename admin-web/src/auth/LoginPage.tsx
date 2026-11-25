@@ -30,7 +30,16 @@ export function LoginPage() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <h1 className="font-heading text-2xl font-semibold text-heading">La Brisa - Admin</h1>
           <FormField label="Correo electrónico">
-            <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              required
+            />
           </FormField>
           <FormField label="Contraseña">
             <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required />

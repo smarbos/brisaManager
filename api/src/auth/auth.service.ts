@@ -11,7 +11,11 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string): Promise<{ accessToken: string }> {
-    const user = await this.prisma.adminUser.findUnique({ where: { email } });
+    // Emails are compared case-insensitively and without surrounding spaces: phones capitalize
+    // the first letter, and "Johanna@…" is the same mailbox as "johanna@…".
+    const user = await this.prisma.adminUser.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
+    });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
