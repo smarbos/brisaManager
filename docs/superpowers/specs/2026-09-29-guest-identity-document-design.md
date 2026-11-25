@@ -102,7 +102,7 @@ Document type, country (for passports) and number are **required**, both client-
 
 ### Full privacy notice (panel text)
 
-> **Responsable:** Damian Mantuano, Formosa 259, depto L. Contacto: contacto@labrisa.com.ar.
+> **Responsable:** Damian Mantuano, Formosa 259, depto L, Mar del Plata, provincia de Buenos Aires. Contacto: contacto@labrisa.com.ar.
 >
 > **Qué datos pedimos:** nombre, teléfono, email, tipo y número de documento y, si los enviás, comprobantes de pago.
 >
@@ -110,7 +110,7 @@ Document type, country (for passports) and number are **required**, both client-
 >
 > **Obligatorios:** nombre, teléfono, email y documento son necesarios para completar el check-in. Recibir promociones es opcional.
 >
-> **Con quién los compartimos:** proveedores que nos ayudan a operar: DigitalOcean (alojamiento de datos), Resend (emails), Twilio (WhatsApp) y Google (calendario de reservas, solo tu nombre). Algunos procesan datos fuera de Argentina. No vendemos tus datos.
+> **Con quién los compartimos:** proveedores que nos ayudan a operar: DigitalOcean (alojamiento de datos), Cloudflare (red y seguridad del sitio, y recepción de emails), Resend (emails), Twilio (WhatsApp) y Google (calendario de reservas: tu nombre, las fechas, la cantidad de huéspedes, el total, el estado y el canal de la reserva). Algunos procesan datos fuera de Argentina. No vendemos tus datos.
 >
 > **Cómo los protegemos:** conexión cifrada (HTTPS), número de documento cifrado y acceso restringido al personal.
 >
@@ -228,8 +228,8 @@ For each matching `ReservationImage` with `deletedAt: null`, it deletes the file
 These notice claims depend on the system and must be revisited if it changes:
 - the document number is encrypted (section 2);
 - receipts are deleted after the stay (section 6);
-- the list of providers (DigitalOcean, Resend, Twilio, Google);
-- Google receives only the guest's name (`GoogleCalendarPushService` event summary);
+- the list of providers (DigitalOcean, Cloudflare, Resend, Twilio, Google);
+- what Google receives: name, dates, guest count, total, status and channel (`GoogleCalendarPushService` event summary and description);
 - marketing only with consent (section 5).
 
 ## Out of scope
@@ -245,6 +245,6 @@ Tracked in TODO.md's "Personal-data protection" list:
 
 ## Open items
 
-- **Postal address city/province:** the owner gave "Formosa 259, depto L". Confirm whether the notice should add the city and province, e.g. "Mar del Plata, Buenos Aires".
+- **Postal address city/province:** added "Mar del Plata, provincia de Buenos Aires" (2026-11-25).
 - **Legal review:** the notice text, and especially the AAIP legend (reproduced from memory), should be checked by a lawyer against the current official wording before going live.
 - **AAIP registration:** registering the database with the Registro Nacional de Bases de Datos is an owner task, outside this codebase.

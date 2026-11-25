@@ -20,7 +20,7 @@ export interface PrivacyNoticeSection {
 export const PRIVACY_NOTICE: PrivacyNoticeSection[] = [
   {
     title: 'Responsable',
-    body: 'Damian Mantuano, Formosa 259, depto L. Contacto: contacto@labrisa.com.ar.',
+    body: 'Damian Mantuano, Formosa 259, depto L, Mar del Plata, provincia de Buenos Aires. Contacto: contacto@labrisa.com.ar.',
   },
   {
     title: 'Qué datos pedimos',
@@ -36,7 +36,7 @@ export const PRIVACY_NOTICE: PrivacyNoticeSection[] = [
   },
   {
     title: 'Con quién los compartimos',
-    body: 'proveedores que nos ayudan a operar: DigitalOcean (alojamiento de datos), Resend (emails), Twilio (WhatsApp) y Google (calendario de reservas, solo tu nombre). Algunos procesan datos fuera de Argentina. No vendemos tus datos.',
+    body: 'proveedores que nos ayudan a operar: DigitalOcean (alojamiento de datos), Cloudflare (red y seguridad del sitio, y recepción de emails), Resend (emails), Twilio (WhatsApp) y Google (calendario de reservas: tu nombre, las fechas, la cantidad de huéspedes, el total, el estado y el canal de la reserva). Algunos procesan datos fuera de Argentina. No vendemos tus datos.',
   },
   {
     title: 'Cómo los protegemos',
