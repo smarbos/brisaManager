@@ -1174,9 +1174,13 @@ describe('ReservationFormPage', () => {
     const depositBox = () => screen.getByRole('checkbox', { name: 'Pedir depósito de garantía' });
     const channel = () => screen.getByLabelText('Canal');
 
-    it('asks for nothing by default on a direct reservation, and for both on a Booking.com one', () => {
+    it('asks for both by default on direct and Booking.com reservations, and for nothing on Airbnb ones', () => {
       renderNewReservation();
 
+      expect(paymentBox()).toBeChecked();
+      expect(depositBox()).toBeChecked();
+
+      fireEvent.change(channel(), { target: { value: 'AIRBNB' } });
       expect(paymentBox()).not.toBeChecked();
       expect(depositBox()).not.toBeChecked();
 
@@ -1194,9 +1198,10 @@ describe('ReservationFormPage', () => {
       fireEvent.click(paymentBox());
 
       fireEvent.change(channel(), { target: { value: 'AIRBNB' } });
+      fireEvent.change(channel(), { target: { value: 'BOOKING' } });
 
-      expect(paymentBox()).toBeChecked();
-      expect(depositBox()).not.toBeChecked();
+      expect(paymentBox()).not.toBeChecked();
+      expect(depositBox()).toBeChecked();
     });
 
     it('sends the choice when creating a reservation', async () => {
@@ -1208,7 +1213,7 @@ describe('ReservationFormPage', () => {
       fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
 
       await waitFor(() =>
-        expect(createSpy).toHaveBeenLastCalledWith(expect.objectContaining({ askForPayment: true, askForDeposit: false })),
+        expect(createSpy).toHaveBeenLastCalledWith(expect.objectContaining({ askForPayment: false, askForDeposit: true })),
       );
     });
 

@@ -919,9 +919,9 @@ describe('ReservationsService', () => {
   describe('payment requests', () => {
     it.each([
       ['BOOKING' as const, true],
-      ['DIRECT' as const, false],
+      ['DIRECT' as const, true],
       ['AIRBNB' as const, false],
-      ['OTHER' as const, false],
+      ['OTHER' as const, true],
     ])('a new %s reservation asks for both payments by default: %s', async (source, asked) => {
       prisma.reservation.create.mockResolvedValue({ id: '1', ...validDto, source });
 

@@ -1,12 +1,13 @@
 import { defaultPaymentRequests, paymentsSettled } from './payment-requests';
 
 describe('defaultPaymentRequests', () => {
-  it('asks for the payment and the deposit on Booking.com reservations', () => {
-    expect(defaultPaymentRequests('BOOKING')).toEqual({ askForPayment: true, askForDeposit: true });
+  it.each(['BOOKING', 'DIRECT', 'OTHER'] as const)('asks for the payment and the deposit on %s reservations', (source) => {
+    expect(defaultPaymentRequests(source)).toEqual({ askForPayment: true, askForDeposit: true });
   });
 
-  it.each(['AIRBNB', 'DIRECT', 'OTHER'] as const)('asks for nothing on %s reservations', (source) => {
-    expect(defaultPaymentRequests(source)).toEqual({ askForPayment: false, askForDeposit: false });
+  // Airbnb guests pay through Airbnb, which doesn't allow collecting payment outside it.
+  it('asks for nothing on Airbnb reservations', () => {
+    expect(defaultPaymentRequests('AIRBNB')).toEqual({ askForPayment: false, askForDeposit: false });
   });
 });
 

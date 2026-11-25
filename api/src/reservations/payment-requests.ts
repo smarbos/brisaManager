@@ -5,8 +5,10 @@ import { Reservation, ReservationSource } from '@prisma/client';
 // Chrome extension's review panel.
 export type PaymentRequests = Pick<Reservation, 'askForPayment' | 'askForDeposit'>;
 
+// Airbnb guests pay through Airbnb, which doesn't allow collecting payment outside it; every
+// other channel starts asking for both.
 export function defaultPaymentRequests(source: ReservationSource): PaymentRequests {
-  const asked = source === 'BOOKING';
+  const asked = source !== 'AIRBNB';
   return { askForPayment: asked, askForDeposit: asked };
 }
 
